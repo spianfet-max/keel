@@ -19,7 +19,7 @@ Only public market data passes through Keel. Pages send ticker symbols and param
 
 1. Create an empty GitHub repo called `keel` and push this folder to it.
 2. On Render: **New + → Blueprint**, pick the repo. `render.yaml` creates two services in Singapore:
-   - `keel-api` — the REST API (`/health`, `/docs`, `/api/...`)
+   - `keel-api` — the REST API (`/health`, `/docs`, `/api/...`); deployed at `https://keel-api-tqpz.onrender.com`
    - `keel-mcp` — the same routes as MCP tools at `/mcp`
 3. Optional: set `KEEL_TOKEN` on `keel-api` to require an `x-keel-token` header (or `?token=`). Leave it empty if the REST API should stay open; it only serves public data.
 
@@ -30,7 +30,7 @@ Free instances sleep after 15 minutes; the first call after that takes about a m
 claude.ai → Settings → Connectors → **Add custom connector**
 
 - Name: **`Keel`** (exactly — the artifacts look for this name)
-- URL: `https://keel-mcp.onrender.com/mcp` (your service URL + `/mcp`)
+- URL: the `keel-mcp` service address shown on Render + `/mcp` (Render adds a suffix, e.g. `keel-mcp-xxxx.onrender.com`)
 
 Then open any of the artifacts and allow Keel when asked. Until then they show clearly labelled sample figures.
 

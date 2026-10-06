@@ -74,7 +74,7 @@ function setStatus(state,code,message){
 }
 function howHtml(){return `<b>${T('Connect live data (one time)','ライブデータの接続（初回のみ）')}</b><ol>
 <li>${T('Deploy the Keel repo on Render (Blueprint). It creates <code>keel-api</code> and <code>keel-mcp</code>.','KeelリポジトリをRenderにデプロイ（Blueprint）。<code>keel-api</code>と<code>keel-mcp</code>が作成されます。')}</li>
-<li>${T('In claude.ai, Settings → Connectors → Add custom connector. Name it exactly <code>Keel</code>; URL <code>https://keel-mcp.onrender.com/mcp</code> (your service URL + /mcp).','claude.aiの設定 → コネクタ → カスタムコネクタを追加。名前は必ず<code>Keel</code>、URLは<code>https://keel-mcp.onrender.com/mcp</code>（サービスURL＋/mcp）。')}</li>
+<li>${T('In claude.ai, Settings → Connectors → Add custom connector. Name it exactly <code>Keel</code>; URL: your <code>keel-mcp</code> service address on Render + <code>/mcp</code>.','claude.aiの設定 → コネクタ → カスタムコネクタを追加。名前は必ず<code>Keel</code>、URLはRenderの<code>keel-mcp</code>のアドレス＋<code>/mcp</code>。')}</li>
 <li>${T('Reload this page and allow Keel when asked.','このページを再読み込みし、確認が出たらKeelを許可します。')}</li></ol>
 <p class="note" style="margin-top:8px">${T('Only ticker symbols and parameters are sent. Public market data from OpenBB providers; free sources can be delayed.','送信されるのはティッカーとパラメータのみ。データはOpenBB経由の公開市場データで、無料ソースのため遅延する場合があります。')}</p>`}
 
