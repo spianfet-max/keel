@@ -1,0 +1,168 @@
+<title>Arcade</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@300;400;500;600&family=Noto+Sans+JP:wght@300;400&display=swap">
+<style>
+/*CORE_CSS*/
+/* Arcade: peer board for Japan's listed games makers, then a collar planner for one concentrated holding. The selected name is drawn in red everywhere; peers stay grey. */
+tr.sel td{background:var(--tint)}
+tbody tr{cursor:pointer}
+.col-in{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px 22px;align-items:end}
+.fld{display:flex;flex-direction:column;gap:5px;min-width:0}
+.fld .row{display:flex;gap:8px;align-items:center}
+.fld output{font-variant-numeric:tabular-nums;min-width:44px}
+.fld input[type=number]{width:100%}
+.out{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:0;margin-top:18px;border-top:1px solid var(--rule)}
+.out .kpi{padding-top:14px}
+.say{font-size:15px;line-height:1.55;max-width:76ch;margin:16px 0 0}
+.say b{font-weight:500}
+</style>
+
+<div class="app">
+  <header class="top">
+    <div class="brand"><h1 data-ja="アーケード">Arcade</h1><span data-ja="日本のゲーム上場企業の比較と、創業者の保有株を守る手段">Japan’s listed games makers side by side, and what a founder can do with a concentrated stake</span></div>
+    <div class="tright">
+      <span class="pill busy" id="status"><i></i></span>
+      <button class="btn q" id="refresh" data-ja="更新">Refresh</button>
+      <button class="btn q" id="themeBtn">Dark</button>
+      <div class="seg" id="langSeg"><button data-l="en">EN</button><button data-l="ja">日本語</button></div>
+    </div>
+  </header>
+  <div class="banner" id="banner" hidden></div>
+  <div class="help" id="how" hidden></div>
+
+  <section class="sec">
+    <div class="sh"><h2 data-ja="同業比較">Peer board</h2><p data-ja="行をクリックすると下の分析対象に設定。列見出しで並べ替え。">Click a row to analyse that company below. Click a column heading to sort.</p></div>
+    <div class="tw"><table id="tbl"></table></div>
+  </section>
+
+  <section class="sec two">
+    <div style="min-width:0">
+      <div class="sh"><h2 data-ja="1年の株価（100に指数化）">One year, rebased to 100</h2><p id="relSub"></p></div>
+      <svg class="ch" id="rel" height="270"></svg>
+      <div class="leg" id="relLeg"></div>
+    </div>
+    <div style="min-width:0">
+      <div class="sh"><h2 data-ja="相関（1年）">How they move together (1 year)</h2><p data-ja="選択銘柄と各社の日次リターン相関。相関が高い同業株は分散効果が小さい。">Correlation of daily returns with the selected company. Selling one games stock to buy another diversifies little when this is high.</p></div>
+      <svg class="ch" id="cor" height="270"></svg>
+    </div>
+  </section>
+
+  <section class="sec">
+    <div class="sh"><h2 id="colT"></h2><p data-ja="プットで下値を守り、コールを売ってその費用を賄うゼロコスト・カラー。ブラック・ショールズ（配当利回り・円金利込み）による概算で、実際の条件は市場とスキューで決まります。">A zero-cost collar: buy a put to set a floor, sell a call to pay for it. Black–Scholes estimate with dividend yield and yen rates; real terms depend on the dealer’s volatility and skew.</p></div>
+    <div class="col-in">
+      <div class="fld"><span class="lbl" data-ja="保有株数">Shares held</span><input type="number" id="sh" min="0" step="10000"></div>
+      <div class="fld"><span class="lbl" data-ja="期間">Tenor</span><div class="seg" id="ten"><button data-v="1" data-ja="1年">1Y</button><button data-v="2" data-ja="2年">2Y</button><button data-v="3" data-ja="3年">3Y</button></div></div>
+      <div class="fld"><span class="lbl" data-ja="下値保護（プット行使価格）">Floor (put strike)</span><div class="row"><input type="range" id="put" min="60" max="95" step="5"><output id="putO"></output></div></div>
+      <div class="fld"><span class="lbl" data-ja="ボラティリティ">Volatility</span><div class="row"><input type="range" id="vol" min="10" max="70" step="1"><output id="volO"></output></div></div>
+      <div class="fld"><span class="lbl" data-ja="スキュー（プットとコールのボラ差）">Skew (put vol − call vol)</span><div class="row"><input type="range" id="skew" min="0" max="10" step="1"><output id="skewO"></output></div></div>
+    </div>
+    <div class="out" id="colOut"></div>
+    <p class="say" id="say"></p>
+    <div style="margin-top:14px">
+      <svg class="ch" id="pay" height="260"></svg>
+      <div class="leg" id="payLeg"></div>
+    </div>
+  </section>
+  <p class="note" id="method"></p>
+</div>
+
+<script>
+const SAMPLE=/*SAMPLE*/;
+/*CORE_JS*/
+const PEERS='7974.T,6758.T,9697.T,7832.T,9766.T,6460.T,9684.T,3635.T';
+const JANAME={'7974.T':'任天堂','6758.T':'ソニーグループ','9697.T':'カプコン','7832.T':'バンダイナムコ','9766.T':'コナミグループ','6460.T':'セガサミー','9684.T':'スクウェア・エニックス','3635.T':'コーエーテクモ'};
+const ENNAME={'7974.T':'Nintendo','6758.T':'Sony Group','9697.T':'Capcom','7832.T':'Bandai Namco','9766.T':'Konami Group','6460.T':'Sega Sammy','9684.T':'Square Enix','3635.T':'Koei Tecmo'};
+const nm=r=>JA()?(JANAME[r.symbol]||r.name||r.symbol):(ENNAME[r.symbol]||r.name||r.symbol);
+let S={sel:'7974.T',sort:'market_cap',dir:-1,sh:1000000,ten:1,put:85,vol:null,skew:3};
+try{const j=JSON.parse(localStorage.getItem('arcade')||'null');if(j)S={...S,...j,vol:null}}catch(e){}
+const save=()=>{try{localStorage.setItem('arcade',JSON.stringify({...S,vol:null}))}catch(e){}};
+let DATA=SAMPLE,LIVE=false;
+const pc=v=>v==null?null:(Math.abs(v)<=2?v*100:v); /* normalised percent -> % */
+
+/* Black-Scholes, as in Keel's analytics.py */
+const ncdf=x=>{const t=1/(1+.2316419*Math.abs(x)),d=.3989423*Math.exp(-x*x/2),p=d*t*(.3193815+t*(-.3565638+t*(1.781478+t*(-1.821256+t*1.330274))));return x>0?1-p:p};
+function bs(kind,s,k,t,r,q,v){if(t<=0||v<=0)return Math.max(0,kind==='call'?s-k:k-s);const d1=(Math.log(s/k)+(r-q+v*v/2)*t)/(v*Math.sqrt(t)),d2=d1-v*Math.sqrt(t);
+  return kind==='call'?s*Math.exp(-q*t)*ncdf(d1)-k*Math.exp(-r*t)*ncdf(d2):k*Math.exp(-r*t)*ncdf(-d2)-s*Math.exp(-q*t)*ncdf(-d1)}
+function zcCall(s,pk,t,r,q,v,sk){const target=bs('put',s,pk,t,r,q,v+sk),cv=Math.max(.01,v);let lo=s*1.0001,hi=s*5;
+  if(bs('call',s,lo,t,r,q,cv)<target)return null;for(let i=0;i<80;i++){const mid=(lo+hi)/2;if(bs('call',s,mid,t,r,q,cv)>target)lo=mid;else hi=mid}return(lo+hi)/2}
+
+function cur(){return(DATA.rows||[]).find(r=>r.symbol===S.sel)||(DATA.rows||[])[0]}
+function render(){
+  const rows=(DATA.rows||[]);
+  const cols=[['name',T('Company','企業'),r=>nm(r)],['market_cap',T('Market cap','時価総額'),r=>r.market_cap],['pe','P/E',r=>r.pe],['fwd_pe',T('Fwd P/E','予想P/E'),r=>r.fwd_pe],['ev_ebitda','EV/EBITDA',r=>r.ev_ebitda],
+    ['op_margin',T('Op. margin','営業利益率'),r=>pc(r.op_margin)],['rev_growth',T('Sales growth','売上成長'),r=>pc(r.rev_growth)],['div_yield',T('Div. yield','配当利回り'),r=>pc(r.div_yield)],
+    ['chg_ytd','YTD',r=>r.chg_ytd],['chg_1y','1Y',r=>r.chg_1y],['vol_1y',T('Vol 1Y','ボラ1Y'),r=>r.vol_1y]];
+  const getter=Object.fromEntries(cols.map(c=>[c[0],c[2]]));
+  const sorted=[...rows].sort((a,b)=>{const x=getter[S.sort](a),y=getter[S.sort](b);if(x==null)return 1;if(y==null)return-1;return typeof x==='string'?S.dir*x.localeCompare(y):S.dir*(x-y)});
+  const f={market_cap:v=>'¥'+big(v),pe:v=>num(v,1),fwd_pe:v=>num(v,1),ev_ebitda:v=>num(v,1),op_margin:v=>num(v,1)+'%',rev_growth:v=>`<span class="${cls(v)}">${pct(v,1)}</span>`,div_yield:v=>num(v,1)+'%',chg_ytd:v=>`<span class="${cls(v)}">${pct(v,1)}</span>`,chg_1y:v=>`<span class="${cls(v)}">${pct(v,1)}</span>`,vol_1y:v=>num(v,1)+'%'};
+  $('#tbl').innerHTML=`<thead><tr>${cols.map(c=>`<th class="sort${S.sort===c[0]?' on':''}" data-k="${c[0]}">${c[1]}${S.sort===c[0]?(S.dir<0?' ↓':' ↑'):''}</th>`).join('')}</tr></thead><tbody>`+
+    sorted.map(r=>`<tr class="${r.symbol===S.sel?'sel':''}" data-s="${esc(r.symbol)}" tabindex="0"><td>${esc(nm(r))}<span class="nm">${esc(r.symbol)}</span></td>${cols.slice(1).map(c=>{const v=getter[c[0]](r);return`<td>${v==null?'—':f[c[0]](v)}</td>`}).join('')}</tr>`).join('')+'</tbody>';
+  $$('#tbl th.sort').forEach(th=>th.onclick=()=>{const k=th.dataset.k;if(S.sort===k)S.dir*=-1;else{S.sort=k;S.dir=k==='name'?1:-1}save();render()});
+  $$('#tbl tbody tr').forEach(tr=>{const pick=()=>{S.sel=tr.dataset.s;S.vol=null;save();render()};tr.onclick=pick;tr.onkeydown=e=>{if(e.key==='Enter')pick()}});
+
+  const c=cur();if(!c)return;
+  /* rebased chart */
+  const red=cssv('--red');
+  const ser=rows.map(r=>{const sp=r.spark||[];const b=sp[0]?.v;return{name:nm(r),color:r.symbol===S.sel?red:cssv('--line'),width:r.symbol===S.sel?2.2:1.2,pts:sp.map(p=>({x:+new Date(p.d+'T00:00:00'),y:b?p.v/b*100:null})),sel:r.symbol===S.sel}});
+  ser.sort((a,b)=>a.sel-b.sel);
+  lineChart($('#rel'),ser,{h:270,xType:'date',yFmt:v=>num(v,0),tipFmt:v=>num(v,1)});
+  legend($('#relLeg'),[{name:nm(c),color:red},{name:T('Peers','同業他社'),color:cssv('--mute')}]);
+  $('#relSub').textContent=T(`${nm(c)} ${pct(c.chg_1y)} over the year; peer median ${pct(median(rows.filter(r=>r!==c).map(r=>r.chg_1y)))}. Largest fall from peak: ${pct(c.max_dd_1y)}.`,`${nm(c)}は1年で${pct(c.chg_1y)}、同業中央値${pct(median(rows.filter(r=>r!==c).map(r=>r.chg_1y)))}。高値からの最大下落${pct(c.max_dd_1y)}。`);
+
+  /* correlation bars vs selected */
+  const cm=DATA.corr||{};const i0=(cm.symbols||[]).indexOf(c.symbol);const svg=$('#cor'),w=W(svg);
+  if(i0>=0){const items=cm.symbols.map((s,j)=>({s,v:cm.matrix[i0][j]})).filter(x=>x.s!==c.symbol).sort((a,b)=>b.v-a.v);
+    const m={l:128,r:40,t:6,b:22},rowH=Math.min(30,(270-m.t-m.b)/items.length),h=m.t+m.b+rowH*items.length,X=v=>m.l+Math.max(0,v)*(w-m.l-m.r);
+    let g='';[0,.25,.5,.75,1].forEach(t=>g+=`<line class="grd" x1="${X(t)}" x2="${X(t)}" y1="${m.t}" y2="${h-m.b}"/><text x="${X(t)}" y="${h-6}" text-anchor="middle">${t}</text>`);
+    items.forEach((it,k)=>{const y=m.t+k*rowH,r=rows.find(x=>x.symbol===it.s)||{symbol:it.s};
+      g+=`<text x="${m.l-8}" y="${y+rowH/2+4}" text-anchor="end" style="fill:var(--ink)">${esc(nm(r))}</text><rect x="${m.l}" y="${y+rowH*.22}" width="${Math.max(1,X(it.v)-m.l)}" height="${rowH*.56}" fill="var(--steel)"/><text x="${X(it.v)+5}" y="${y+rowH/2+4}">${num(it.v,2)}</text>`});
+    svg.setAttribute('viewBox',`0 0 ${w} ${h}`);svg.setAttribute('height',h);svg.innerHTML=g}
+  else svg.innerHTML='';
+
+  collar(c);
+}
+function median(a){const v=a.filter(x=>x!=null).sort((x,y)=>x-y);return v.length?v[Math.floor(v.length/2)]:null}
+function collar(c){
+  if(S.vol==null)S.vol=Math.round(c.vol_1y||30);
+  $('#sh').value=S.sh;$('#put').value=S.put;$('#putO').textContent=S.put+'%';$('#vol').value=S.vol;$('#volO').textContent=S.vol+'%';$('#skew').value=S.skew;$('#skewO').textContent=S.skew+' pts';
+  $$('#ten button').forEach(b=>b.classList.toggle('on',+b.dataset.v===S.ten));
+  $('#colT').textContent=T(`Protecting a stake in ${nm(c)}`,`${nm(c)}株の保有を守る`);
+  const s=c.last||100,t=S.ten,r=(DATA.jpy_1y??0.8)/100,q=(pc(c.div_yield)||0)/100,v=S.vol/100,sk=S.skew/100,pk=s*S.put/100;
+  const ck=zcCall(s,pk,t,r,q,v,sk);const val=s*S.sh;
+  const putCost=bs('put',s,pk,t,r,q,v+sk);
+  const ccInc=bs('call',s,s*1.2,t,r,q,v)/s*100;
+  const capPct=ck?ck/s*100-100:null;
+  $('#colOut').innerHTML=[
+    [T('Stake today','現在の保有額'),'¥'+big(val),T(`${S.sh.toLocaleString()} shares at ¥${px(s)}`,`${S.sh.toLocaleString()}株 × ¥${px(s)}`)],
+    [T('Floor','下限'),'¥'+big(pk*S.sh),T(`put at ¥${px(pk)} · costs ${num(putCost/s*100,1)}% alone`,`プット ¥${px(pk)} · 単独では${num(putCost/s*100,1)}%`)],
+    [T('Cap for zero cost','ゼロコストの上限'),ck?'¥'+big(ck*S.sh):'—',ck?T(`call at ¥${px(ck)}, +${num(capPct,0)}% upside kept`,`コール ¥${px(ck)}、上昇余地 +${num(capPct,0)}%`):T('Floor too high to finance','下限が高すぎて賄えません')],
+    [T('Covered call income','カバードコール収入'),num(ccInc,1)+'%',T(`selling a ${t}Y call 20% out of the money`,`${t}年・20%アウトのコール売り`)]]
+    .map(([l,v2,s2])=>`<div class="kpi"><span class="lbl">${l}</span><span class="v">${v2}</span><span class="s">${s2}</span></div>`).join('');
+  $('#say').innerHTML=ck?T(`Over ${t} year${t>1?'s':''}, the stake can be held between <b>${S.put}%</b> and <b>${num(ck/s*100,0)}%</b> of today’s price at no upfront cost. The worst case is a loss of ¥${big((s-pk)*S.sh)}; the price for that is giving up gains beyond ¥${px(ck)} a share. Dividends stay with the holder. A Lombard loan against the hedged shares can usually lend more than against unhedged stock.`,
+    `${t}年間、保有株を現在値の<b>${S.put}%</b>から<b>${num(ck/s*100,0)}%</b>の範囲に、初期費用なしで固定できます。最悪でも損失は¥${big((s-pk)*S.sh)}、その代わり1株¥${px(ck)}を超える上昇は放棄します。配当は保有者が受け取ります。ヘッジ済み株式を担保にしたロンバード融資は、通常ヘッジなしより高い掛目が見込めます。`):
+    T('At this floor the put costs more than any call can pay for. Lower the floor or lengthen the tenor.','この下限ではプット費用をコール売りで賄えません。下限を下げるか期間を延ばしてください。');
+  /* payoff */
+  const xs=[];for(let p=40;p<=200;p+=2)xs.push(p);
+  const ps=[{name:T('Shares only','現物のみ'),color:cssv('--mute'),pts:xs.map(p=>({x:p,y:p-100}))},
+    {name:T('With collar','カラー付き'),color:cssv('--red'),width:2.2,pts:xs.map(p=>{const sp=s*p/100;let vv=Math.max(sp,pk);if(ck)vv=Math.min(vv,ck);return{x:p,y:vv/s*100-100}})}];
+  lineChart($('#pay'),ps,{h:260,zero:true,xTicks:[40,60,80,100,120,140,160,180,200],xFmt:v=>v+'%',tipX:v=>T(`Price at maturity ${v}% of today`,`満期時株価 現在比${v}%`),yFmt:v=>(v>0?'+':'')+num(v,0)+'%',tipFmt:v=>pct(v,0)});
+  legend($('#payLeg'),ps);
+  $('#method').innerHTML=T(`<b>Data.</b> Valuation and margins from Yahoo Finance key statistics through OpenBB; returns and volatility from daily closes. Collar uses the 1-year JGB yield (${num(DATA.jpy_1y,2)}%) as the yen rate and the company’s dividend yield; volatility defaults to one-year realised. Indicative only; listed Japanese single-stock options are thin, so real collars are priced OTC. ${LIVE?'':'<b>Sample figures, not real company data.</b>'}`,
+    `<b>データ。</b>バリュエーションと利益率はOpenBB経由のYahoo Finance、リターンとボラは日次終値から。カラーは円金利に日本国債1年（${num(DATA.jpy_1y,2)}%）、各社の配当利回りを使用し、ボラは1年実現ボラが初期値。参考値です。日本の個別株オプションは流動性が低く、実際のカラーは相対取引で値決めされます。${LIVE?'':'<b>サンプル数値であり、実際の企業データではありません。</b>'}`);
+}
+window.redraw=render;
+async function load(fresh){setStatus('busy');
+  const r=await keel('api_comps',{symbols:PEERS},{fresh});
+  if(r.ok&&r.data&&r.data.rows){DATA=r.data;LIVE=true;setStatus('live')}else{DATA=SAMPLE;LIVE=false;setStatus(r.code==='no_mcp'?'sample':'err',r.code,r.message)}
+  S.vol=null;render()}
+$('#sh').oninput=e=>{S.sh=Math.max(0,+e.target.value||0);save();collar(cur())};
+$('#put').oninput=e=>{S.put=+e.target.value;save();collar(cur())};
+$('#vol').oninput=e=>{S.vol=+e.target.value;collar(cur())};
+$('#skew').oninput=e=>{S.skew=+e.target.value;save();collar(cur())};
+$$('#ten button').forEach(b=>b.onclick=()=>{S.ten=+b.dataset.v;save();collar(cur())});
+$('#refresh').onclick=()=>load(true);
+$('#how').innerHTML=howHtml();
+$$('#langSeg button').forEach(b=>b.onclick=()=>{setLang(b.dataset.l);$('#how').innerHTML=howHtml();restatus();render()});
+setLang(LANG);render();load(false);
+</script>

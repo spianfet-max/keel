@@ -1,0 +1,413 @@
+"""Data access for Keel. Every outside call goes through here.
+
+Most data comes from OpenBB's Open Data Platform (`from openbb import obb`):
+  * prices, quotes, fundamentals, news, company and economic calendars -> yfinance extension
+  * US Treasury curve -> Federal Reserve (H.15), no key needed
+  * EUR AAA curve -> ECB, no key needed
+  * CPI -> OECD, no key needed
+Two gaps are filled directly:
+  * JGB curve -> Japan Ministry of Finance CSV (not in OpenBB)
+  * option implied vols -> the yfinance library that OpenBB's yfinance extension ships with
+
+Results are cached in memory (Render's free instance sleeps; the first call after
+waking is slow, later ones are instant).
+"""
+
+from __future__ import annotations
+
+import io
+import logging
+import threading
+import time
+from concurrent.futures import ThreadPoolExecutor
+from datetime import date, datetime, timedelta
+from functools import wraps
+
+import httpx
+import numpy as np
+import pandas as pd
+
+from .analytics import to_percent
+
+log = logging.getLogger("keel.data")
+
+_obb = None
+
+
+def obb():
+    """Import OpenBB lazily so tests and cold start stay fast."""
+    global _obb
+    if _obb is None:
+        from openbb import obb as _o  # noqa: PLC0415
+
+        _obb = _o
+        try:
+            _o.user.preferences.output_type = "OBBject"
+        except Exception:  # pragma: no cover
+            pass
+    return _obb
+
+
+# --------------------------------------------------------------------------- #
+# Cache
+# --------------------------------------------------------------------------- #
+
+_cache: dict = {}
+_lock = threading.Lock()
+
+
+def cached(ttl: int):
+    def deco(fn):
+        @wraps(fn)
+        def wrapper(*args, **kwargs):
+            key = (fn.__name__, args, tuple(sorted(kwargs.items())))
+            now = time.time()
+            with _lock:
+                hit = _cache.get(key)
+                if hit and now - hit[0] < ttl:
+                    return hit[1]
+            val = fn(*args, **kwargs)
+            with _lock:
+                _cache[key] = (now, val)
+            return val
+
+        wrapper.cache_clear = lambda: _cache.clear()  # type: ignore[attr-defined]
+        return wrapper
+
+    return deco
+
+
+def _df(result) -> pd.DataFrame:
+    """OBBject -> flat DataFrame with a 'date' column when there is one."""
+    if result is None:
+        return pd.DataFrame()
+    if isinstance(result, pd.DataFrame):
+        df = result
+    elif hasattr(result, "to_dataframe"):
+        df = result.to_dataframe()
+    elif hasattr(result, "results"):
+        df = pd.DataFrame([r.model_dump() if hasattr(r, "model_dump") else r for r in result.results])
+    else:
+        df = pd.DataFrame(result)
+    if df.index.name in ("date", "Date") or isinstance(df.index, pd.DatetimeIndex):
+        df = df.reset_index().rename(columns={"index": "date", "Date": "date"})
+    return df
+
+
+def _pool(fn, items, workers: int = 6) -> dict:
+    out = {}
+    with ThreadPoolExecutor(max_workers=workers) as ex:
+        futs = {it: ex.submit(fn, it) for it in items}
+        for it, f in futs.items():
+            try:
+                out[it] = f.result()
+            except Exception as e:  # noqa: BLE001
+                log.warning("fetch %s failed: %s", it, e)
+                out[it] = None
+    return out
+
+
+# --------------------------------------------------------------------------- #
+# Prices
+# --------------------------------------------------------------------------- #
+
+
+@cached(ttl=900)
+def closes(symbol: str, years: float = 3) -> pd.Series:
+    """Daily closes for any Yahoo symbol (stocks 7974.T, FX USDJPY=X, indices ^N225)."""
+    start = (date.today() - timedelta(days=int(365.25 * years) + 7)).isoformat()
+    res = obb().yfinance.equity.price.historical(symbol=symbol, start_date=start)
+    df = _df(res)
+    if df.empty or "close" not in df:
+        raise ValueError(f"no prices for {symbol}")
+    s = pd.Series(pd.to_numeric(df["close"], errors="coerce").values, index=pd.to_datetime(df["date"]))
+    s = s[~s.index.duplicated(keep="last")].sort_index().dropna()
+    s.name = symbol
+    return s
+
+
+def many_closes(symbols: list[str], years: float = 3) -> dict[str, pd.Series]:
+    got = _pool(lambda s: closes(s, years), symbols)
+    return {k: v for k, v in got.items() if v is not None and len(v) > 0}
+
+
+@cached(ttl=3600)
+def metrics(symbols: tuple[str, ...]) -> dict[str, dict]:
+    """Valuation and profile numbers per symbol (yfinance key metrics + quote)."""
+    out: dict[str, dict] = {s: {} for s in symbols}
+    try:
+        df = _df(obb().yfinance.equity.fundamental.metrics(symbol=",".join(symbols)))
+        for _, row in df.iterrows():
+            sym = row.get("symbol")
+            if sym in out:
+                out[sym].update({k: _clean(v) for k, v in row.items()})
+    except Exception as e:  # noqa: BLE001
+        log.warning("metrics failed: %s", e)
+    try:
+        q = _df(obb().yfinance.equity.price.quote(symbol=",".join(symbols)))
+        for _, row in q.iterrows():
+            sym = row.get("symbol")
+            if sym in out:
+                for k in ("name", "currency", "exchange", "last_price", "prev_close", "year_high", "year_low"):
+                    if k in row and row[k] is not None:
+                        out[sym].setdefault(k, _clean(row[k]))
+    except Exception as e:  # noqa: BLE001
+        log.warning("quote failed: %s", e)
+    return out
+
+
+def _clean(v):
+    if isinstance(v, (np.floating, float)):
+        return None if np.isnan(v) else float(v)
+    if isinstance(v, (np.integer,)):
+        return int(v)
+    if isinstance(v, (pd.Timestamp, datetime, date)):
+        return str(v)[:10]
+    return v
+
+
+# --------------------------------------------------------------------------- #
+# News and calendars
+# --------------------------------------------------------------------------- #
+
+
+@cached(ttl=900)
+def news(symbol: str, limit: int = 6) -> list[dict]:
+    df = _df(obb().yfinance.news(symbol=symbol, limit=limit, fetch_body=False))
+    items = []
+    for _, r in df.head(limit).iterrows():
+        items.append(
+            {
+                "title": r.get("title"),
+                "date": _clean(r.get("date")),
+                "source": r.get("author") or r.get("source"),
+                "url": r.get("url"),
+                "symbol": symbol,
+            }
+        )
+    return items
+
+
+@cached(ttl=3600)
+def econ_calendar(days: int = 14) -> list[dict]:
+    start = date.today()
+    end = start + timedelta(days=days)
+    df = _df(obb().yfinance.economy.calendar(start_date=start.isoformat(), end_date=end.isoformat()))
+    keep = ["date", "country", "event", "importance", "consensus", "previous", "actual", "reference_period"]
+    rows = []
+    for _, r in df.iterrows():
+        rows.append({k: _clean(r.get(k)) for k in keep})
+    return rows
+
+
+@cached(ttl=3600)
+def company_events(symbols: tuple[str, ...]) -> list[dict]:
+    df = _df(obb().yfinance.company_calendar(symbol=",".join(symbols)))
+    rows = []
+    for _, r in df.iterrows():
+        rows.append(
+            {
+                "symbol": r.get("symbol"),
+                "earnings_date": _clean(r.get("earnings_date")),
+                "ex_dividend_date": _clean(r.get("ex_dividend_date")),
+            }
+        )
+    return rows
+
+
+# --------------------------------------------------------------------------- #
+# Curves
+# --------------------------------------------------------------------------- #
+
+UST_COLS = {
+    "month_1": 1 / 12,
+    "month_3": 0.25,
+    "month_6": 0.5,
+    "year_1": 1,
+    "year_2": 2,
+    "year_3": 3,
+    "year_5": 5,
+    "year_7": 7,
+    "year_10": 10,
+    "year_20": 20,
+    "year_30": 30,
+}
+
+
+@cached(ttl=3 * 3600)
+def ust_history(years: float = 3) -> pd.DataFrame:
+    """Daily Treasury par yields in %, columns as years-to-maturity floats."""
+    start = (date.today() - timedelta(days=int(365.25 * years))).isoformat()
+    df = _df(obb().federal_reserve.treasury_rates(start_date=start))
+    df["date"] = pd.to_datetime(df["date"])
+    df = df.set_index("date").sort_index()
+    out = pd.DataFrame({yrs: to_percent(df[c]) for c, yrs in UST_COLS.items() if c in df})
+    return out.dropna(how="all")
+
+
+def _maturity_years(m) -> float | None:
+    if m is None:
+        return None
+    s = str(m)
+    if "_" in s:
+        parts = s.split("_")
+        try:
+            months = sum(int(parts[i + 1]) * (12 if parts[i] == "year" else 1) for i in range(0, len(parts), 2))
+            return months / 12
+        except (ValueError, IndexError):
+            return None
+    try:
+        return float(s)
+    except ValueError:
+        return None
+
+
+@cached(ttl=3 * 3600)
+def ecb_curve(on: str | None = None) -> dict[float, float]:
+    """Euro area AAA par-yield curve (proxy for Bunds) in %."""
+    kw = {"rating": "aaa", "yield_curve_type": "par_yield"}
+    if on:
+        kw["date"] = on
+    df = _df(obb().ecb.yield_curve(**kw))
+    if df.empty:
+        return {}
+    if "date" in df:
+        df = df[df["date"] == df["date"].max()]
+    yrs = df["maturity"].map(_maturity_years) if "maturity" in df else None
+    if yrs is None and "maturity_years" in df:
+        yrs = df["maturity_years"]
+    rates = to_percent(df["rate"])
+    return {float(y): float(r) for y, r in zip(yrs, rates) if y is not None and pd.notna(r)}
+
+
+MOF_CURRENT = "https://www.mof.go.jp/english/policy/jgbs/reference/interest_rate/jgbcme.csv"
+MOF_ALL = "https://www.mof.go.jp/english/policy/jgbs/reference/interest_rate/historical/jgbcme_all.csv"
+
+
+def parse_mof_csv(text: str) -> pd.DataFrame:
+    """Parse the MOF JGB benchmark CSV into a date-indexed frame, columns = years.
+
+    The file starts with a title line, then a header like
+    'Date,1Y,2Y,...,40Y'. Missing points are '-'. Dates are Gregorian
+    in the English file (2026/10/1); older files may use era dates (R8.10.1).
+    """
+    lines = text.splitlines()
+    hdr = next(i for i, l in enumerate(lines) if l.lower().startswith("date"))
+    df = pd.read_csv(io.StringIO("\n".join(lines[hdr:])), na_values=["-", ""])
+    df = df.rename(columns={df.columns[0]: "date"})
+    df["date"] = df["date"].map(_parse_jp_date)
+    df = df.dropna(subset=["date"]).set_index("date").sort_index()
+    cols = {}
+    for c in df.columns:
+        cs = str(c).strip().upper()
+        if cs.endswith("Y"):
+            try:
+                cols[c] = float(cs[:-1])
+            except ValueError:
+                pass
+    df = df[list(cols)].rename(columns=cols).apply(pd.to_numeric, errors="coerce")
+    return df
+
+
+_ERAS = {"R": 2018, "H": 1988, "S": 1925}
+
+
+def _parse_jp_date(s) -> pd.Timestamp | None:
+    s = str(s).strip()
+    if not s:
+        return None
+    if s[0] in _ERAS and "." in s:
+        try:
+            y, m, d = s[1:].split(".")
+            return pd.Timestamp(_ERAS[s[0]] + int(y), int(m), int(d))
+        except ValueError:
+            return None
+    try:
+        return pd.Timestamp(s.replace(".", "/"))
+    except (ValueError, TypeError):
+        return None
+
+
+@cached(ttl=6 * 3600)
+def jgb_history() -> pd.DataFrame:
+    frames = []
+    with httpx.Client(timeout=30, headers={"User-Agent": "keel/1.0"}) as c:
+        for url in (MOF_ALL, MOF_CURRENT):
+            try:
+                r = c.get(url)
+                r.raise_for_status()
+                frames.append(parse_mof_csv(r.content.decode("utf-8", errors="replace")))
+            except Exception as e:  # noqa: BLE001
+                log.warning("MOF %s failed: %s", url, e)
+    if not frames:
+        raise ValueError("JGB data unavailable")
+    df = pd.concat(frames)
+    return df[~df.index.duplicated(keep="last")].sort_index()
+
+
+# --------------------------------------------------------------------------- #
+# Options (implied vol)
+# --------------------------------------------------------------------------- #
+
+
+@cached(ttl=1800)
+def implied_vol(symbol: str, target_days: int = 365) -> dict:
+    """ATM implied vol and 90% put skew at the expiry nearest target_days.
+
+    Uses the yfinance library bundled with OpenBB's yfinance extension. Coverage is
+    good for US names and thin for most Japanese single stocks.
+    """
+    import yfinance as yf  # noqa: PLC0415
+
+    t = yf.Ticker(symbol)
+    exps = list(t.options or [])
+    if not exps:
+        return {}
+    today = date.today()
+    exp = min(exps, key=lambda e: abs((date.fromisoformat(e) - today).days - target_days))
+    chain = t.option_chain(exp)
+    spot = None
+    try:
+        spot = float(t.fast_info["last_price"])
+    except Exception:  # noqa: BLE001
+        pass
+    if not spot:
+        return {}
+
+    def iv_at(df: pd.DataFrame, k: float) -> float | None:
+        df = df[(df["impliedVolatility"] > 0.01) & (df["impliedVolatility"] < 3)]
+        if df.empty:
+            return None
+        row = df.iloc[(df["strike"] - k).abs().argsort()[:1]]
+        return float(row["impliedVolatility"].iloc[0] * 100)
+
+    atm = iv_at(chain.calls, spot) or iv_at(chain.puts, spot)
+    p90 = iv_at(chain.puts, spot * 0.9)
+    return {
+        "expiry": exp,
+        "days": (date.fromisoformat(exp) - today).days,
+        "atm_iv": atm,
+        "put90_iv": p90,
+        "skew_90": (p90 - atm) if (p90 and atm) else None,
+    }
+
+
+# --------------------------------------------------------------------------- #
+# Macro
+# --------------------------------------------------------------------------- #
+
+
+@cached(ttl=12 * 3600)
+def cpi_index(countries: tuple[str, ...], start: str = "2000-01-01") -> pd.DataFrame:
+    """Monthly CPI index levels (OECD), columns = OECD country names."""
+    df = _df(obb().oecd.cpi(country=",".join(countries), transform="index", frequency="monthly", start_date=start))
+    if df.empty:
+        return df
+    if "expenditure" in df:
+        tot = df[df["expenditure"].astype(str).str.lower().isin(["total", "all"])]
+        if not tot.empty:
+            df = tot
+    df["date"] = pd.to_datetime(df["date"])
+    wide = df.pivot_table(index="date", columns="country", values="value", aggfunc="last").sort_index()
+    wide.columns = [str(c).lower().replace(" ", "_") for c in wide.columns]
+    return wide

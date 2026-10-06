@@ -1,0 +1,179 @@
+<title>Meeting Brief</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@300;400;500;600&family=Noto+Sans+JP:wght@300;400&display=swap">
+<style>
+/*CORE_CSS*/
+/* Brief: one-page market pack for a client meeting. Read top to bottom like the printed sheet a specialist brings: instruments, what to say, what is coming, what was in the news. */
+.pack-h{display:flex;justify-content:space-between;align-items:baseline;gap:8px 16px;flex-wrap:wrap;padding-block:18px 4px}
+.pack-h h2{margin:0;font-size:22px;font-weight:300}
+.pack-h .m{color:var(--mute);font-size:12.5px}
+#topic{min-width:0;flex:1 1 220px;max-width:340px}
+.add{display:flex;gap:6px}
+.add input{width:130px}
+.rng{position:relative;width:90px;height:14px;display:inline-block;vertical-align:middle}
+.rng::before{content:"";position:absolute;left:0;right:0;top:6px;height:2px;background:var(--track)}
+.rng b{position:absolute;top:2px;width:2px;height:10px;background:var(--ink)}
+.pts{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:10px;max-width:78ch}
+.pts li{padding-left:14px;border-left:2px solid var(--line);line-height:1.5;font-size:14px}
+.pts li.k{border-left-color:var(--red)}
+.ev{display:grid;grid-template-columns:88px 34px minmax(0,1fr) auto;gap:4px 10px;padding:7px 0;border-bottom:1px solid var(--line);font-size:13px;align-items:baseline}
+.ev .d{color:var(--mute);font-variant-numeric:tabular-nums}
+.ev .c{font-size:11px;border:1px solid var(--line);text-align:center;padding:0 3px}
+.ev .x{color:var(--mute);font-size:12px;font-variant-numeric:tabular-nums;text-align:right}
+.ev.hi .e{font-weight:500}
+@media (max-width:520px){.ev{grid-template-columns:76px 30px minmax(0,1fr)}.ev .x{grid-column:3;text-align:left}}
+.nw{display:flex;flex-direction:column;gap:2px;padding:8px 0;border-bottom:1px solid var(--line)}
+.nw a,.nw span.t{color:var(--ink);text-decoration:none;font-size:14px;line-height:1.4}
+.nw a:hover{text-decoration:underline}
+.nw small{color:var(--mute);font-size:12px}
+td.sym{font-weight:400}
+.copied{color:var(--pos);font-size:12px}
+</style>
+
+<div class="app">
+  <header class="top">
+    <div class="brand"><h1 data-ja="面談ブリーフ">Meeting Brief</h1><span data-ja="顧客面談用の1ページのマーケット資料">A one-page market pack for a client meeting</span></div>
+    <div class="tright">
+      <span class="pill busy" id="status"><i></i></span>
+      <button class="btn q" id="themeBtn">Dark</button>
+      <div class="seg" id="langSeg"><button data-l="en">EN</button><button data-l="ja">日本語</button></div>
+    </div>
+  </header>
+  <div class="banner" id="banner" hidden></div>
+  <div class="help" id="how" hidden></div>
+
+  <div class="bar">
+    <div class="grp"><span class="lbl" data-ja="テーマ">Theme</span><div class="seg" id="preset"></div></div>
+  </div>
+  <div class="bar">
+    <div class="chips" id="chips"></div>
+    <form class="add" id="addF"><input type="text" id="addI" placeholder="7974.T, AAPL, GBPJPY=X" aria-label="Add symbol"><button class="btn q" data-ja="追加">Add</button></form>
+    <input type="text" id="topic" placeholder="Meeting topic (stays on this device)" aria-label="Meeting topic">
+    <button class="btn p" id="go" data-ja="作成">Build pack</button>
+    <button class="btn q" id="copy" data-ja="テキストをコピー">Copy as text</button><span id="copied" class="copied" hidden></span>
+  </div>
+
+  <div class="pack-h"><h2 id="packT"></h2><span class="m" id="packM"></span></div>
+
+  <section class="sec">
+    <div class="tw"><table id="tbl"></table></div>
+  </section>
+
+  <section class="sec two">
+    <div style="min-width:0">
+      <div class="sh"><h2 data-ja="話のポイント">Talking points</h2><p data-ja="数値から自動作成。面談前に確認してください。">Written from the numbers above. Check before you use them.</p></div>
+      <ul class="pts" id="pts"></ul>
+    </div>
+    <div style="min-width:0">
+      <div class="sh"><h2 data-ja="6か月の推移（100に指数化）">Six months, rebased to 100</h2><p id="relSub"></p></div>
+      <svg class="ch" id="rel" height="240"></svg>
+      <div class="leg" id="relLeg"></div>
+    </div>
+  </section>
+
+  <section class="sec two even">
+    <div style="min-width:0">
+      <div class="sh"><h2 data-ja="今後の予定">Coming up</h2><p data-ja="経済指標（米・日・欧・中・英）と決算日。">Economic releases (US, Japan, euro area, China, UK) and company dates.</p></div>
+      <div id="cal"></div>
+    </div>
+    <div style="min-width:0">
+      <div class="sh"><h2 data-ja="ニュース">In the news</h2><p data-ja="各銘柄の最新見出し。">Latest headlines for these symbols.</p></div>
+      <div id="news"></div>
+    </div>
+  </section>
+  <p class="note" data-ja="送信されるのはティッカーのみで、面談テーマはこの端末にのみ保存されます。価格はOpenBB経由の無料データで遅延の可能性があります。投資助言ではありません。">Only the ticker symbols leave this page; the meeting topic stays on this device. Prices come from free OpenBB providers and can be delayed. Not investment advice.</p>
+</div>
+
+<script>
+const SAMPLES=/*SAMPLE*/;
+/*CORE_JS*/
+const PRESETS=[
+ {k:'fx',en:'Yen & rates',ja:'円・金利',s:['USDJPY=X','EURJPY=X','^TNX','^N225']},
+ {k:'jeq',en:'Japan equity',ja:'日本株',s:['^N225','1306.T','7203.T','8306.T']},
+ {k:'usr',en:'US rates & credit',ja:'米金利・社債',s:['^TNX','^FVX','LQD','HYG']},
+ {k:'game',en:'Gaming',ja:'ゲーム',s:['7974.T','6758.T','9697.T','7832.T']},
+ {k:'cmd',en:'Gold & oil',ja:'金・原油',s:['GC=F','CL=F','USDJPY=X']}];
+const LABEL={'USDJPY=X':['USD/JPY','ドル円'],'EURJPY=X':['EUR/JPY','ユーロ円'],'GBPJPY=X':['GBP/JPY','ポンド円'],'^TNX':['US 10Y yield','米10年金利'],'^FVX':['US 5Y yield','米5年金利'],
+ '^N225':['Nikkei 225','日経平均'],'^GSPC':['S&P 500','S&P500'],'GC=F':['Gold','金'],'CL=F':['WTI crude','WTI原油'],'1306.T':['TOPIX ETF','TOPIX ETF'],'LQD':['US IG credit ETF','米投資適格社債ETF'],'HYG':['US high yield ETF','米ハイイールドETF']};
+const nm=(s,n)=>LABEL[s]?(JA()?LABEL[s][1]:LABEL[s][0]):(n||s);
+const isYield=s=>/^\^(TNX|FVX|TYX|IRX)$/.test(s);
+let S={preset:'fx',syms:PRESETS[0].s.slice(),topic:''};
+try{const j=JSON.parse(localStorage.getItem('brief')||'null');if(j&&Array.isArray(j.syms)&&j.syms.length)S={...S,...j}}catch(e){}
+const save=()=>{try{localStorage.setItem('brief',JSON.stringify(S))}catch(e){}};
+let DATA=null,LIVE=false,BUILT=null;
+
+function chips(){$('#chips').innerHTML=S.syms.map(s=>`<span class="chip"><span>${esc(s)}</span><button aria-label="Remove ${esc(s)}" data-x="${esc(s)}">×</button></span>`).join('');
+  $$('#chips [data-x]').forEach(b=>b.onclick=()=>{S.syms=S.syms.filter(x=>x!==b.dataset.x);S.preset='';chips();presets();save()})}
+function presets(){$('#preset').innerHTML=PRESETS.map(p=>`<button data-k="${p.k}" class="${S.preset===p.k?'on':''}">${JA()?p.ja:p.en}</button>`).join('');
+  $$('#preset button').forEach(b=>b.onclick=()=>{const p=PRESETS.find(x=>x.k===b.dataset.k);S.preset=p.k;S.syms=p.s.slice();chips();presets();save();build()})}
+
+function render(){
+  const d=DATA;if(!d)return;
+  const today=new Date();
+  $('#packT').textContent=(S.topic?S.topic+' · ':'')+T('Market pack','マーケット資料');
+  $('#packM').textContent=T(`Prepared ${fdate(today.toISOString().slice(0,10))}${LIVE?'':' · sample figures'}`,`${fdate(today.toISOString().slice(0,10))}作成${LIVE?'':' · サンプル数値'}`);
+  const items=d.items||[];
+  $('#tbl').innerHTML=`<thead><tr><th>${T('Instrument','銘柄')}</th><th>${T('Last','現在値')}</th><th>1D</th><th>1W</th><th>1M</th><th>YTD</th><th>1Y</th><th>${T('Vol 1M','ボラ1M')}</th><th>${T('52-week range','52週レンジ')}</th><th>${T('3 months','3か月')}</th></tr></thead><tbody>`+
+   items.map(it=>{if(it.error)return`<tr><td class="sym">${esc(it.symbol)}</td><td colspan="9" style="text-align:left;color:var(--mute)">${T('No data for this symbol','データなし')}</td></tr>`;
+    const y=isYield(it.symbol),ch=(v,a)=>y?`<span class="${cls(a)}">${bp(a)}</span>`:`<span class="${cls(v)}">${pct(v,1)}</span>`;
+    const sp=(it.spark||[]).slice(-65).map(p=>p.v);
+    return `<tr><td class="sym">${esc(nm(it.symbol,it.name))}<span class="nm">${esc(it.symbol)}</span></td><td>${y?num(it.last,2)+'%':px(it.last)}</td><td>${ch(it.chg_1d,it.abs_1d)}</td><td>${ch(it.chg_1w,it.abs_1w)}</td><td>${ch(it.chg_1m,it.abs_1m)}</td><td>${ch(it.chg_ytd,it.abs_ytd)}</td><td>${ch(it.chg_1y,it.abs_1y)}</td><td>${y?'—':num(it.vol_20d,1)+'%'}</td>
+     <td><span class="rng" title="${px(it.low_52w)} – ${px(it.high_52w)}"><b style="left:calc(${Math.max(0,Math.min(100,it.pos_52w??50))}% - 1px)"></b></span></td><td>${spark(sp,110,26,cssv('--ink'))}</td></tr>`}).join('')+'</tbody>';
+
+  /* talking points */
+  const ok=items.filter(i=>!i.error);const P=[];const px2=(i,v)=>isYield(i.symbol)?num(v,2)+'%':px(v);const okP=ok.filter(i=>!isYield(i.symbol));
+  if(ok.length){
+    const mover=[...(okP.length?okP:ok)].sort((a,b)=>Math.abs(b.chg_1m||0)-Math.abs(a.chg_1m||0))[0];
+    P.push({k:1,t:T(`<b>${esc(nm(mover.symbol,mover.name))}</b> moved the most this month, ${pct(mover.chg_1m)}${mover.chg_ytd!=null?` (${pct(mover.chg_ytd)} this year)`:''}.`,`今月最も動いたのは<b>${esc(nm(mover.symbol,mover.name))}</b>で${pct(mover.chg_1m)}${mover.chg_ytd!=null?`（年初来${pct(mover.chg_ytd)}）`:''}。`)});
+    ok.filter(i=>i.pos_52w!=null&&(i.pos_52w>=90||i.pos_52w<=10)).slice(0,2).forEach(i=>P.push({t:i.pos_52w>=90?T(`${esc(nm(i.symbol,i.name))} is close to its 52-week high (${px2(i,i.high_52w)}).`,`${esc(nm(i.symbol,i.name))}は52週高値（${px2(i,i.high_52w)}）に接近。`):T(`${esc(nm(i.symbol,i.name))} is near its 52-week low (${px2(i,i.low_52w)}).`,`${esc(nm(i.symbol,i.name))}は52週安値（${px2(i,i.low_52w)}）付近。`)}));
+    okP.filter(i=>i.vol_20d!=null&&i.vol_1y!=null&&i.vol_20d>i.vol_1y*1.3).slice(0,2).forEach(i=>P.push({t:T(`Volatility in ${esc(nm(i.symbol,i.name))} has picked up: ${num(i.vol_20d,1)}% over the last month against ${num(i.vol_1y,1)}% over the year. Option premiums for structured ideas will be richer.`,`${esc(nm(i.symbol,i.name))}のボラティリティが上昇：直近1か月${num(i.vol_20d,1)}%（1年平均${num(i.vol_1y,1)}%）。仕組商品のオプション・プレミアムは厚めに。`)}));
+    okP.filter(i=>i.vol_20d!=null&&i.vol_1y!=null&&i.vol_20d<i.vol_1y*.7).slice(0,1).forEach(i=>P.push({t:T(`${esc(nm(i.symbol,i.name))} is unusually calm (${num(i.vol_20d,1)}% vs ${num(i.vol_1y,1)}% a year), so protection is cheap relative to its history.`,`${esc(nm(i.symbol,i.name))}は落ち着いており（${num(i.vol_20d,1)}%、1年平均${num(i.vol_1y,1)}%）、プロテクションが過去比で割安。`)}));
+    ok.filter(i=>isYield(i.symbol)&&i.abs_1m!=null&&Math.abs(i.abs_1m)>=.1).forEach(i=>P.push({t:T(`${esc(nm(i.symbol,i.name))} is ${num(i.last,2)}%, ${bp(i.abs_1m)} over the month and ${bp(i.abs_ytd)} this year.`,`${esc(nm(i.symbol,i.name))}は${num(i.last,2)}%、1か月で${bp(i.abs_1m)}、年初来${bp(i.abs_ytd)}。`)}));
+    const dd=okP.filter(i=>i.max_dd_1y!=null).sort((a,b)=>a.max_dd_1y-b.max_dd_1y)[0];
+    if(dd&&dd.max_dd_1y<-15)P.push({t:T(`Worst fall from peak over the year: ${esc(nm(dd.symbol,dd.name))}, ${pct(dd.max_dd_1y)}. Useful context for barrier levels.`,`過去1年の最大下落：${esc(nm(dd.symbol,dd.name))} ${pct(dd.max_dd_1y)}。バリア水準の参考に。`)});
+  }
+  const hiEv=(d.calendar||[]).filter(e=>/high/i.test(e.importance||'')).slice(0,2);
+  if(hiEv.length)P.push({t:T(`Watch: ${hiEv.map(e=>`${esc(e.event)} (${fdate(String(e.date).slice(0,10),{day:'numeric',month:'short'})})`).join(', ')}.`,`注目：${hiEv.map(e=>`${esc(e.event)}（${fdate(String(e.date).slice(0,10),{day:'numeric',month:'short'})}）`).join('、')}。`)});
+  $('#pts').innerHTML=P.map(p=>`<li class="${p.k?'k':''}">${p.t}</li>`).join('')||`<li>${T('Nothing stands out.','特記事項なし。')}</li>`;
+  BUILT={items:ok,points:P.map(p=>p.t.replace(/<[^>]+>/g,'')),cal:d.calendar||[],events:d.events||[],news:d.news||[]};
+
+  /* rebased chart */
+  const cols=['--a1','--a2','--a3','--a4','--a6','--a7','--a8','--a5'];
+  const ser=ok.map((it,i)=>{const sp=(it.spark||[]).slice(-126);const b=sp[0]?.v;return{name:nm(it.symbol,it.name),color:cssv(cols[i%cols.length]),pts:sp.map(p=>({x:+new Date(p.d+'T00:00:00'),y:b?p.v/b*100:null}))}});
+  lineChart($('#rel'),ser,{h:240,xType:'date',yFmt:v=>num(v,0),tipFmt:v=>num(v,1)});legend($('#relLeg'),ser);
+  $('#relSub').textContent=T('Yields are rebased like prices, so a move from 4.0% to 4.4% shows as 110.','利回りも価格と同様に指数化（4.0%→4.4%は110）。');
+
+  /* calendar */
+  const cal=(d.calendar||[]).filter(e=>!/low/i.test(e.importance||'')).slice(0,14);
+  const evs=(d.events||[]).filter(e=>e.earnings_date).map(e=>({date:e.earnings_date,country:'—',event:T(`${nm(e.symbol)} results`,`${nm(e.symbol)} 決算`),importance:'High',co:1}));
+  const all=[...cal,...evs].sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+  $('#cal').innerHTML=all.map(e=>`<div class="ev${/high/i.test(e.importance||'')?' hi':''}"><span class="d">${fdate(String(e.date).slice(0,10),{weekday:'short',day:'numeric',month:'short'})}</span><span class="c">${esc(e.co?'CO':e.country||'')}</span><span class="e">${esc(e.event)}</span><span class="x">${e.consensus!=null&&e.consensus!==''?T('cons. ','予想 ')+esc(e.consensus):''}${e.previous!=null&&e.previous!==''?' · '+T('prev. ','前回 ')+esc(e.previous):''}</span></div>`).join('')||`<p class="empty">${T('No scheduled releases found.','予定なし。')}</p>`;
+  $('#news').innerHTML=(d.news||[]).slice(0,10).map(n=>`<div class="nw">${n.url?`<a href="${esc(n.url)}" target="_blank" rel="noopener">${esc(n.title)}</a>`:`<span class="t">${esc(n.title)}</span>`}<small>${esc(n.source||'')} · ${fdate(String(n.date||'').slice(0,10),{day:'numeric',month:'short'})} · ${esc(n.symbol)}</small></div>`).join('')||`<p class="empty">${T('No headlines.','見出しなし。')}</p>`;
+}
+window.redraw=render;
+
+async function build(){
+  if(!S.syms.length)return;
+  setStatus('busy');
+  const r=await keel('api_brief',{symbols:S.syms.join(','),days:14});
+  if(r.ok&&r.data&&r.data.items){DATA=r.data;LIVE=true;setStatus('live')}
+  else{DATA=SAMPLES[S.preset]||SAMPLES.fx;LIVE=false;setStatus(r.code==='no_mcp'?'sample':'err',r.code,r.message)}
+  render();
+}
+function asText(){if(!BUILT)return'';const L=[];
+  L.push(`${S.topic?S.topic+' — ':''}${T('Market pack','マーケット資料')} ${new Date().toISOString().slice(0,10)}${LIVE?'':' (SAMPLE)'}`,'');
+  BUILT.items.forEach(i=>L.push(`${nm(i.symbol,i.name)}: ${isYield(i.symbol)?num(i.last,2)+'%':px(i.last)} | 1M ${isYield(i.symbol)?bp(i.abs_1m):pct(i.chg_1m)} | YTD ${isYield(i.symbol)?bp(i.abs_ytd):pct(i.chg_ytd)} | 1Y ${isYield(i.symbol)?bp(i.abs_1y):pct(i.chg_1y)}${isYield(i.symbol)?'':' | vol '+num(i.vol_20d,1)+'%'}`));
+  L.push('',T('Points','ポイント')+':');BUILT.points.forEach(p=>L.push('- '+p));
+  return L.join('\n')}
+$('#copy').onclick=async()=>{const t=asText();const el=$('#copied');try{await navigator.clipboard.writeText(t);el.textContent=T('Copied','コピーしました')}catch(e){el.textContent=T('Copy blocked here; select the table instead.','コピーできません。表を選択してください。')}el.hidden=false;setTimeout(()=>el.hidden=true,2500)};
+$('#addF').onsubmit=e=>{e.preventDefault();const v=$('#addI').value.split(/[,\s]+/).map(x=>x.trim().toUpperCase()).filter(Boolean);
+  v.forEach(x=>{if(!S.syms.includes(x)&&S.syms.length<12)S.syms.push(x)});$('#addI').value='';S.preset='';chips();presets();save()};
+$('#topic').oninput=e=>{S.topic=e.target.value.slice(0,80);save();if(DATA)render()};
+$('#go').onclick=build;
+$('#how').innerHTML=howHtml();
+$$('#langSeg button').forEach(b=>b.onclick=()=>{setLang(b.dataset.l);$('#how').innerHTML=howHtml();$('#topic').placeholder=T('Meeting topic (stays on this device)','面談テーマ（この端末のみ）');presets();restatus();render()});
+$('#topic').value=S.topic||'';
+setLang(LANG);$('#topic').placeholder=T('Meeting topic (stays on this device)','面談テーマ（この端末のみ）');chips();presets();
+DATA=SAMPLES[S.preset]||SAMPLES.fx;render();build();
+</script>

@@ -1,0 +1,164 @@
+<title>Barrier</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@300;400;500;600&family=Noto+Sans+JP:wght@300;400&display=swap">
+<style>
+/*CORE_CSS*/
+/* Barrier: a term-sheet desk view. Controls read like note terms; red marks knock-in and loss, steel marks autocall. */
+.terms{display:flex;gap:12px 26px;flex-wrap:wrap;align-items:flex-end}
+.term{display:flex;flex-direction:column;gap:5px}
+.term .row{display:flex;align-items:center;gap:10px}
+.term output{font-variant-numeric:tabular-nums;font-weight:400;min-width:38px}
+.mini{display:inline-block;width:64px;height:6px;background:var(--track);vertical-align:middle;margin-left:8px;position:relative}
+.mini b{position:absolute;left:0;top:0;bottom:0;background:var(--red)}
+.mini.s b{background:var(--steel)}
+.hm{display:grid;gap:2px;font-size:11.5px;font-variant-numeric:tabular-nums}
+.hm div{display:flex;align-items:center;justify-content:center;min-height:34px;min-width:0;overflow:hidden}
+.hm .h{color:var(--mute);justify-content:flex-end;padding-right:6px;white-space:nowrap}
+.hm .hc{color:var(--mute);white-space:nowrap}
+.stale{color:var(--warn);font-size:12px}
+.outcome{display:flex;height:22px;width:100%;margin-top:14px;font-size:11px;color:#fff;font-variant-numeric:tabular-nums}
+.outcome span{display:flex;align-items:center;justify-content:center;overflow:hidden;white-space:nowrap}
+</style>
+
+<div class="app">
+  <header class="top">
+    <div class="brand"><h1 data-ja="バリア">Barrier</h1><span data-ja="過去のデータでノックインはどれだけ起きたか：オートコール・FCNの原資産選び">How often would history have knocked in? Picking underlyings for autocalls and FCNs</span></div>
+    <div class="tright">
+      <span class="pill busy" id="status"><i></i></span>
+      <button class="btn q" id="themeBtn">Dark</button>
+      <div class="seg" id="langSeg"><button data-l="en">EN</button><button data-l="ja">日本語</button></div>
+    </div>
+  </header>
+  <div class="banner" id="banner" hidden></div>
+  <div class="help" id="how" hidden></div>
+
+  <div class="bar terms">
+    <div class="term"><span class="lbl" data-ja="期間">Tenor</span><div class="seg" id="tenor"><button data-v="6">6M</button><button data-v="12">12M</button><button data-v="18">18M</button><button data-v="24">24M</button></div></div>
+    <div class="term"><span class="lbl" data-ja="ノックイン">Knock-in</span><div class="row"><input type="range" id="ki" min="40" max="85" step="5"><output id="kiO"></output></div></div>
+    <div class="term"><span class="lbl" data-ja="早期償還水準">Autocall level</span><div class="seg" id="ac"><button data-v="90">90%</button><button data-v="95">95%</button><button data-v="100">100%</button><button data-v="105">105%</button></div></div>
+    <div class="term"><span class="lbl" data-ja="観測">Observation</span><div class="seg" id="obs"><button data-v="1" data-ja="毎月">Monthly</button><button data-v="3" data-ja="四半期">Quarterly</button><button data-v="6" data-ja="半年">Semi-annual</button></div></div>
+    <div class="term"><span class="lbl" data-ja="検証期間">History</span><div class="seg" id="yrs"><button data-v="5">5Y</button><button data-v="10">10Y</button><button data-v="15">15Y</button></div></div>
+  </div>
+  <div class="bar">
+    <div class="grp"><span class="lbl" data-ja="原資産">Underlyings</span><div class="seg" id="preset"></div></div>
+    <div class="chips" id="chips"></div>
+    <form class="grp" id="addF"><input type="text" id="addI" placeholder="6501.T, NVDA" aria-label="Add underlying" style="width:130px"><button class="btn q" data-ja="追加">Add</button></form>
+    <button class="btn p" id="run" data-ja="検証する">Run back-test</button><span class="stale" id="stale" hidden></span>
+  </div>
+
+  <section class="sec">
+    <div class="sh"><h2 id="bkT"></h2><p id="bkS"></p></div>
+    <div class="kpis" id="kpis" style="border-bottom:0"></div>
+    <div class="outcome" id="outcome"></div>
+    <div class="leg" id="outLeg"></div>
+  </section>
+
+  <section class="sec">
+    <div class="sh"><h2 data-ja="原資産ごと（単独で組成した場合）">Each underlying on its own</h2><p data-ja="ノックイン率の低い順。インプライド・ボラは約1年物のATM。スキューは90%プット − ATM。">Sorted by knock-in rate, lowest first. Implied vol is at-the-money near the note’s tenor; skew is the 90% put minus at-the-money. Japanese single stocks usually have no listed option data here.</p></div>
+    <div class="tw"><table id="tbl"></table></div>
+  </section>
+
+  <section class="sec two even">
+    <div style="min-width:0">
+      <div class="sh"><h2 data-ja="相関（日次リターン、1年）">Correlation (daily returns, 1 year)</h2><p data-ja="相関が低いほどワーストオブのクーポンは高く、ノックインも起きやすくなります。">Lower correlation pays a higher worst-of coupon and knocks in more often.</p></div>
+      <div id="hm"></div>
+    </div>
+    <div style="min-width:0">
+      <div class="sh"><h2 data-ja="ボラティリティ：実現とインプライド">Volatility: realised and implied</h2><p data-ja="インプライドが実現を上回るほど、オプション売りのプレミアムが厚い。">Where implied sits above realised, the note is selling richer option premium.</p></div>
+      <svg class="ch" id="vol" height="240"></svg>
+      <div class="leg" id="volLeg"></div>
+    </div>
+  </section>
+  <p class="note" id="method"></p>
+</div>
+
+<script>
+const SAMPLE=/*SAMPLE*/;
+/*CORE_JS*/
+const PRESETS=[
+ {k:'jp',en:'Japan large caps',ja:'日本大型株',s:['^N225','7203.T','6758.T','8306.T','9984.T']},
+ {k:'us',en:'US tech',ja:'米国テック',s:['NVDA','AAPL','MSFT','AMZN']},
+ {k:'idx',en:'Indices',ja:'指数',s:['^N225','^GSPC','^STOXX50E']},
+ {k:'game',en:'Gaming',ja:'ゲーム',s:['7974.T','6758.T','9697.T']}];
+const NAMES={'^N225':['Nikkei 225','日経平均'],'^GSPC':['S&P 500','S&P500'],'^STOXX50E':['Euro Stoxx 50','ユーロ・ストックス50']};
+const nm=(s,n)=>NAMES[s]?(JA()?NAMES[s][1]:NAMES[s][0]):(n||s);
+let S={preset:'jp',syms:PRESETS[0].s.slice(),tenor:12,ki:60,ac:100,obs:3,yrs:10};
+try{const j=JSON.parse(localStorage.getItem('barrier')||'null');if(j&&Array.isArray(j.syms))S={...S,...j}}catch(e){}
+const save=()=>{try{localStorage.setItem('barrier',JSON.stringify(S))}catch(e){}};
+let DATA=SAMPLE,LIVE=false;
+
+function segs(){[['tenor','tenor'],['ac','ac'],['obs','obs'],['yrs','yrs']].forEach(([id,k])=>$$('#'+id+' button').forEach(b=>{b.classList.toggle('on',+b.dataset.v===S[k]);b.onclick=()=>{S[k]=+b.dataset.v;save();segs();dirty()}}));
+  $('#ki').value=S.ki;$('#kiO').textContent=S.ki+'%'}
+function chips(){$('#chips').innerHTML=S.syms.map(s=>`<span class="chip"><span>${esc(s)}</span><button aria-label="Remove ${esc(s)}" data-x="${esc(s)}">×</button></span>`).join('');
+  $$('#chips [data-x]').forEach(b=>b.onclick=()=>{S.syms=S.syms.filter(x=>x!==b.dataset.x);S.preset='';chips();presets();save();dirty()})}
+function presets(){$('#preset').innerHTML=PRESETS.map(p=>`<button data-k="${p.k}" class="${S.preset===p.k?'on':''}">${JA()?p.ja:p.en}</button>`).join('');
+  $$('#preset button').forEach(b=>b.onclick=()=>{const p=PRESETS.find(x=>x.k===b.dataset.k);S.preset=p.k;S.syms=p.s.slice();chips();presets();save();run()})}
+function dirty(){const p=DATA.params||{};const same=p.tenor_m===S.tenor&&p.ki===S.ki&&p.autocall===S.ac&&p.obs_m===S.obs&&p.years===S.yrs;
+  const el=$('#stale');el.hidden=same&&LIVE!==null;el.textContent=same?'':T('Terms changed: run the back-test to update.','条件が変更されました。検証を実行してください。')}
+
+function render(){
+  const d=DATA,p=d.params||{},b=d.basket,rows=(d.rows||[]).filter(r=>!r.error);
+  const ok=rows.map(r=>r.symbol);
+  $('#bkT').textContent=T(`Worst-of ${ok.length} · ${p.tenor_m}M · KI ${p.ki}% · autocall ${p.autocall}% ${p.obs_m===1?'monthly':p.obs_m===3?'quarterly':'semi-annual'}`,`ワーストオブ ${ok.length}銘柄 · ${p.tenor_m}か月 · KI ${p.ki}% · 早期償還 ${p.autocall}%（${p.obs_m===1?'毎月':p.obs_m===3?'四半期':'半年'}）`);
+  if(b&&b.windows){
+    $('#bkS').textContent=T(`${b.windows.toLocaleString()} notes started on every trading day from ${fdate(b.from)} until ${p.tenor_m} months before ${fdate(b.to)}. ${LIVE?'':'Sample figures.'}`,`${fdate(b.from)}から${fdate(b.to)}の${p.tenor_m}か月前まで、毎営業日に組成した${b.windows.toLocaleString()}本の仮想ノート。${LIVE?'':'サンプル数値。'}`);
+    $('#kpis').innerHTML=[[T('Called early','早期償還'),pct(b.autocall_rate,0,false),b.avg_call_months?T(`on average after ${num(b.avg_call_months,1)} months`,`平均${num(b.avg_call_months,1)}か月後`):''],
+      [T('Knocked in','ノックイン'),pct(b.ki_rate,0,false),T(`worst performer closed below ${p.ki}%`,`最低銘柄が${p.ki}%を下回った`)],
+      [T('Lost capital at maturity','満期で元本割れ'),pct(b.loss_rate,0,false),b.avg_loss!=null?T(`average loss ${num(b.avg_loss,0)}%, worst ${num(b.worst_loss,0)}%`,`平均損失${num(b.avg_loss,0)}%、最大${num(b.worst_loss,0)}%`):T('no losses in the sample','損失なし')],
+      [T('Ran to maturity, capital back','満期・元本確保'),pct(100-b.autocall_rate-b.loss_rate,0,false),T('coupon paid if the note pays at maturity','満期時の条件によりクーポン受取')]]
+      .map(([l,v,s])=>`<div class="kpi"><span class="lbl">${l}</span><span class="v">${v}</span><span class="s">${s}</span></div>`).join('');
+    const seg=[[b.autocall_rate,'--steel',T('Called','早期償還')],[100-b.autocall_rate-b.loss_rate,'--mute',T('Capital back','元本確保')],[b.loss_rate,'--red',T('Loss','元本割れ')]];
+    $('#outcome').innerHTML=seg.map(([v,c,l])=>v>0?`<span style="width:${v}%;background:var(${c})" title="${l} ${num(v,0)}%">${v>=8?num(v,0)+'%':''}</span>`:'').join('');
+    $('#outLeg').innerHTML=seg.map(([v,c,l])=>`<span><i style="background:var(${c});height:8px;width:8px"></i>${l}</span>`).join('');
+  }else{$('#bkS').textContent=T('Add at least two underlyings for a worst-of back-test.','ワーストオブの検証には2銘柄以上が必要です。');$('#kpis').innerHTML='';$('#outcome').innerHTML='';$('#outLeg').innerHTML=''}
+
+  const sorted=[...rows].sort((a,c)=>(a.backtest?.ki_rate??999)-(c.backtest?.ki_rate??999));
+  $('#tbl').innerHTML=`<thead><tr><th>${T('Underlying','原資産')}</th><th>${T('Vol 3M','ボラ3M')}</th><th>${T('Vol 1Y','ボラ1Y')}</th><th>${T('Implied','インプライド')}</th><th>${T('Skew','スキュー')}</th><th>${T('Div. yield','配当利回り')}</th><th>${T(`Worst ${p.tenor_m}M fall`,`${p.tenor_m}か月最大下落`)}</th><th>${T('Called','早期償還')}</th><th>${T('Knock-in','KI')}</th><th>${T('Loss','損失')}</th></tr></thead><tbody>`+
+    sorted.map(r=>{const bt=r.backtest||{};const dy=r.div_yield!=null?(r.div_yield<1?r.div_yield*100:r.div_yield):null;
+      return `<tr><td>${esc(nm(r.symbol,r.name))}<span class="nm">${esc(r.symbol)}</span></td><td>${num(r.vol_60d,1)}%</td><td>${num(r.vol_1y,1)}%</td><td>${r.atm_iv!=null?num(r.atm_iv,1)+'%':'—'}</td><td>${r.skew_90!=null?'+'+num(r.skew_90,1):'—'}</td><td>${dy!=null?num(dy,1)+'%':'—'}</td><td class="dn">${pct(r.worst_tenor_drop,0)}</td>
+      <td>${pct(bt.autocall_rate,0,false)}<span class="mini s"><b style="width:${bt.autocall_rate||0}%"></b></span></td><td>${pct(bt.ki_rate,0,false)}<span class="mini"><b style="width:${bt.ki_rate||0}%"></b></span></td><td>${pct(bt.loss_rate,0,false)}</td></tr>`}).join('')+
+    (d.rows||[]).filter(r=>r.error).map(r=>`<tr><td>${esc(r.symbol)}</td><td colspan="9" style="text-align:left;color:var(--mute)">${T('No price history found','価格データなし')}</td></tr>`).join('')+'</tbody>';
+
+  /* heatmap */
+  const cm=d.corr||{};
+  if(cm.matrix){const n=cm.symbols.length;const nmap=Object.fromEntries(rows.map(r=>[r.symbol,nm(r.symbol,r.name)]));const lab=s=>{const t=(nmap[s]||nm(s)).replace(' 225','').replace(' Group','');return esc(t.length>10?t.split(' ')[0]:t)};
+    let h=`<div class="hm" style="grid-template-columns:minmax(64px,auto) repeat(${n},minmax(0,1fr))"><div></div>${cm.symbols.map(s=>`<div class="hc">${lab(s)}</div>`).join('')}`;
+    cm.matrix.forEach((row,i)=>{h+=`<div class="h">${lab(cm.symbols[i])}</div>`+row.map((v,j)=>{const a=i===j?0:Math.max(0,Math.min(1,v));
+      return `<div style="background:color-mix(in srgb,var(--steel) ${Math.round(a*85)}%,var(--track));color:${a>.55?'#fff':'var(--ink)'}">${i===j?'':num(v,2)}</div>`}).join('')});
+    $('#hm').innerHTML=h+'</div>';
+  }else $('#hm').innerHTML=`<p class="empty">${T('Needs two or more underlyings.','2銘柄以上が必要です。')}</p>`;
+
+  /* volatility dumbbell: one row per underlying */
+  const vs=sorted.map(r=>({label:nm(r.symbol,r.name),rv:r.vol_1y,r3:r.vol_60d,iv:r.atm_iv}));
+  const svg=$('#vol'),w=W(svg),rowH=30,m={l:110,r:16,t:8,b:24},h=m.t+m.b+rowH*vs.length;
+  const mx=Math.max(10,...vs.flatMap(v=>[v.rv,v.r3,v.iv]).filter(x=>x!=null));const tk=niceTicks(0,mx*1.05,5);const top=tk[tk.length-1];
+  const X=v=>m.l+v/top*(w-m.l-m.r);let g='';
+  tk.forEach(t=>g+=`<line class="grd" x1="${X(t)}" x2="${X(t)}" y1="${m.t}" y2="${h-m.b}"/><text x="${X(t)}" y="${h-6}" text-anchor="middle">${t}%</text>`);
+  const cR=cssv('--mute'),c3=cssv('--steel'),cI=cssv('--red');
+  vs.forEach((v,i)=>{const y=m.t+rowH*i+rowH/2;const xs=[v.rv,v.r3,v.iv].filter(x=>x!=null);
+    g+=`<text x="${m.l-8}" y="${y+4}" text-anchor="end" style="fill:var(--ink)">${esc(v.label.length>16?v.label.slice(0,15)+'…':v.label)}</text>`;
+    if(xs.length>1)g+=`<line x1="${X(Math.min(...xs))}" x2="${X(Math.max(...xs))}" y1="${y}" y2="${y}" stroke="${cR}" stroke-width="2" stroke-opacity=".4"/>`;
+    [[v.rv,cR,T('Realised 1Y','実現1年')],[v.r3,c3,T('Realised 3M','実現3か月')],[v.iv,cI,T('Implied','インプライド')]].forEach(([x,c,l])=>{if(x!=null)g+=`<circle cx="${X(x)}" cy="${y}" r="5" fill="${c}"><title>${esc(v.label)} · ${l} ${num(x,1)}%</title></circle>`});
+  });
+  svg.setAttribute('viewBox',`0 0 ${w} ${h}`);svg.setAttribute('height',h);svg.innerHTML=g;
+  legend($('#volLeg'),[{name:T('Realised 1Y','実現1年'),color:cR},{name:T('Realised 3M','実現3か月'),color:c3},{name:T('Implied (where listed)','インプライド（上場オプションがある場合）'),color:cI}]);
+  $('#method').innerHTML=T(`<b>Method.</b> A note is started on every trading day in the history window. It is called on the first observation date where every underlying is at or above the autocall level. If not called, it knocks in when the worst performer closes below the barrier on any day, and loses the worst performer’s fall at maturity if that ends below 100%. Closing prices stand in for a continuous barrier; coupons, funding and fees are left out. This describes what happened in the past; it is not a probability of what will happen. Prices from Yahoo Finance through OpenBB; implied vols from listed options where available.`,
+   `<b>算出方法。</b>検証期間の毎営業日に仮想ノートを組成。全銘柄が早期償還水準以上となった最初の観測日に償還。償還されない場合、最低銘柄の終値がバリアを下回った日にノックインし、満期時に100%未満なら最低銘柄の下落分の元本割れ。連続観測バリアを終値で近似し、クーポン・調達・手数料は考慮していません。過去の結果であり、将来の確率ではありません。価格はOpenBB経由のYahoo Finance、インプライド・ボラは上場オプションがある場合のみ。`);
+  dirty();
+}
+window.redraw=render;
+async function run(){
+  if(!S.syms.length)return;setStatus('busy');$('#run').disabled=true;
+  const r=await keel('api_sp_screen',{symbols:S.syms.join(','),tenor_m:S.tenor,ki:S.ki,autocall:S.ac,obs_m:S.obs,years:S.yrs,iv:true});
+  $('#run').disabled=false;
+  if(r.ok&&r.data&&r.data.rows){DATA=r.data;LIVE=true;setStatus('live')}else{DATA=SAMPLE;LIVE=false;setStatus(r.code==='no_mcp'?'sample':'err',r.code,r.message)}
+  render();
+}
+$('#ki').oninput=e=>{S.ki=+e.target.value;$('#kiO').textContent=S.ki+'%';save();dirty()};
+$('#addF').onsubmit=e=>{e.preventDefault();$('#addI').value.split(/[,\s]+/).map(x=>x.trim().toUpperCase()).filter(Boolean).forEach(x=>{if(!S.syms.includes(x)&&S.syms.length<8)S.syms.push(x)});$('#addI').value='';S.preset='';chips();presets();save();dirty()};
+$('#run').onclick=run;
+$('#how').innerHTML=howHtml();
+$$('#langSeg button').forEach(b=>b.onclick=()=>{setLang(b.dataset.l);$('#how').innerHTML=howHtml();presets();restatus();render()});
+setLang(LANG);segs();chips();presets();render();run();
+</script>

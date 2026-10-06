@@ -1,0 +1,144 @@
+<title>Carry</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@300;400;500;600&family=Noto+Sans+JP:wght@300;400&display=swap">
+<style>
+/*CORE_CSS*/
+/* Carry: yen-hedged yield board. Steel = USD, gold = EUR, black = JGB; solid lines unhedged, dashed lines hedged into yen. */
+.ctl{display:flex;flex-direction:column;gap:4px;min-width:0}
+.ctl .row{display:flex;gap:10px;align-items:center}
+.ctl output{font-variant-numeric:tabular-nums;min-width:52px;text-align:right}
+.verdict{font-size:15px;line-height:1.55;max-width:74ch;margin:0}
+.verdict b{font-weight:500}
+td.k{color:var(--mute)}
+td .pk{font-size:11px;margin-left:6px}
+</style>
+
+<div class="app">
+  <header class="top">
+    <div class="brand"><h1 data-ja="キャリー">Carry</h1><span data-ja="円投資家から見た外国債券：ヘッジ前とヘッジ後の利回り">Foreign bonds through a yen investor’s eyes: yield before and after the currency hedge</span></div>
+    <div class="tright">
+      <span class="pill busy" id="status"><i></i></span>
+      <button class="btn q" id="refresh" data-ja="更新">Refresh</button>
+      <button class="btn q" id="themeBtn">Dark</button>
+      <div class="seg" id="langSeg"><button data-l="en">EN</button><button data-l="ja">日本語</button></div>
+    </div>
+  </header>
+  <div class="banner" id="banner" hidden></div>
+  <div class="help" id="how" hidden></div>
+
+  <section class="kpis" id="kpis"></section>
+
+  <div class="bar">
+    <div class="ctl"><span class="lbl" data-ja="USD/JPY ベーシス（追加ヘッジコスト）">USD/JPY basis (extra hedge cost)</span>
+      <div class="row"><input type="range" id="bUsd" min="-50" max="100" step="5" value="0"><output id="bUsdO"></output></div></div>
+    <div class="ctl"><span class="lbl" data-ja="EUR/JPY ベーシス">EUR/JPY basis</span>
+      <div class="row"><input type="range" id="bEur" min="-50" max="100" step="5" value="0"><output id="bEurO"></output></div></div>
+    <div class="ctl"><span class="lbl" data-ja="ヘッジ期間の金利">Hedge tenor rate</span>
+      <div class="seg" id="hzSeg"><button data-h="1" class="on" data-ja="1年">1Y</button><button data-h="0.25" data-ja="3か月">3M</button></div></div>
+  </div>
+
+  <section class="sec">
+    <p class="verdict" id="verdict"></p>
+  </section>
+
+  <section class="sec two">
+    <div>
+      <div class="sh"><h2 data-ja="利回り曲線：ヘッジ前と円ヘッジ後">Curves: unhedged and hedged into yen</h2><p id="curveSub"></p></div>
+      <svg class="ch" id="curve" height="300"></svg>
+      <div class="leg" id="curveLeg"></div>
+    </div>
+    <div style="min-width:0">
+      <div class="sh"><h2 data-ja="年限別の比較">By maturity</h2><p data-ja="利回り（%）。ヘッジ後の値と日本国債との差。">Yields in %. Hedged yields and their pick-up over the same-maturity JGB.</p></div>
+      <div class="tw"><table id="tbl"></table></div>
+    </div>
+  </section>
+
+  <section class="sec">
+    <div class="sh"><h2 data-ja="米国債10年：3年間の推移">US 10-year over three years</h2><p data-ja="月末値。ヘッジ後利回り＝米国債10年 −（米国1年 − 日本国債1年）− ベーシス。">Month-end. Hedged = UST 10Y − (UST 1Y − JGB 1Y) − basis. The gap between the red and dashed lines is what the hedge has cost.</p></div>
+    <svg class="ch" id="hist" height="260"></svg>
+    <div class="leg" id="histLeg"></div>
+  </section>
+
+  <p class="note" id="method"></p>
+</div>
+
+<script>
+const SAMPLE=/*SAMPLE*/;
+/*CORE_JS*/
+let DATA=SAMPLE, LIVE=false;
+const S={bUsd:0,bEur:0,hz:1};
+const C=()=>({us:cssv('--a1'),eu:cssv('--a3'),jp:cssv('--a4'),red:cssv('--red')});
+
+function curveMap(arr){const m={};(arr||[]).forEach(p=>m[p.t]=p.y);return m}
+function interp(arr,t){const p=(arr||[]).filter(x=>x.y!=null).sort((a,b)=>a.t-b.t);if(!p.length)return null;if(t<=p[0].t)return p[0].y;if(t>=p[p.length-1].t)return p[p.length-1].y;
+  for(let i=1;i<p.length;i++)if(t<=p[i].t){const a=p[i-1],b=p[i];return a.y+(b.y-a.y)*(t-a.t)/(b.t-a.t)}return null}
+function calc(){
+  const c=DATA.curves,h=S.hz;
+  const rUs=interp(c.us,h),rEu=interp(c.eu,h),rJp=h<1?interp(c.jp,1):interp(c.jp,h);
+  const hcUs=rUs!=null&&rJp!=null?rUs-rJp+S.bUsd/100:null, hcEu=rEu!=null&&rJp!=null?rEu-rJp+S.bEur/100:null;
+  const tenors=[1,2,3,5,7,10,20,30];
+  const rows=tenors.map(t=>{const us=interp(c.us,t),eu=interp(c.eu,t),jp=interp(c.jp,t);
+    return{t,us,eu,jp,ush:us!=null&&hcUs!=null?us-hcUs:null,euh:eu!=null&&hcEu!=null?eu-hcEu:null}});
+  return{rUs,rEu,rJp,hcUs,hcEu,rows}
+}
+function render(){
+  const k=calc(),r10=k.rows.find(r=>r.t===10),fx=DATA.fx||{};
+  const jpNote=S.hz<1?T(' JGB 1Y used for the yen leg (MOF publishes no 3M point).',' 円側は日本国債1年を使用（財務省は3か月を公表していません）。'):'';
+  $('#kpis').innerHTML=[
+    [T('USD hedge cost','USDヘッジコスト'),num(k.hcUs),'%',T(`per year · USD ${S.hz<1?'3M':'1Y'} ${num(k.rUs)}% vs JGB ${num(k.rJp)}%`,`年率 · 米国${S.hz<1?'3か月':'1年'} ${num(k.rUs)}% − 日本国債 ${num(k.rJp)}%`)],
+    [T('UST 10Y hedged','米国債10年（ヘッジ後）'),num(r10.ush),'%',T(`${num(r10.us)}% unhedged · ${bp(r10.ush-r10.jp)} vs JGB`,`ヘッジ前 ${num(r10.us)}% · 日本国債比 ${bp(r10.ush-r10.jp)}`)],
+    [T('EUR 10Y hedged','ユーロ10年（ヘッジ後）'),num(r10.euh),'%',T(`AAA curve ${num(r10.eu)}% · ${bp(r10.euh-r10.jp)} vs JGB`,`AAA曲線 ${num(r10.eu)}% · 日本国債比 ${bp(r10.euh-r10.jp)}`)],
+    [T('JGB 10Y','日本国債10年'),num(r10.jp),'%',T(`as of ${fdate(DATA.asof?.jp)}`,`${fdate(DATA.asof?.jp)}時点`)],
+    [T('USD/JPY','ドル円'),fx.USDJPY?num(fx.USDJPY.spot,2):'—','',fx.USDJPY?T(`1Y realised vol ${num(fx.USDJPY.vol_1y,1)}%`,`1年実現ボラ ${num(fx.USDJPY.vol_1y,1)}%`):''],
+  ].map(([l,v,u,s])=>`<div class="kpi"><span class="lbl">${l}</span><span class="v">${v}<small>${u}</small></span><span class="s">${s}</span></div>`).join('');
+
+  const best=[['USD',r10.ush],['EUR',r10.euh],['JGB',r10.jp]].filter(x=>x[1]!=null).sort((a,b)=>b[1]-a[1])[0];
+  const gapUs=r10.ush-r10.jp;
+  $('#verdict').innerHTML=JA()?
+    `円ベースで見ると、10年の米国債はヘッジ後<b>${num(r10.ush)}%</b>で、日本国債10年（${num(r10.jp)}%）を<b>${bp(gapUs)}</b>${gapUs>=0?'上回ります':'下回ります'}。為替ヘッジに年<b>${num(k.hcUs)}%</b>かかるため、${num(r10.us)}%の利回りの大半が消えます。ヘッジ後で最も高いのは<b>${best[0]==='JGB'?'日本国債':best[0]+'債'}</b>です。ヘッジなしで保有する場合、ドル円が年${num(r10.us-r10.jp)}%以上円高に動くと日本国債に劣後します。${jpNote}`:
+    `For a yen investor, the 10-year Treasury yields <b>${num(r10.ush)}%</b> once hedged, <b>${bp(gapUs)}</b> ${gapUs>=0?'above':'below'} the 10-year JGB at ${num(r10.jp)}%. The hedge costs <b>${num(k.hcUs)}%</b> a year, which takes most of the ${num(r10.us)}% headline yield. Hedged, the best 10-year yield is <b>${best[0]==='JGB'?'the JGB':best[0]+' bonds'}</b>. Held unhedged, the Treasury falls behind the JGB if the yen strengthens more than ${num(r10.us-r10.jp)}% a year.${jpNote}`;
+
+  $('#tbl').innerHTML=`<thead><tr><th data-ja="年限">Maturity</th><th>UST</th><th>${T('UST hedged','UST ヘッジ後')}</th><th>EUR AAA</th><th>${T('EUR hedged','EUR ヘッジ後')}</th><th>JGB</th></tr></thead><tbody>`+
+    k.rows.map(r=>`<tr${r.t===10?' class="hl"':''}><td>${r.t}${T('Y','年')}</td><td>${num(r.us)}</td><td>${num(r.ush)}<span class="pk ${cls(r.ush-r.jp)}">${bp(r.ush-r.jp)}</span></td><td>${num(r.eu)}</td><td>${num(r.euh)}<span class="pk ${cls(r.euh-r.jp)}">${bp(r.euh-r.jp)}</span></td><td>${num(r.jp)}</td></tr>`).join('')+'</tbody>';
+
+  const col=C(),tx=[1,2,3,5,7,10,20,30];
+  const ser=[
+    {name:T('UST','米国債'),color:col.us,pts:tx.map(t=>({x:t,y:interp(DATA.curves.us,t)}))},
+    {name:T('UST hedged','米国債 ヘッジ後'),color:col.us,dash:1,pts:k.rows.map(r=>({x:r.t,y:r.ush}))},
+    {name:'EUR AAA',color:col.eu,pts:tx.map(t=>({x:t,y:interp(DATA.curves.eu,t)}))},
+    {name:T('EUR hedged','EUR ヘッジ後'),color:col.eu,dash:1,pts:k.rows.map(r=>({x:r.t,y:r.euh}))},
+    {name:'JGB',color:col.jp,width:2,pts:tx.map(t=>({x:t,y:interp(DATA.curves.jp,t)}))}];
+  ser.forEach(s=>s.dots=1);
+  lineChart($('#curve'),ser,{h:300,xTicks:tx,xFmt:v=>v+(JA()?'年':'Y'),tipX:v=>v+T('-year','年'),yFmt:v=>num(v,1)+'%',tipFmt:v=>num(v,2)+'%'});
+  legend($('#curveLeg'),ser);
+  $('#curveSub').textContent=T(`Hedge cost: USD ${num(k.hcUs)}%, EUR ${num(k.hcEu)}% a year, applied flat across maturities (a rolling ${S.hz<1?'3-month':'1-year'} hedge).`,`ヘッジコスト：USD 年${num(k.hcUs)}%、EUR 年${num(k.hcEu)}%を全年限に一律適用（${S.hz<1?'3か月':'1年'}ロールヘッジ）。`);
+
+  const H=(DATA.history||[]).map(r=>({x:+new Date(r.date+'T00:00:00'),us10:r.us10,jp10:r.jp10,hc:r.usd_hedge_cost+S.bUsd/100}));
+  H.forEach(r=>r.h=r.us10-r.hc);
+  const hs=[{name:T('UST 10Y','米国債10年'),color:col.us,pts:H.map(r=>({x:r.x,y:r.us10}))},
+    {name:T('UST 10Y hedged','米国債10年 ヘッジ後'),color:col.red,dash:1,pts:H.map(r=>({x:r.x,y:r.h}))},
+    {name:T('JGB 10Y','日本国債10年'),color:col.jp,pts:H.map(r=>({x:r.x,y:r.jp10}))},
+    {name:T('Hedge cost','ヘッジコスト'),color:cssv('--mute'),area:1,width:1,pts:H.map(r=>({x:r.x,y:r.hc}))}];
+  lineChart($('#hist'),hs,{h:260,xType:'date',zero:true,yFmt:v=>num(v,1)+'%',tipFmt:v=>num(v,2)+'%'});
+  legend($('#histLeg'),hs);
+  $('#bUsdO').textContent=(S.bUsd>0?'+':'')+S.bUsd+'bp';$('#bEurO').textContent=(S.bEur>0?'+':'')+S.bEur+'bp';
+  $('#method').innerHTML=T(`<b>Method.</b> Hedge cost from covered interest parity: foreign ${S.hz<1?'3-month':'1-year'} government rate minus the 1-year JGB, plus the cross-currency basis you set (a more negative USD/JPY basis makes hedging dearer for yen investors; enter it as extra cost). Sources: Federal Reserve H.15 Treasury curve and ECB euro-area AAA par curve through OpenBB; JGB curve from Japan’s Ministry of Finance. Treasury data as of ${fdate(DATA.asof?.us)}. ${(DATA.errors||[]).length?'Missing: '+esc(DATA.errors.join('; ')):''} Indicative only.`,
+    `<b>算出方法。</b>カバー付き金利平価に基づくヘッジコスト：外国${S.hz<1?'3か月':'1年'}国債利回り − 日本国債1年 ＋ 設定したベーシス（ドル円ベーシスのマイナス幅が大きいほど円投資家のヘッジは割高。追加コストとして入力）。出所：OpenBB経由のFRB H.15米国債利回り、ECBユーロ圏AAAパー利回り、日本国債は財務省。米国債データ ${fdate(DATA.asof?.us)}時点。${(DATA.errors||[]).length?'欠損：'+esc(DATA.errors.join('; ')):''} 参考値です。`);
+}
+window.redraw=render;
+
+async function load(fresh){
+  setStatus('busy');
+  const r=await keel('api_yields',{basis_usd_bp:0,basis_eur_bp:0},{fresh});
+  if(r.ok&&r.data&&r.data.curves){DATA=r.data;LIVE=true;setStatus('live')}else{DATA=SAMPLE;LIVE=false;setStatus(r.code==='no_mcp'?'sample':'err',r.code,r.message)}
+  render();
+}
+$('#how').innerHTML=howHtml();
+$('#bUsd').oninput=e=>{S.bUsd=+e.target.value;render()};
+$('#bEur').oninput=e=>{S.bEur=+e.target.value;render()};
+$$('#hzSeg button').forEach(b=>b.onclick=()=>{S.hz=+b.dataset.h;$$('#hzSeg button').forEach(x=>x.classList.toggle('on',x===b));render()});
+$$('#langSeg button').forEach(b=>b.onclick=()=>{setLang(b.dataset.l);$('#how').innerHTML=howHtml();restatus();render()});
+$('#refresh').onclick=()=>load(true);
+setLang(LANG);render();load(false);
+</script>

@@ -1,0 +1,13 @@
+# Slim OpenBB install: only the providers Keel uses (~300 MB RAM, fits Render's free tier).
+# `pip install openbb` pulls every extension and needs ~1 GB.
+openbb-core==2.0.1
+openbb-yfinance==2.0.0
+openbb-federal-reserve==2.0.0
+openbb-ecb==2.0.0
+openbb-oecd==2.0.0
+yfinance==1.7.0
+fastapi==0.142.2
+uvicorn==0.54.0
+httpx==0.28.1
+pandas==3.0.6
+numpy==2.5.3

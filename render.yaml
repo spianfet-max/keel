@@ -1,0 +1,26 @@
+# Render Blueprint: New + > Blueprint, pick this repo. Creates two free web services.
+services:
+  - type: web
+    name: keel-api
+    runtime: python
+    plan: free
+    region: singapore
+    buildCommand: pip install -r requirements.txt && python -c "from openbb import obb"
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.13.5"
+      - key: KEEL_TOKEN
+        sync: false   # optional shared secret; leave empty for open access
+
+  - type: web
+    name: keel-mcp
+    runtime: python
+    plan: free
+    region: singapore
+    buildCommand: pip install -r requirements-mcp.txt && python -c "from openbb import obb"
+    startCommand: openbb-mcp --app mcp_app.py --name app --transport streamable-http --host 0.0.0.0 --port $PORT --system-prompt mcp_prompt.txt
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.13.5"
