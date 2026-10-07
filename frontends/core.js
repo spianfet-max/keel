@@ -29,9 +29,29 @@ function mcpReady(){
 }
 const unwrap=p=>{if(p&&typeof p==='object'&&!Array.isArray(p)&&Object.keys(p).length===1&&p.result&&typeof p.result==='object')return p.result;return p};
 /* Returns {ok:true,data} or {ok:false,code,message}. Retries once on retryable errors (Render waking up). */
+/* Outside claude.ai (GitHub Pages, a local file, VS Code Live Server) there is no connector:
+   call the Keel REST API directly. Address can be changed with localStorage 'keel-url'. */
+let KEEL_URL='https://keel-api-tqpz.onrender.com';try{KEEL_URL=localStorage.getItem('keel-url')||KEEL_URL}catch(e){}
+const REST={api_yields:'/api/yields',api_brief:'/api/brief',api_sp_screen:'/api/sp/screen',api_comps:'/api/comps',api_history:'/api/history',api_returns:'/api/returns',api_ppp:'/api/ppp',api_snapshot:'/api/snapshot'};
+let VIA=null;
+async function keelRest(tool,input){
+  const path=REST[tool];if(!path)return{ok:false,code:'no_mcp'};
+  const qs=new URLSearchParams(Object.entries(input||{}).filter(([,v])=>v!=null).map(([k,v])=>[k,String(v)])).toString();
+  for(let attempt=0;attempt<2;attempt++){
+    try{const ac=new AbortController(),to=setTimeout(()=>ac.abort(),90000);
+      const r=await fetch(KEEL_URL.replace(/\/+$/,'')+path+(qs?'?'+qs:''),{signal:ac.signal});clearTimeout(to);
+      if(r.ok){VIA='rest';return{ok:true,data:await r.json()}}
+      if(r.status>=500&&attempt===0){await new Promise(ok=>setTimeout(ok,5000));continue}
+      let msg='';try{msg=(await r.json()).detail||''}catch(e){}
+      return{ok:false,code:'rest_error',message:'HTTP '+r.status+(msg?': '+msg:'')};
+    }catch(e){if(attempt===0)continue;return{ok:false,code:'rest_unreachable',message:String(e&&e.message||e)}}
+  }
+  return{ok:false,code:'rest_unreachable'};
+}
 async function keel(tool,input,{fresh=false}={}){
   const m=await mcpReady();
-  if(!m)return{ok:false,code:'no_mcp'};
+  if(!m)return keelRest(tool,input);
+  VIA='mcp';
   const opts={cache:fresh?{refresh:true,staleTime:300000,gcTime:3600000}:{staleTime:300000,gcTime:3600000}};
   for(let attempt=0;attempt<2;attempt++){
     try{const r=await m.callTool(KEEL,tool,input,opts);
@@ -50,6 +70,8 @@ function keelMsg(code,message){
   switch(code){
     case 'no_mcp':case 'not_granted':case 'capability_disabled':case 'capability_removed':
       return T('Live data runs inside claude.ai. This view shows sample data.','ライブデータはclaude.ai内で動作します。この表示はサンプルデータです。');
+    case 'rest_unreachable':return T('Could not reach the Keel API. The free server may be waking up (about a minute), or this network blocks onrender.com.','Keel APIに接続できません。無料サーバーの起動中（約1分）か、このネットワークでonrender.comがブロックされています。');
+    case 'rest_error':return T('The Keel API returned an error: ','Keel APIのエラー：')+(message||'');
     case 'server_not_connected':case 'selection_required':case 'server_not_found':
       return T('Add your keel connector in claude.ai Settings → Connectors, then reload.','claude.aiの設定 → コネクタでKeelを追加し、再読み込みしてください。');
     case 'needs_reauth':return T('Reconnect Keel in claude.ai Settings → Connectors.','claude.aiの設定 → コネクタでKeelを再接続してください。');
@@ -65,7 +87,7 @@ function restatus(){if(STAT)setStatus(...STAT)}
 function setStatus(state,code,message){
   STAT=[state,code,message];const p=$('#status');if(!p)return;
   p.className='pill '+state;
-  p.innerHTML='<i></i>'+(state==='live'?T('Live · Keel','ライブ · Keel'):state==='busy'?T('Loading…','読み込み中…'):state==='sample'?T('Sample data','サンプルデータ'):T('Sample data','サンプルデータ'));
+  p.innerHTML='<i></i>'+(state==='live'?(VIA==='rest'?T('Live · Keel API','ライブ · Keel API'):T('Live · Keel','ライブ · Keel')):state==='busy'?T('Loading…','読み込み中…'):state==='sample'?T('Sample data','サンプルデータ'):T('Sample data','サンプルデータ'));
   const b=$('#banner');if(!b)return;
   if(state==='live'||state==='busy'){b.hidden=true;return}
   b.hidden=false;
