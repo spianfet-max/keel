@@ -56,6 +56,18 @@ _cache: dict = {}
 _lock = threading.Lock()
 
 
+def _has_data(v) -> bool:
+    if v is None:
+        return False
+    if isinstance(v, (pd.Series, pd.DataFrame)):
+        return not v.empty
+    if isinstance(v, dict):
+        return any(_has_data(x) if isinstance(x, (dict, list)) else x is not None for x in v.values())
+    if isinstance(v, (list, tuple)):
+        return len(v) > 0
+    return True
+
+
 def cached(ttl: int):
     def deco(fn):
         @wraps(fn)
@@ -67,8 +79,9 @@ def cached(ttl: int):
                 if hit and now - hit[0] < ttl:
                     return hit[1]
             val = fn(*args, **kwargs)
-            with _lock:
-                _cache[key] = (now, val)
+            if _has_data(val):  # never cache an empty answer (e.g. Yahoo throttling)
+                with _lock:
+                    _cache[key] = (now, val)
             return val
 
         wrapper.cache_clear = lambda: _cache.clear()  # type: ignore[attr-defined]
@@ -137,14 +150,17 @@ def many_closes(symbols: list[str], years: float = 3) -> dict[str, pd.Series]:
 def metrics(symbols: tuple[str, ...]) -> dict[str, dict]:
     """Valuation and profile numbers per symbol (yfinance key metrics + quote)."""
     out: dict[str, dict] = {s: {} for s in symbols}
-    try:
-        df = _df(obb().yfinance.equity.fundamental.metrics(symbol=",".join(symbols)))
-        for _, row in df.iterrows():
-            sym = row.get("symbol")
-            if sym in out:
-                out[sym].update({k: _clean(v) for k, v in row.items()})
-    except Exception as e:  # noqa: BLE001
-        log.warning("metrics failed: %s", e)
+    for attempt in range(2):
+        try:
+            df = _df(obb().yfinance.equity.fundamental.metrics(symbol=",".join(symbols)))
+            for _, row in df.iterrows():
+                sym = row.get("symbol")
+                if sym in out:
+                    out[sym].update({k: _clean(v) for k, v in row.items()})
+            break
+        except Exception as e:  # noqa: BLE001
+            log.warning("metrics failed (attempt %d): %s", attempt + 1, e)
+            time.sleep(1.5)
     try:
         q = _df(obb().yfinance.equity.price.quote(symbol=",".join(symbols)))
         for _, row in q.iterrows():
@@ -450,8 +466,11 @@ def implied_vol(symbol: str, target_days: int = 365) -> dict:
     exps.sort(key=lambda e: abs((date.fromisoformat(e) - today).days - target_days))
 
     def clean(df: pd.DataFrame) -> pd.DataFrame:
-        df = df[(df["bid"] > 0) & (df["ask"] > 0) & (df["impliedVolatility"] > 0.03) & (df["impliedVolatility"] < 3)]
-        return df
+        # A live bid during market hours; otherwise (Yahoo shows zero bids when closed) a traded price.
+        quoted = (df["bid"] > 0) & (df["ask"] > 0)
+        traded = (df["lastPrice"] > 0) & (df.get("volume", 0).fillna(0) > 0) if "volume" in df else (df["lastPrice"] > 0)
+        ok = quoted if quoted.sum() >= 3 else traded
+        return df[ok & (df["impliedVolatility"] > 0.05) & (df["impliedVolatility"] < 3)]
 
     for exp in exps[:4]:
         try:
