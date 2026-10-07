@@ -142,7 +142,7 @@ def client(monkeypatch):
     monkeypatch.setattr(D, "jgb_history", lambda: jgb)
     monkeypatch.setattr(D, "ecb_curve", lambda on=None: {1.0: 2.0, 10.0: 2.6, 30.0: 2.9})
     monkeypatch.setattr(D, "news", lambda s, limit=6: [{"title": f"{s} headline", "date": "2026-10-05", "url": "https://x", "source": "Y", "symbol": s}])
-    monkeypatch.setattr(D, "econ_calendar", lambda days=14: [{"date": "2026-10-10", "country": "US", "event": "CPI"}, {"date": "2026-10-11", "country": "BR", "event": "IPCA"}])
+    monkeypatch.setattr(D, "econ_calendar", lambda days=14: [{"date": "2026-10-10", "country": "US", "event": "CPI"}, {"date": "2026-10-11", "country": "BR", "event": "IPCA"}, {"date": "2026-10-12", "country": "Japan", "event": "PPI"}])
     monkeypatch.setattr(D, "company_events", lambda syms: [{"symbol": syms[0], "earnings_date": "2026-11-05"}])
     monkeypatch.setattr(D, "implied_vol", lambda s, d=365: {"atm_iv": 22.0, "skew_90": 3.0, "expiry": "2027-09-17"})
     cpi_idx = pd.date_range("2005-01-31", "2026-08-31", freq="ME")
@@ -166,10 +166,15 @@ def test_yields(client):
     assert j["history"] and "us10_hedged" in j["history"][-1]
 
 
+def test_country_key():
+    assert D.country_key("US") == "US" and D.country_key("Japan") == "JP"
+    assert D.country_key("EMU") == "EU" and D.country_key("BR") is None
+
+
 def test_brief_filters_calendar(client):
     j = client.get("/api/brief", params={"symbols": "USDJPY=X,7974.T"}).json()
     assert len(j["items"]) == 2 and j["items"][0]["spark"]
-    assert [e["country"] for e in j["calendar"]] == ["US"]
+    assert [e["country"] for e in j["calendar"]] == ["US", "JP"]
     assert j["news"] and j["events"]
 
 

@@ -171,32 +171,103 @@ def _clean(v):
 # --------------------------------------------------------------------------- #
 
 
+# Friendly search terms for symbols whose ticker feed is usually empty (FX, indices, futures).
+NEWS_QUERY = {"USDJPY=X": "yen dollar", "EURJPY=X": "euro yen", "GBPJPY=X": "pound yen", "^N225": "Nikkei",
+              "^TNX": "Treasury yields", "^FVX": "Treasury yields", "^GSPC": "S&P 500", "GC=F": "gold price",
+              "CL=F": "oil prices", "1306.T": "TOPIX"}
+
+
+def _norm_news(item: dict, sym: str) -> dict | None:
+    """Flatten one yfinance news item (same shape OpenBB's company-news fetcher reads)."""
+    c = item.get("content") if isinstance(item, dict) else None
+    if not isinstance(c, dict):
+        return None
+    url = None
+    for k in ("clickThroughUrl", "canonicalUrl"):
+        v = c.get(k)
+        if isinstance(v, dict) and v.get("url"):
+            url = v["url"]
+            break
+    prov = c.get("provider")
+    title = c.get("title")
+    if not title:
+        return None
+    return {"title": title, "date": c.get("pubDate") or c.get("displayTime"), "url": url or c.get("previewUrl"),
+            "source": prov.get("displayName") if isinstance(prov, dict) else None, "symbol": sym}
+
+
 @cached(ttl=900)
 def news(symbol: str, limit: int = 6) -> list[dict]:
-    df = _df(obb().yfinance.news(symbol=symbol, limit=limit, fetch_body=False))
-    items = []
-    for _, r in df.head(limit).iterrows():
-        items.append(
-            {
-                "title": r.get("title"),
-                "date": _clean(r.get("date")),
-                "source": r.get("author") or r.get("source"),
-                "url": r.get("url"),
-                "symbol": symbol,
-            }
-        )
-    return items
+    """Ticker news feed (yfinance, as OpenBB's company-news fetcher does); falls back to a keyword search."""
+    import yfinance as yf  # noqa: PLC0415
+
+    items: list[dict] = []
+    try:
+        items = [n for n in (_norm_news(x, symbol) for x in (yf.Ticker(symbol).get_news(count=limit) or [])) if n]
+    except Exception as e:  # noqa: BLE001
+        log.warning("news feed %s failed: %s", symbol, e)
+    if not items:
+        q = NEWS_QUERY.get(symbol)
+        if q:
+            try:
+                df = _df(obb().yfinance.news(query=q, limit=limit, fetch_body=False))
+                for _, r in df.head(limit).iterrows():
+                    items.append({"title": r.get("title"), "date": _clean(r.get("date")), "source": r.get("author"),
+                                  "url": r.get("url"), "symbol": symbol})
+            except Exception as e:  # noqa: BLE001
+                log.warning("news search %s failed: %s", q, e)
+    return items[:limit]
+
+
+CAL_ALIASES = {
+    "US": {"US", "USA", "UNITED STATES"},
+    "JP": {"JP", "JPN", "JAPAN"},
+    "EU": {"EU", "EZ", "EMU", "EA", "EUR", "EURO AREA", "EUROZONE", "EURO ZONE", "EUROPEAN UNION"},
+    "DE": {"DE", "DEU", "GERMANY"},
+    "GB": {"GB", "UK", "GBR", "UNITED KINGDOM"},
+    "CN": {"CN", "CHN", "CHINA"},
+}
+
+
+def country_key(raw) -> str | None:
+    s = str(raw or "").strip().upper()
+    for k, al in CAL_ALIASES.items():
+        if s in al:
+            return k
+    return None
 
 
 @cached(ttl=3600)
 def econ_calendar(days: int = 14) -> list[dict]:
+    """Economic events for the next `days`. Yahoo returns 12 rows unless asked, so page through up to 300."""
+    import yfinance as yf  # noqa: PLC0415
+
     start = date.today()
     end = start + timedelta(days=days)
-    df = _df(obb().yfinance.economy.calendar(start_date=start.isoformat(), end_date=end.isoformat()))
-    keep = ["date", "country", "event", "importance", "consensus", "previous", "actual", "reference_period"]
+    cal = yf.Calendars(start=start.isoformat(), end=end.isoformat())
+    frames = []
+    for off in (0, 100, 200):
+        df = cal.get_economic_events_calendar(start=start.isoformat(), end=end.isoformat(), limit=100, offset=off, force=True)
+        if df is None or df.empty:
+            break
+        frames.append(df.reset_index())
+        if len(df) < 100:
+            break
+    if not frames:
+        return []
+    df = pd.concat(frames, ignore_index=True)
     rows = []
     for _, r in df.iterrows():
-        rows.append({k: _clean(r.get(k)) for k in keep})
+        rows.append({
+            "date": _clean(r.get("Event Time")),
+            "country": r.get("Region"),
+            "event": r.get("Event"),
+            "reference_period": r.get("For"),
+            "actual": _clean(r.get("Actual")),
+            "consensus": _clean(r.get("Expected")),
+            "previous": _clean(r.get("Last")),
+        })
+    rows.sort(key=lambda x: str(x["date"] or ""))
     return rows
 
 

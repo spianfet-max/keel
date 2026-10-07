@@ -237,6 +237,8 @@ def brief(
 
     news_items: list[dict] = []
     got = D._pool(lambda s: D.news(s, 5), syms)
+    if not any(got.values()):
+        errors.append("news: no headlines returned")
     for s in syms:
         news_items.extend(got.get(s) or [])
     news_items.sort(key=lambda n: n.get("date") or "", reverse=True)
@@ -256,11 +258,14 @@ def brief(
 
     cal = []
     try:
-        keep = {c.strip().upper() for c in countries.split(",") if c.strip()}
-        for ev in D.econ_calendar(days):
-            ctry = str(ev.get("country") or "").upper()
-            if not keep or ctry in keep or ctry[:2] in keep:
-                cal.append(ev)
+        keep = {D.country_key(c) or c.strip().upper() for c in countries.split(",") if c.strip()}
+        allev = D.econ_calendar(days)
+        for ev in allev:
+            k = D.country_key(ev.get("country"))
+            if not keep or (k and k in keep):
+                cal.append({**ev, "country": k or ev.get("country")})
+        if allev and not cal:
+            errors.append(f"economic calendar: {len(allev)} events, none for {sorted(keep)}")
     except Exception as e:  # noqa: BLE001
         errors.append(f"economic calendar: {e}")
 
