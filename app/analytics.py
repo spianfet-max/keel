@@ -347,3 +347,19 @@ def zero_cost_call_strike(
         else:
             hi = mid
     return (lo + hi) / 2
+
+
+def implied_vol_from_price(kind: str, price: float, s: float, k: float, t: float, r: float, q: float) -> float | None:
+    """Black-Scholes implied vol (decimal) by bisection; None if the price is outside no-arbitrage bounds."""
+    if price is None or price <= 0 or t <= 0:
+        return None
+    lo, hi = 1e-4, 4.0
+    if not (bs_price(kind, s, k, t, r, q, lo) < price < bs_price(kind, s, k, t, r, q, hi)):
+        return None
+    for _ in range(80):
+        mid = (lo + hi) / 2
+        if bs_price(kind, s, k, t, r, q, mid) > price:
+            hi = mid
+        else:
+            lo = mid
+    return (lo + hi) / 2

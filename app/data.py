@@ -446,16 +446,19 @@ def jgb_history() -> pd.DataFrame:
 
 
 @cached(ttl=1800)
-def implied_vol(symbol: str, target_days: int = 365) -> dict:
-    """ATM implied vol and 90% put skew near target_days.
+def implied_vol(symbol: str, target_days: int = 365, rate: float = 0.04, div_yield: float = 0.0) -> dict:
+    """ATM implied vol and 90% put skew near target_days, computed from option prices.
 
-    Uses the yfinance library bundled with OpenBB's yfinance extension. Stale
-    far-dated quotes often carry junk vols, so only options with a live bid are
-    used, the ATM figure is the median over 95-105% strikes, and the next-closest
-    expiries are tried if the nearest has no clean quotes. Coverage is good for
-    US names and thin for most Japanese single stocks.
+    Yahoo's own impliedVolatility field is junk outside US trading hours (it is
+    derived from zero bids), so vols are solved here with Black-Scholes from the
+    mid-quote when there is a live market, else the last traded price. ATM is the
+    median over 95-105% strikes; the next-closest expiries are tried if the nearest
+    has too few prices. rate and div_yield are decimals. Coverage is good for US
+    names and thin for most Japanese single stocks.
     """
     import yfinance as yf  # noqa: PLC0415
+
+    from .analytics import implied_vol_from_price  # noqa: PLC0415
 
     t = yf.Ticker(symbol)
     exps = list(t.options or [])
@@ -469,26 +472,28 @@ def implied_vol(symbol: str, target_days: int = 365) -> dict:
     exps = [e for e in exps if (date.fromisoformat(e) - today).days >= 20]
     exps.sort(key=lambda e: abs((date.fromisoformat(e) - today).days - target_days))
 
-    def clean(df: pd.DataFrame) -> pd.DataFrame:
-        # A live bid during market hours; otherwise (Yahoo shows zero bids when closed) a traded price.
-        quoted = (df["bid"] > 0) & (df["ask"] > 0)
-        traded = (df["lastPrice"] > 0) & (df.get("volume", 0).fillna(0) > 0) if "volume" in df else (df["lastPrice"] > 0)
-        ok = quoted if quoted.sum() >= 3 else traded
-        return df[ok & (df["impliedVolatility"] > 0.05) & (df["impliedVolatility"] < 3)]
+    def vols(df: pd.DataFrame, kind: str, tyears: float, lo: float, hi: float) -> list[float]:
+        out = []
+        for _, r in df[(df["strike"] >= spot * lo) & (df["strike"] <= spot * hi)].iterrows():
+            bid, ask, last = r.get("bid") or 0, r.get("ask") or 0, r.get("lastPrice") or 0
+            px = (bid + ask) / 2 if bid > 0 and ask > 0 else last
+            v = implied_vol_from_price(kind, float(px), spot, float(r["strike"]), tyears, rate, div_yield)
+            if v is not None and 0.05 < v < 3:
+                out.append(v * 100)
+        return out
 
     for exp in exps[:4]:
         try:
             ch = t.option_chain(exp)
         except Exception:  # noqa: BLE001
             continue
-        both = pd.concat([clean(ch.calls), clean(ch.puts)])
-        near = both[(both["strike"] >= spot * 0.95) & (both["strike"] <= spot * 1.05)]
+        tyears = (date.fromisoformat(exp) - today).days / 365.0
+        near = vols(ch.calls, "call", tyears, 0.95, 1.05) + vols(ch.puts, "put", tyears, 0.95, 1.05)
         if len(near) < 2:
             continue
-        atm = float(near["impliedVolatility"].median() * 100)
-        puts = clean(ch.puts)
-        p90 = puts[(puts["strike"] >= spot * 0.87) & (puts["strike"] <= spot * 0.93)]
-        put90 = float(p90["impliedVolatility"].median() * 100) if len(p90) else None
+        atm = float(np.median(near))
+        p90 = vols(ch.puts, "put", tyears, 0.87, 0.93)
+        put90 = float(np.median(p90)) if p90 else None
         return {
             "expiry": exp,
             "days": (date.fromisoformat(exp) - today).days,

@@ -336,7 +336,18 @@ def sp_screen(
         meta = D.metrics(tuple(s for s in syms if not s.startswith("^")))
     except Exception:  # noqa: BLE001
         pass
-    ivs = D._pool(lambda s: D.implied_vol(s, tenor_m * 30), syms) if iv else {}
+    usd_rate = 0.04
+    try:
+        h = D.ust_history(1).dropna(how="all")
+        usd_rate = float(h[1.0].dropna().iloc[-1]) / 100
+    except Exception:  # noqa: BLE001
+        pass
+
+    def _iv(s):
+        dy = (meta.get(s, {}).get("dividend_yield") or 0) / 100  # Yahoo gives percent
+        return D.implied_vol(s, tenor_m * 30, usd_rate, dy)
+
+    ivs = D._pool(_iv, syms) if iv else {}
 
     rows = []
     for s in syms:

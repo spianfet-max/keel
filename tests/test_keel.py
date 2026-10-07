@@ -101,6 +101,12 @@ def test_collar_zero_cost():
     assert call == pytest.approx(put, rel=1e-4)
 
 
+def test_implied_vol_roundtrip():
+    px = A.bs_price("put", 100, 90, 1, 0.04, 0.01, 0.31)
+    assert A.implied_vol_from_price("put", px, 100, 90, 1, 0.04, 0.01) == pytest.approx(0.31, abs=1e-4)
+    assert A.implied_vol_from_price("call", 0.0, 100, 90, 1, 0.04, 0.01) is None
+
+
 def test_bs_put_call_parity():
     s, k, t, r, q, v = 100, 105, 0.75, 0.01, 0.02, 0.25
     c, p = A.bs_price("call", s, k, t, r, q, v), A.bs_price("put", s, k, t, r, q, v)
@@ -154,7 +160,7 @@ def client(monkeypatch):
     monkeypatch.setattr(D, "news", lambda s, limit=6, query=None: [{"title": f"{s} headline", "date": "2026-10-05", "url": "https://x", "source": "Y", "symbol": s}])
     monkeypatch.setattr(D, "econ_calendar", lambda days=14: [{"date": "2026-10-10", "country": "US", "event": "CPI"}, {"date": "2026-10-11", "country": "BR", "event": "IPCA"}, {"date": "2026-10-12", "country": "Japan", "event": "PPI"}])
     monkeypatch.setattr(D, "company_events", lambda syms: [{"symbol": syms[0], "earnings_date": "2026-11-05"}])
-    monkeypatch.setattr(D, "implied_vol", lambda s, d=365: {"atm_iv": 22.0, "skew_90": 3.0, "expiry": "2027-09-17"})
+    monkeypatch.setattr(D, "implied_vol", lambda s, d=365, r=0.04, q=0.0: {"atm_iv": 22.0, "skew_90": 3.0, "expiry": "2027-09-17"})
     cpi_idx = pd.date_range("2005-01-31", "2026-08-31", freq="ME")
     cpi = pd.DataFrame({n: np.linspace(100, 160, len(cpi_idx)) for n, _ in M.PPP_MAP.values()}, index=cpi_idx)
     cpi["japan"] = np.linspace(100, 112, len(cpi_idx))
