@@ -67,6 +67,35 @@ def interp_curve(curve: dict[float, float], tenor: float) -> float | None:
 # --------------------------------------------------------------------------- #
 
 
+SPLIT_RATIOS = (2, 3, 4, 5, 8, 10, 20, 25, 50, 100)
+
+
+def fix_splits(closes: pd.Series, tol: float = 0.06) -> pd.Series:
+    """Undo unadjusted stock splits: a one-day move close to 1:n or n:1 rescales the earlier history.
+
+    Yahoo occasionally misses splits for Japanese ETFs and small caps, which shows up
+    as a single 90% 'crash'. Real one-day moves of that size essentially never happen
+    in the instruments these tools cover.
+    """
+    c = pd.to_numeric(closes, errors="coerce").dropna().astype(float).copy()
+    if len(c) < 3:
+        return c
+    vals = c.values
+    for i in range(1, len(vals)):
+        r = vals[i] / vals[i - 1]
+        if 0.4 < r < 2.5:
+            continue
+        for n in SPLIT_RATIOS:
+            for target in (1 / n, float(n)):
+                if abs(r / target - 1) < tol:
+                    vals[:i] = vals[:i] * target
+                    break
+            else:
+                continue
+            break
+    return pd.Series(vals, index=c.index, name=closes.name)
+
+
 def log_returns(closes: pd.Series) -> pd.Series:
     c = pd.to_numeric(closes, errors="coerce").dropna()
     c = c[c > 0]

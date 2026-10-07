@@ -76,6 +76,16 @@ def test_barrier_backtest_bounds_and_logic():
     assert basket["ki_rate"] >= single["ki_rate"] - 1e-9
 
 
+def test_fix_splits():
+    idx = pd.bdate_range("2024-01-01", periods=6)
+    raw = pd.Series([3000, 3010, 3020, 302, 303, 304], index=idx, dtype=float)  # unadjusted 10:1 split
+    fixed = A.fix_splits(raw)
+    assert fixed.iloc[0] == pytest.approx(300) and fixed.iloc[-1] == 304
+    assert A.realized_vol(fixed) < 20
+    crash = pd.Series([100, 100, 55, 56, 57, 58], index=idx, dtype=float)  # real -45% move left alone
+    assert A.fix_splits(crash).iloc[0] == 100
+
+
 def test_monthly_return_stats():
     st = A.monthly_return_stats({"A": gbm(seed=4), "B": gbm(seed=5, vol=0.1)})
     assert st["months"] > 100

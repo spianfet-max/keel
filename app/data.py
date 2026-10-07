@@ -27,7 +27,7 @@ import httpx
 import numpy as np
 import pandas as pd
 
-from .analytics import to_percent
+from .analytics import fix_splits, to_percent
 
 log = logging.getLogger("keel.data")
 
@@ -123,6 +123,8 @@ def closes(symbol: str, years: float = 3) -> pd.Series:
     s = pd.Series(pd.to_numeric(df["close"], errors="coerce").values, index=pd.to_datetime(df["date"]))
     s = s[~s.index.duplicated(keep="last")].sort_index().dropna()
     s.name = symbol
+    if "=" not in symbol and not symbol.startswith("^"):
+        s = fix_splits(s)
     return s
 
 
