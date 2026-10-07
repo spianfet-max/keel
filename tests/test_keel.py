@@ -125,6 +125,21 @@ R8.10.5,0.82,0.96,1.03,1.11,1.23,1.32,1.4,1.47,1.54,1.62,2.02,2.42,2.62,2.82,3.0
 """
 
 
+OECD_SAMPLE = """STRUCTURE,STRUCTURE_ID,ACTION,REF_AREA,FREQ,METHODOLOGY,MEASURE,UNIT_MEASURE,EXPENDITURE,ADJUSTMENT,TRANSFORMATION,TIME_PERIOD,OBS_VALUE
+DATAFLOW,OECD.SDD.TPS:DSD_PRICES@DF_PRICES_ALL(1.0),I,JPN,M,N,CPI,IX,_T,N,_Z,2026-07,111.2
+DATAFLOW,OECD.SDD.TPS:DSD_PRICES@DF_PRICES_ALL(1.0),I,JPN,M,N,CPI,IX,_T,N,_Z,2026-08,111.5
+DATAFLOW,OECD.SDD.TPS:DSD_PRICES@DF_PRICES_ALL(1.0),I,AUS,Q,N,CPI,IX,_T,N,_Z,2026-Q2,140.0
+DATAFLOW,OECD.SDD.TPS:DSD_PRICES@DF_PRICES_ALL(1.0),I,EA20,M,N,CPI,IX,_T,N,_Z,2026-08,
+"""
+
+
+def test_parse_oecd_cpi():
+    df = D.parse_oecd_cpi_csv(OECD_SAMPLE)
+    assert df.loc["2026-08-31", "JPN"] == pytest.approx(111.5)
+    assert df.loc["2026-06-30", "AUS"] == pytest.approx(140.0)
+    assert "EA20" not in df
+
+
 def test_parse_mof():
     df = D.parse_mof_csv(MOF_SAMPLE)
     assert list(df.columns)[:3] == [1.0, 2.0, 3.0]
@@ -163,8 +178,8 @@ def client(monkeypatch):
     monkeypatch.setattr(D, "implied_vol", lambda s, d=365, r=0.04, q=0.0: {"atm_iv": 22.0, "skew_90": 3.0, "expiry": "2027-09-17"})
     cpi_idx = pd.date_range("2005-01-31", "2026-08-31", freq="ME")
     cpi = pd.DataFrame({n: np.linspace(100, 160, len(cpi_idx)) for n, _ in M.PPP_MAP.values()}, index=cpi_idx)
-    cpi["japan"] = np.linspace(100, 112, len(cpi_idx))
-    cpi["united_states"] = np.linspace(100, 170, len(cpi_idx))
+    cpi["JPN"] = np.linspace(100, 112, len(cpi_idx))
+    cpi["USA"] = np.linspace(100, 170, len(cpi_idx))
     monkeypatch.setattr(D, "cpi_index", lambda names, start="2000-01-01": cpi)
     return TestClient(M.app)
 

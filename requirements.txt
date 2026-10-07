@@ -4,7 +4,6 @@ openbb-core==2.0.1
 openbb-yfinance==2.0.0
 openbb-federal-reserve==2.0.0
 openbb-ecb==2.0.0
-openbb-oecd==2.0.0
 yfinance==1.7.0
 fastapi==0.142.2
 uvicorn==0.54.0

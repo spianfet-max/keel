@@ -436,32 +436,35 @@ def returns(
     return _safe(stats)
 
 
-# Parity: OECD CPI names for the countries it covers (ISO3 -> OECD name, currency)
+# Parity: Parity's ISO3 code -> (OECD area code, currency)
 PPP_MAP = {
-    "AUS": ("australia", "AUD"), "BRA": ("brazil", "BRL"), "CAN": ("canada", "CAD"), "CHE": ("switzerland", "CHF"),
-    "CHL": ("chile", "CLP"), "CHN": ("china", "CNY"), "COL": ("colombia", "COP"), "CRI": ("costa_rica", "CRC"),
-    "CZE": ("czechia", "CZK"), "DNK": ("denmark", "DKK"), "EUZ": ("euro_area_20_countries", "EUR"),
-    "GBR": ("united_kingdom", "GBP"), "HUN": ("hungary", "HUF"), "IDN": ("indonesia", "IDR"), "IND": ("india", "INR"),
-    "ISR": ("israel", "ILS"), "JPN": ("japan", "JPY"), "KOR": ("korea", "KRW"), "MEX": ("mexico", "MXN"),
-    "NOR": ("norway", "NOK"), "NZL": ("new_zealand", "NZD"), "POL": ("poland", "PLN"), "SAU": ("saudi_arabia", "SAR"),
-    "SWE": ("sweden", "SEK"), "TUR": ("turkiye", "TRY"), "ZAF": ("south_africa", "ZAR"),
+    "AUS": ("AUS", "AUD"), "BRA": ("BRA", "BRL"), "CAN": ("CAN", "CAD"), "CHE": ("CHE", "CHF"),
+    "CHL": ("CHL", "CLP"), "CHN": ("CHN", "CNY"), "COL": ("COL", "COP"), "CRI": ("CRI", "CRC"),
+    "CZE": ("CZE", "CZK"), "DNK": ("DNK", "DKK"), "EUZ": ("EA20", "EUR"),
+    "GBR": ("GBR", "GBP"), "HUN": ("HUN", "HUF"), "IDN": ("IDN", "IDR"), "IND": ("IND", "INR"),
+    "ISR": ("ISR", "ILS"), "JPN": ("JPN", "JPY"), "KOR": ("KOR", "KRW"), "MEX": ("MEX", "MXN"),
+    "NOR": ("NOR", "NOK"), "NZL": ("NZL", "NZD"), "POL": ("POL", "PLN"), "SAU": ("SAU", "SAR"),
+    "SWE": ("SWE", "SEK"), "TUR": ("TUR", "TRY"), "ZAF": ("ZAF", "ZAR"),
 }
 
 
 @app.get("/api/ppp", operation_id="relative_ppp", dependencies=[Depends(check_token)])
 def ppp(base_year: int = Query(2005, ge=2000, le=2020)):
-    """Relative purchasing-power parity against the dollar from OECD CPI.
+    """Relative purchasing-power parity against the dollar from OECD CPI (OECD SDMX API).
 
     Fair rate today = average market rate in the base year x (local CPI growth / US CPI growth).
     Gap < 0 means the currency trades cheaper than inflation differentials imply.
     """
-    names = tuple(sorted({v[0] for v in PPP_MAP.values()} | {"united_states"}))
-    cpi = D.cpi_index(names, f"{base_year}-01-01")
-    if cpi.empty or "united_states" not in cpi:
+    areas = tuple(sorted({v[0] for v in PPP_MAP.values()} | {"USA"}))
+    try:
+        cpi = D.cpi_index(areas, f"{base_year}-01")
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(503, f"OECD CPI unavailable: {e}") from e
+    if cpi.empty or "USA" not in cpi:
         raise HTTPException(503, "CPI data unavailable")
     fx = D.many_closes([f"{c}=X" for _, c in PPP_MAP.values()], date.today().year - base_year + 1)
     base_mask = cpi.index.year == base_year
-    us_ratio = cpi["united_states"].dropna().iloc[-1] / cpi.loc[base_mask, "united_states"].mean()
+    us_ratio = cpi["USA"].dropna().iloc[-1] / cpi.loc[base_mask, "USA"].mean()
     rows = []
     for iso, (name, ccy) in PPP_MAP.items():
         s = fx.get(f"{ccy}=X")

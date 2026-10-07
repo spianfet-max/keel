@@ -43,7 +43,7 @@ In chat, Claude gets the Keel tools (`api_yields`, `api_brief`, `api_sp_screen`,
 | Prices, quotes, fundamentals, news, earnings dates, economic calendar | OpenBB `yfinance` extension | no |
 | US Treasury curve | OpenBB `federal_reserve` (H.15) | no |
 | Euro-area AAA curve | OpenBB `ecb` | no |
-| CPI | OpenBB `oecd` | no |
+| CPI | OECD SDMX API, called directly (OpenBB's `oecd` extension needs more memory than the free tier) | no |
 | JGB curve | Japan Ministry of Finance CSV (not in OpenBB) | no |
 | Option implied vols | `yfinance` library bundled with OpenBB's extension; thin for Japanese single stocks | no |
 

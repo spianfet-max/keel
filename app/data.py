@@ -509,17 +509,43 @@ def implied_vol(symbol: str, target_days: int = 365, rate: float = 0.04, div_yie
 # --------------------------------------------------------------------------- #
 
 
+OECD_CPI_URL = ("https://sdmx.oecd.org/public/rest/v2/data/dataflow/OECD.SDD.TPS/DSD_PRICES%40DF_PRICES_ALL/1.0/"
+                "{areas}.*.N.CPI.IX._T.N._Z?dimensionAtObservation=TIME_PERIOD&detail=full&c[TIME_PERIOD]=ge:{start}")
+
+
+def parse_oecd_cpi_csv(text: str) -> pd.DataFrame:
+    """SDMX-CSV from the OECD prices dataflow -> monthly CPI index, one column per ISO3 area.
+
+    Monthly series are preferred; areas that only publish quarterly (Australia,
+    New Zealand) are spread to month-ends by carrying each quarter forward.
+    """
+    df = pd.read_csv(io.StringIO(text))
+    df = df[["REF_AREA", "FREQ", "TIME_PERIOD", "OBS_VALUE"]].dropna(subset=["OBS_VALUE"])
+    out = {}
+    for area, g in df.groupby("REF_AREA"):
+        m = g[g["FREQ"] == "M"]
+        if not m.empty:
+            idx = pd.PeriodIndex(m["TIME_PERIOD"], freq="M").to_timestamp(how="end").normalize()
+            out[area] = pd.Series(m["OBS_VALUE"].astype(float).values, index=idx).sort_index()
+            continue
+        q = g[g["FREQ"] == "Q"]
+        if not q.empty:
+            idx = pd.PeriodIndex(q["TIME_PERIOD"].str.replace("-Q", "Q"), freq="Q").to_timestamp(how="end").normalize()
+            ser = pd.Series(q["OBS_VALUE"].astype(float).values, index=idx).sort_index()
+            out[area] = ser.resample("ME").ffill()
+    return pd.DataFrame(out).sort_index()
+
+
 @cached(ttl=12 * 3600)
-def cpi_index(countries: tuple[str, ...], start: str = "2000-01-01") -> pd.DataFrame:
-    """Monthly CPI index levels (OECD), columns = OECD country names."""
-    df = _df(obb().oecd.cpi(country=",".join(countries), transform="index", frequency="monthly", start_date=start))
-    if df.empty:
-        return df
-    if "expenditure" in df:
-        tot = df[df["expenditure"].astype(str).str.lower().isin(["total", "all"])]
-        if not tot.empty:
-            df = tot
-    df["date"] = pd.to_datetime(df["date"])
-    wide = df.pivot_table(index="date", columns="country", values="value", aggfunc="last").sort_index()
-    wide.columns = [str(c).lower().replace(" ", "_") for c in wide.columns]
-    return wide
+def cpi_index(areas: tuple[str, ...], start: str = "2005-01") -> pd.DataFrame:
+    """Monthly CPI index levels from the OECD (ISO3 area codes; euro area = EA20).
+
+    Called directly rather than through OpenBB's OECD extension, whose metadata
+    loader needs more memory than Render's free tier has.
+    """
+    url = OECD_CPI_URL.format(areas="+".join(areas), start=start)
+    headers = {"Accept": "application/vnd.sdmx.data+csv; version=2.0.0", "User-Agent": "keel/1.0"}
+    with httpx.Client(timeout=60, headers=headers) as c:
+        r = c.get(url)
+        r.raise_for_status()
+    return parse_oecd_cpi_csv(r.text)
