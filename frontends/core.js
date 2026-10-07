@@ -21,7 +21,7 @@ const big=v=>{if(v==null||!isFinite(v))return'—';const a=Math.abs(v);return a>
 const fdate=(d,o={day:'numeric',month:'short',year:'numeric'})=>{if(!d)return'—';const x=new Date(String(d).length<=10?d+'T00:00:00':d);return isNaN(x)?String(d):x.toLocaleDateString(JA()?'ja-JP':'en-GB',o)};
 
 /* ----- Keel: market data through the viewer's "Keel" connector ----- */
-const KEEL='Keel';
+const KEEL='keel'; /* exact display name of the custom connector (a different 'Keel' exists in the connector directory) */
 let MCP=null, MCPREADY=null;
 function mcpReady(){
   if(!MCPREADY)MCPREADY=(window.claude&&window.claude.use?window.claude.use('mcp'):Promise.resolve(null)).then(m=>(MCP=m)).catch(()=>null);
@@ -51,10 +51,10 @@ function keelMsg(code,message){
     case 'no_mcp':case 'not_granted':case 'capability_disabled':case 'capability_removed':
       return T('Live data runs inside claude.ai. This view shows sample data.','ライブデータはclaude.ai内で動作します。この表示はサンプルデータです。');
     case 'server_not_connected':case 'selection_required':case 'server_not_found':
-      return T('Add the Keel connector in claude.ai Settings → Connectors, then reload.','claude.aiの設定 → コネクタでKeelを追加し、再読み込みしてください。');
+      return T('Add your keel connector in claude.ai Settings → Connectors, then reload.','claude.aiの設定 → コネクタでKeelを追加し、再読み込みしてください。');
     case 'needs_reauth':return T('Reconnect Keel in claude.ai Settings → Connectors.','claude.aiの設定 → コネクタでKeelを再接続してください。');
     case 'not_in_manifest':return T('Keel is not allowed for this page. Allow it from the page’s Permissions menu.','このページではKeelが許可されていません。ページの権限メニューから許可してください。');
-    case 'blocked_by_policy':case 'approval_required':return T('Your organisation’s policy blocks Keel here.','組織のポリシーによりKeelは使用できません。');
+    case 'blocked_by_policy':case 'approval_required':return T('This page reached a connector that cannot serve it. Make sure your custom connector is named exactly “keel” (lowercase), not the directory’s “Keel”.','このページは別のコネクタに接続されています。カスタムコネクタ名が小文字の「keel」であることを確認してください（ディレクトリの「Keel」とは別物です）。');
     case 'server_unavailable':return T('Keel did not answer. The free server may be waking up; try Refresh in a minute.','Keelが応答しません。無料サーバーの起動中の可能性があります。1分後に更新してください。');
     case 'tool_error':return T('Keel reported an error: ','Keelのエラー：')+(message||'');
     default:return T('Live data unavailable','ライブデータを取得できません')+(message?': '+message:'.');
@@ -74,7 +74,7 @@ function setStatus(state,code,message){
 }
 function howHtml(){return `<b>${T('Connect live data (one time)','ライブデータの接続（初回のみ）')}</b><ol>
 <li>${T('Deploy the Keel repo on Render (Blueprint). It creates <code>keel-api</code> and <code>keel-mcp</code>.','KeelリポジトリをRenderにデプロイ（Blueprint）。<code>keel-api</code>と<code>keel-mcp</code>が作成されます。')}</li>
-<li>${T('In claude.ai, Settings → Connectors → Add custom connector. Name it exactly <code>Keel</code>; URL: your <code>keel-mcp</code> service address on Render + <code>/mcp</code>.','claude.aiの設定 → コネクタ → カスタムコネクタを追加。名前は必ず<code>Keel</code>、URLはRenderの<code>keel-mcp</code>のアドレス＋<code>/mcp</code>。')}</li>
+<li>${T('In claude.ai, Settings → Connectors → Add custom connector. Name it exactly <code>keel</code> (lowercase; a different “Keel” connector exists); URL: your <code>keel-mcp</code> service address on Render + <code>/mcp</code>.','claude.aiの設定 → コネクタ → カスタムコネクタを追加。名前は必ず小文字の<code>keel</code>（別の「Keel」コネクタがあるため）、URLはRenderの<code>keel-mcp</code>のアドレス＋<code>/mcp</code>。')}</li>
 <li>${T('Reload this page and allow Keel when asked.','このページを再読み込みし、確認が出たらKeelを許可します。')}</li></ol>
 <p class="note" style="margin-top:8px">${T('Only ticker symbols and parameters are sent. Public market data from OpenBB providers; free sources can be delayed.','送信されるのはティッカーとパラメータのみ。データはOpenBB経由の公開市場データで、無料ソースのため遅延する場合があります。')}</p>`}
 
