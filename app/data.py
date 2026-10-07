@@ -526,8 +526,10 @@ def implied_vol(symbol: str, target_days: int = 365, rate: float = 0.04, div_yie
 # --------------------------------------------------------------------------- #
 
 
-OECD_CPI_URL = ("https://sdmx.oecd.org/public/rest/v2/data/dataflow/OECD.SDD.TPS/DSD_PRICES%40DF_PRICES_ALL/1.0/"
-                "{area}.{freq}.N.CPI.IX._T.N._Z?dimensionAtObservation=TIME_PERIOD&detail=dataonly")
+# OECD SDMX REST v1 accepts several areas joined by '+' in one key (the v2 path returns an
+# empty body for that), so a refresh costs two requests: monthly areas and quarterly ones.
+OECD_CPI_URL = ("https://sdmx.oecd.org/public/rest/data/OECD.SDD.TPS,DSD_PRICES@DF_PRICES_ALL,1.0/"
+                "{areas}.{freq}.N.CPI.IX._T.N._Z?startPeriod={start}&dimensionAtObservation=AllDimensions")
 OECD_QUARTERLY = {"AUS", "NZL"}
 
 
@@ -555,21 +557,22 @@ def parse_oecd_cpi_csv(text: str) -> pd.DataFrame:
 
 
 @cached(ttl=24 * 3600)
-def _cpi_area(area: str) -> str | None:
-    """Raw SDMX-CSV for one area, cached a day. Backs off on HTTP 429 (the OECD API is rate-limited)."""
-    headers = {"Accept": "application/vnd.sdmx.data+csv; version=2.0.0", "User-Agent": "keel/1.0"}
-    url = OECD_CPI_URL.format(area=area, freq="Q" if area in OECD_QUARTERLY else "M")
-    with httpx.Client(timeout=45, headers=headers) as c:
-        for attempt in range(3):
+def _cpi_csv(areas: tuple[str, ...], freq: str, start: str) -> str | None:
+    """Raw SDMX-CSV for several areas in one request, cached a day; backs off once on HTTP 429."""
+    headers = {"Accept": "application/vnd.sdmx.data+csv; charset=utf-8", "User-Agent": "keel/1.0"}
+    url = OECD_CPI_URL.format(areas="+".join(areas), freq=freq, start=start)
+    with httpx.Client(timeout=60, headers=headers) as c:
+        for attempt in range(2):
             r = c.get(url)
-            if r.status_code == 429:
-                wait = float(r.headers.get("Retry-After") or 0) or 2.0 * (attempt + 1)
-                time.sleep(min(wait, 8))
+            if r.status_code == 429 and attempt == 0:
+                time.sleep(min(float(r.headers.get("Retry-After") or 5), 10))
                 continue
-            if r.status_code == 200 and r.text.strip():
-                return r.text
             break
-    log.warning("OECD CPI %s: HTTP %s", area, r.status_code)
+    if r.status_code == 200 and r.text.strip():
+        return r.text
+    log.warning("OECD CPI %s (%s): HTTP %s, %d bytes", freq, ",".join(areas), r.status_code, len(r.text))
+    if r.status_code == 429:
+        raise ValueError("the OECD API rate limit was hit; it resets within the hour")
     return None
 
 
@@ -577,19 +580,18 @@ def cpi_index(areas: tuple[str, ...], start: str = "2005-01") -> pd.DataFrame:
     """Monthly CPI index levels from the OECD (ISO3 area codes; euro area = EA20).
 
     Called directly rather than through OpenBB's OECD extension, whose metadata
-    loader needs more memory than Render's free tier has. One request per area
-    (multi-area keys come back empty from the v2 API), one at a time because the
-    API rate-limits, USA first since every comparison needs it.
+    loader needs more memory than Render's free tier has. Two requests per day at
+    most (the API is rate-limited per IP): monthly areas and quarterly areas.
     """
-    order = sorted(areas, key=lambda a: (a != "USA", a))
+    monthly = tuple(sorted(a for a in areas if a not in OECD_QUARTERLY))
+    quarterly = tuple(sorted(a for a in areas if a in OECD_QUARTERLY))
     frames = []
-    for a in order:
-        t = _cpi_area(a)
+    for group, freq in ((monthly, "M"), (quarterly, "Q")):
+        if not group:
+            continue
+        t = _cpi_csv(group, freq, start)
         if t:
-            try:
-                frames.append(parse_oecd_cpi_csv(t))
-            except Exception as e:  # noqa: BLE001
-                log.warning("OECD CPI %s parse failed: %s", a, e)
+            frames.append(parse_oecd_cpi_csv(t))
     if not frames:
         raise ValueError("OECD returned no CPI data")
     df = pd.concat(frames, axis=1).sort_index()
