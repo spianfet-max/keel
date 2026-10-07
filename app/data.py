@@ -510,7 +510,8 @@ def implied_vol(symbol: str, target_days: int = 365, rate: float = 0.04, div_yie
 
 
 OECD_CPI_URL = ("https://sdmx.oecd.org/public/rest/v2/data/dataflow/OECD.SDD.TPS/DSD_PRICES%40DF_PRICES_ALL/1.0/"
-                "{areas}.*.N.CPI.IX._T.N._Z?dimensionAtObservation=TIME_PERIOD&detail=full&c[TIME_PERIOD]=ge:{start}")
+                "{area}.{freq}.N.CPI.IX._T.N._Z?dimensionAtObservation=TIME_PERIOD&detail=dataonly")
+OECD_QUARTERLY = {"AUS", "NZL"}
 
 
 def parse_oecd_cpi_csv(text: str) -> pd.DataFrame:
@@ -541,11 +542,23 @@ def cpi_index(areas: tuple[str, ...], start: str = "2005-01") -> pd.DataFrame:
     """Monthly CPI index levels from the OECD (ISO3 area codes; euro area = EA20).
 
     Called directly rather than through OpenBB's OECD extension, whose metadata
-    loader needs more memory than Render's free tier has.
+    loader needs more memory than Render's free tier has. One request per area:
+    multi-area keys come back empty from the v2 API (OpenBB falls back the same way).
     """
-    url = OECD_CPI_URL.format(areas="+".join(areas), start=start)
     headers = {"Accept": "application/vnd.sdmx.data+csv; version=2.0.0", "User-Agent": "keel/1.0"}
-    with httpx.Client(timeout=60, headers=headers) as c:
-        r = c.get(url)
-        r.raise_for_status()
-    return parse_oecd_cpi_csv(r.text)
+
+    def one(area: str) -> str | None:
+        url = OECD_CPI_URL.format(area=area, freq="Q" if area in OECD_QUARTERLY else "M")
+        with httpx.Client(timeout=45, headers=headers) as c:
+            r = c.get(url)
+        if r.status_code != 200 or not r.text.strip():
+            log.warning("OECD CPI %s: HTTP %s, %d bytes", area, r.status_code, len(r.text))
+            return None
+        return r.text
+
+    texts = [t for t in _pool(one, list(areas), workers=4).values() if t]
+    if not texts:
+        raise ValueError("OECD returned no CPI data")
+    frames = [parse_oecd_cpi_csv(t) for t in texts]
+    df = pd.concat(frames, axis=1).sort_index()
+    return df[df.index >= pd.Timestamp(start + "-01")]
