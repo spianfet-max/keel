@@ -531,8 +531,23 @@ def implied_vol(symbol: str, target_days: int = 365, rate: float = 0.04, div_yie
 OECD_CPI_URL = ("https://sdmx.oecd.org/public/rest/data/OECD.SDD.TPS,DSD_PRICES@DF_PRICES_ALL,1.0/"
                 "{areas}.{freq}.N.CPI.IX._T.N._Z?startPeriod={start}&dimensionAtObservation=AllDimensions")
 OECD_QUARTERLY = {"AUS", "NZL"}
+# Countries that moved to the COICOP 2018 classification publish newer data in a separate dataflow.
+OECD_C2018_URL = ("https://sdmx.oecd.org/public/rest/data/OECD.SDD.TPS,DSD_PRICES_COICOP2018@DF_PRICES_C2018_ALL,1.0/"
+                  "{areas}.M.N.CPI.IX._T.N._Z?startPeriod={start}&dimensionAtObservation=AllDimensions")
+C2018_AREA = {"EA20": "EA"}
 OECD_GY_URL = ("https://sdmx.oecd.org/public/rest/data/OECD.SDD.TPS,DSD_PRICES@DF_PRICES_ALL,1.0/"
                "{areas}.M.N.CPI.PA._T.N.GY?startPeriod={start}&dimensionAtObservation=AllDimensions")
+
+
+def splice(old: pd.Series, new: pd.Series) -> pd.Series:
+    """Append `new` after `old` ends, rescaled to match `old` at their last common month."""
+    o, n = old.dropna(), new.dropna()
+    common = o.index.intersection(n.index)
+    if common.empty or n.index[-1] <= o.index[-1]:
+        return o
+    k = o.loc[common[-1]] / n.loc[common[-1]]
+    tail = n[n.index > o.index[-1]] * k
+    return pd.concat([o, tail]).sort_index()
 
 
 def extend_with_yoy(level: pd.Series, yoy: pd.Series) -> pd.Series:
@@ -573,10 +588,11 @@ def parse_oecd_cpi_csv(text: str) -> pd.DataFrame:
 
 
 @cached(ttl=24 * 3600)
-def _cpi_csv(areas: tuple[str, ...], freq: str, start: str, yoy: bool = False) -> str | None:
+def _cpi_csv(areas: tuple[str, ...], freq: str, start: str, yoy: bool = False, c2018: bool = False) -> str | None:
     """Raw SDMX-CSV for several areas in one request, cached a day; backs off once on HTTP 429."""
     headers = {"Accept": "application/vnd.sdmx.data+csv; charset=utf-8", "User-Agent": "keel/1.0"}
-    url = (OECD_GY_URL if yoy else OECD_CPI_URL).format(areas="+".join(areas), freq=freq, start=start)
+    tmpl = OECD_C2018_URL if c2018 else OECD_GY_URL if yoy else OECD_CPI_URL
+    url = tmpl.format(areas="+".join(areas), freq=freq, start=start)
     with httpx.Client(timeout=60, headers=headers) as c:
         for attempt in range(2):
             r = c.get(url)
@@ -616,7 +632,21 @@ def cpi_index(areas: tuple[str, ...], start: str = "2005-01") -> pd.DataFrame:
     lagging = tuple(sorted(a for a in monthly if a in df and df[a].last_valid_index() is not None
                            and df[a].last_valid_index() < cut))
     if lagging:
-        try:
+        try:  # 1) the COICOP 2018 dataflow, spliced on
+            t = _cpi_csv(tuple(C2018_AREA.get(a, a) for a in lagging), "M", start, c2018=True)
+            if t:
+                c18 = parse_oecd_cpi_csv(t)
+                for a in lagging:
+                    b = C2018_AREA.get(a, a)
+                    if b in c18:
+                        sp = splice(df[a], c18[b])
+                        df = df.reindex(df.index.union(sp.index))
+                        df[a] = sp
+        except Exception as e:  # noqa: BLE001
+            log.warning("OECD COICOP 2018 splice failed: %s", e)
+        lagging = tuple(a for a in lagging if df[a].last_valid_index() < cut)
+    if lagging:
+        try:  # 2) year-on-year rates, chained
             t = _cpi_csv(lagging, "M", start, yoy=True)
             if t:
                 gy = parse_oecd_cpi_csv(t)

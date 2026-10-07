@@ -140,6 +140,14 @@ def test_parse_oecd_cpi():
     assert "EA20" not in df
 
 
+def test_splice():
+    o = pd.Series([100.0, 101, 102], index=pd.date_range("2021-04-30", periods=3, freq="ME"))
+    n = pd.Series([50.0, 51, 52, 53], index=pd.date_range("2021-06-30", periods=4, freq="ME"))
+    sp = D.splice(o, n)
+    assert sp.index[-1] == pd.Timestamp("2021-09-30") and sp.iloc[-1] == pytest.approx(102 * 53 / 50)
+    assert len(sp) == 6
+
+
 def test_extend_with_yoy():
     idx = pd.date_range("2020-01-31", "2021-06-30", freq="ME")
     level = pd.Series(np.linspace(100, 101.7, len(idx)), index=idx)
