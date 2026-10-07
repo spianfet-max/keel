@@ -80,7 +80,7 @@ def fix_splits(closes: pd.Series, tol: float = 0.06) -> pd.Series:
     c = pd.to_numeric(closes, errors="coerce").dropna().astype(float).copy()
     if len(c) < 3:
         return c
-    vals = c.values
+    vals = c.to_numpy(dtype=float, copy=True)
     for i in range(1, len(vals)):
         r = vals[i] / vals[i - 1]
         if 0.4 < r < 2.5:
