@@ -115,7 +115,7 @@ function render(){
 
   const sorted=[...rows].sort((a,c)=>(a.backtest?.ki_rate??999)-(c.backtest?.ki_rate??999));
   $('#tbl').innerHTML=`<thead><tr><th>${T('Underlying','原資産')}</th><th>${T('Vol 3M','ボラ3M')}</th><th>${T('Vol 1Y','ボラ1Y')}</th><th>${T('Implied','インプライド')}</th><th>${T('Skew','スキュー')}</th><th>${T('Div. yield','配当利回り')}</th><th>${T(`Worst ${p.tenor_m}M fall`,`${p.tenor_m}か月最大下落`)}</th><th>${T('Called','早期償還')}</th><th>${T('Knock-in','KI')}</th><th>${T('Loss','損失')}</th></tr></thead><tbody>`+
-    sorted.map(r=>{const bt=r.backtest||{};const dy=r.div_yield!=null?(r.div_yield<1?r.div_yield*100:r.div_yield):null;
+    sorted.map(r=>{const bt=r.backtest||{};const dy=r.div_yield; /* percent, as Yahoo reports it */
       return `<tr><td>${esc(nm(r.symbol,r.name))}<span class="nm">${esc(r.symbol)}</span></td><td>${num(r.vol_60d,1)}%</td><td>${num(r.vol_1y,1)}%</td><td>${r.atm_iv!=null?num(r.atm_iv,1)+'%':'—'}</td><td>${r.skew_90!=null?'+'+num(r.skew_90,1):'—'}</td><td>${dy!=null?num(dy,1)+'%':'—'}</td><td class="dn">${pct(r.worst_tenor_drop,0)}</td>
       <td>${pct(bt.autocall_rate,0,false)}<span class="mini s"><b style="width:${bt.autocall_rate||0}%"></b></span></td><td>${pct(bt.ki_rate,0,false)}<span class="mini"><b style="width:${bt.ki_rate||0}%"></b></span></td><td>${pct(bt.loss_rate,0,false)}</td></tr>`}).join('')+
     (d.rows||[]).filter(r=>r.error).map(r=>`<tr><td>${esc(r.symbol)}</td><td colspan="9" style="text-align:left;color:var(--mute)">${T('No price history found','価格データなし')}</td></tr>`).join('')+'</tbody>';

@@ -344,7 +344,7 @@ def sp_screen(
                 "atm_iv": v.get("atm_iv"),
                 "skew_90": v.get("skew_90"),
                 "iv_expiry": v.get("expiry"),
-                "div_yield": m.get("dividend_yield"),
+                "div_yield": m.get("dividend_yield"),  # percent, as Yahoo reports it
                 "max_dd_1y": A.max_drawdown(c.iloc[-252:]),
                 "worst_tenor_drop": A.min_distance_path(c, td),
                 "backtest": bt,
@@ -385,7 +385,7 @@ def comps(symbols: str = Query(..., description="Comma-separated tickers, e.g. 7
                 "op_margin": m.get("operating_margin"),
                 "rev_growth": m.get("revenue_growth"),
                 "roe": m.get("return_on_equity"),
-                "div_yield": m.get("dividend_yield"),
+                "div_yield": m.get("dividend_yield"),  # percent, as Yahoo reports it
                 **st,
                 "spark": A.sparkline(c, 260) if c is not None else [],
             }

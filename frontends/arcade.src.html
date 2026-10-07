@@ -78,7 +78,7 @@ let S={sel:'7974.T',sort:'market_cap',dir:-1,sh:1000000,ten:1,put:85,vol:null,sk
 try{const j=JSON.parse(localStorage.getItem('arcade')||'null');if(j)S={...S,...j,vol:null}}catch(e){}
 const save=()=>{try{localStorage.setItem('arcade',JSON.stringify({...S,vol:null}))}catch(e){}};
 let DATA=SAMPLE,LIVE=false;
-const pc=v=>v==null?null:(Math.abs(v)<=2?v*100:v); /* normalised percent -> % */
+const pc=v=>v==null?null:v*100; /* margins and growth arrive as fractions; dividend yield arrives in percent */
 
 /* Black-Scholes, as in Keel's analytics.py */
 const ncdf=x=>{const t=1/(1+.2316419*Math.abs(x)),d=.3989423*Math.exp(-x*x/2),p=d*t*(.3193815+t*(-.3565638+t*(1.781478+t*(-1.821256+t*1.330274))));return x>0?1-p:p};
@@ -91,7 +91,7 @@ function cur(){return(DATA.rows||[]).find(r=>r.symbol===S.sel)||(DATA.rows||[])[
 function render(){
   const rows=(DATA.rows||[]);
   const cols=[['name',T('Company','企業'),r=>nm(r)],['market_cap',T('Market cap','時価総額'),r=>r.market_cap],['pe','P/E',r=>r.pe],['fwd_pe',T('Fwd P/E','予想P/E'),r=>r.fwd_pe],['ev_ebitda','EV/EBITDA',r=>r.ev_ebitda],
-    ['op_margin',T('Op. margin','営業利益率'),r=>pc(r.op_margin)],['rev_growth',T('Sales growth','売上成長'),r=>pc(r.rev_growth)],['div_yield',T('Div. yield','配当利回り'),r=>pc(r.div_yield)],
+    ['op_margin',T('Op. margin','営業利益率'),r=>pc(r.op_margin)],['rev_growth',T('Sales growth','売上成長'),r=>pc(r.rev_growth)],['div_yield',T('Div. yield','配当利回り'),r=>r.div_yield],
     ['chg_ytd','YTD',r=>r.chg_ytd],['chg_1y','1Y',r=>r.chg_1y],['vol_1y',T('Vol 1Y','ボラ1Y'),r=>r.vol_1y]];
   const getter=Object.fromEntries(cols.map(c=>[c[0],c[2]]));
   const sorted=[...rows].sort((a,b)=>{const x=getter[S.sort](a),y=getter[S.sort](b);if(x==null)return 1;if(y==null)return-1;return typeof x==='string'?S.dir*x.localeCompare(y):S.dir*(x-y)});
@@ -128,7 +128,7 @@ function collar(c){
   $('#sh').value=S.sh;$('#put').value=S.put;$('#putO').textContent=S.put+'%';$('#vol').value=S.vol;$('#volO').textContent=S.vol+'%';$('#skew').value=S.skew;$('#skewO').textContent=S.skew+' pts';
   $$('#ten button').forEach(b=>b.classList.toggle('on',+b.dataset.v===S.ten));
   $('#colT').textContent=T(`Protecting a stake in ${nm(c)}`,`${nm(c)}株の保有を守る`);
-  const s=c.last||100,t=S.ten,r=(DATA.jpy_1y??0.8)/100,q=(pc(c.div_yield)||0)/100,v=S.vol/100,sk=S.skew/100,pk=s*S.put/100;
+  const s=c.last||100,t=S.ten,r=(DATA.jpy_1y??0.8)/100,q=(c.div_yield||0)/100,v=S.vol/100,sk=S.skew/100,pk=s*S.put/100;
   const ck=zcCall(s,pk,t,r,q,v,sk);const val=s*S.sh;
   const putCost=bs('put',s,pk,t,r,q,v+sk);
   const ccInc=bs('call',s,s*1.2,t,r,q,v)/s*100;

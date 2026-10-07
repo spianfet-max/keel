@@ -425,10 +425,13 @@ def jgb_history() -> pd.DataFrame:
 
 @cached(ttl=1800)
 def implied_vol(symbol: str, target_days: int = 365) -> dict:
-    """ATM implied vol and 90% put skew at the expiry nearest target_days.
+    """ATM implied vol and 90% put skew near target_days.
 
-    Uses the yfinance library bundled with OpenBB's yfinance extension. Coverage is
-    good for US names and thin for most Japanese single stocks.
+    Uses the yfinance library bundled with OpenBB's yfinance extension. Stale
+    far-dated quotes often carry junk vols, so only options with a live bid are
+    used, the ATM figure is the median over 95-105% strikes, and the next-closest
+    expiries are tried if the nearest has no clean quotes. Coverage is good for
+    US names and thin for most Japanese single stocks.
     """
     import yfinance as yf  # noqa: PLC0415
 
@@ -436,33 +439,39 @@ def implied_vol(symbol: str, target_days: int = 365) -> dict:
     exps = list(t.options or [])
     if not exps:
         return {}
-    today = date.today()
-    exp = min(exps, key=lambda e: abs((date.fromisoformat(e) - today).days - target_days))
-    chain = t.option_chain(exp)
-    spot = None
     try:
         spot = float(t.fast_info["last_price"])
     except Exception:  # noqa: BLE001
-        pass
-    if not spot:
         return {}
+    today = date.today()
+    exps = [e for e in exps if (date.fromisoformat(e) - today).days >= 20]
+    exps.sort(key=lambda e: abs((date.fromisoformat(e) - today).days - target_days))
 
-    def iv_at(df: pd.DataFrame, k: float) -> float | None:
-        df = df[(df["impliedVolatility"] > 0.01) & (df["impliedVolatility"] < 3)]
-        if df.empty:
-            return None
-        row = df.iloc[(df["strike"] - k).abs().argsort()[:1]]
-        return float(row["impliedVolatility"].iloc[0] * 100)
+    def clean(df: pd.DataFrame) -> pd.DataFrame:
+        df = df[(df["bid"] > 0) & (df["ask"] > 0) & (df["impliedVolatility"] > 0.03) & (df["impliedVolatility"] < 3)]
+        return df
 
-    atm = iv_at(chain.calls, spot) or iv_at(chain.puts, spot)
-    p90 = iv_at(chain.puts, spot * 0.9)
-    return {
-        "expiry": exp,
-        "days": (date.fromisoformat(exp) - today).days,
-        "atm_iv": atm,
-        "put90_iv": p90,
-        "skew_90": (p90 - atm) if (p90 and atm) else None,
-    }
+    for exp in exps[:4]:
+        try:
+            ch = t.option_chain(exp)
+        except Exception:  # noqa: BLE001
+            continue
+        both = pd.concat([clean(ch.calls), clean(ch.puts)])
+        near = both[(both["strike"] >= spot * 0.95) & (both["strike"] <= spot * 1.05)]
+        if len(near) < 2:
+            continue
+        atm = float(near["impliedVolatility"].median() * 100)
+        puts = clean(ch.puts)
+        p90 = puts[(puts["strike"] >= spot * 0.87) & (puts["strike"] <= spot * 0.93)]
+        put90 = float(p90["impliedVolatility"].median() * 100) if len(p90) else None
+        return {
+            "expiry": exp,
+            "days": (date.fromisoformat(exp) - today).days,
+            "atm_iv": atm,
+            "put90_iv": put90,
+            "skew_90": (put90 - atm) if put90 is not None else None,
+        }
+    return {}
 
 
 # --------------------------------------------------------------------------- #
