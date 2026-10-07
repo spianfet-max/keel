@@ -537,28 +537,43 @@ def parse_oecd_cpi_csv(text: str) -> pd.DataFrame:
     return pd.DataFrame(out).sort_index()
 
 
-@cached(ttl=12 * 3600)
+@cached(ttl=24 * 3600)
+def _cpi_area(area: str) -> str | None:
+    """Raw SDMX-CSV for one area, cached a day. Backs off on HTTP 429 (the OECD API is rate-limited)."""
+    headers = {"Accept": "application/vnd.sdmx.data+csv; version=2.0.0", "User-Agent": "keel/1.0"}
+    url = OECD_CPI_URL.format(area=area, freq="Q" if area in OECD_QUARTERLY else "M")
+    with httpx.Client(timeout=45, headers=headers) as c:
+        for attempt in range(3):
+            r = c.get(url)
+            if r.status_code == 429:
+                wait = float(r.headers.get("Retry-After") or 0) or 2.0 * (attempt + 1)
+                time.sleep(min(wait, 8))
+                continue
+            if r.status_code == 200 and r.text.strip():
+                return r.text
+            break
+    log.warning("OECD CPI %s: HTTP %s", area, r.status_code)
+    return None
+
+
 def cpi_index(areas: tuple[str, ...], start: str = "2005-01") -> pd.DataFrame:
     """Monthly CPI index levels from the OECD (ISO3 area codes; euro area = EA20).
 
     Called directly rather than through OpenBB's OECD extension, whose metadata
-    loader needs more memory than Render's free tier has. One request per area:
-    multi-area keys come back empty from the v2 API (OpenBB falls back the same way).
+    loader needs more memory than Render's free tier has. One request per area
+    (multi-area keys come back empty from the v2 API), one at a time because the
+    API rate-limits, USA first since every comparison needs it.
     """
-    headers = {"Accept": "application/vnd.sdmx.data+csv; version=2.0.0", "User-Agent": "keel/1.0"}
-
-    def one(area: str) -> str | None:
-        url = OECD_CPI_URL.format(area=area, freq="Q" if area in OECD_QUARTERLY else "M")
-        with httpx.Client(timeout=45, headers=headers) as c:
-            r = c.get(url)
-        if r.status_code != 200 or not r.text.strip():
-            log.warning("OECD CPI %s: HTTP %s, %d bytes", area, r.status_code, len(r.text))
-            return None
-        return r.text
-
-    texts = [t for t in _pool(one, list(areas), workers=4).values() if t]
-    if not texts:
+    order = sorted(areas, key=lambda a: (a != "USA", a))
+    frames = []
+    for a in order:
+        t = _cpi_area(a)
+        if t:
+            try:
+                frames.append(parse_oecd_cpi_csv(t))
+            except Exception as e:  # noqa: BLE001
+                log.warning("OECD CPI %s parse failed: %s", a, e)
+    if not frames:
         raise ValueError("OECD returned no CPI data")
-    frames = [parse_oecd_cpi_csv(t) for t in texts]
     df = pd.concat(frames, axis=1).sort_index()
     return df[df.index >= pd.Timestamp(start + "-01")]

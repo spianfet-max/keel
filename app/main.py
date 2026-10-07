@@ -461,7 +461,7 @@ def ppp(base_year: int = Query(2005, ge=2000, le=2020)):
     except Exception as e:  # noqa: BLE001
         raise HTTPException(503, f"OECD CPI unavailable: {e}") from e
     if cpi.empty or "USA" not in cpi:
-        raise HTTPException(503, "CPI data unavailable")
+        raise HTTPException(503, "US CPI unavailable from the OECD right now; try again in a minute")
     fx = D.many_closes([f"{c}=X" for _, c in PPP_MAP.values()], date.today().year - base_year + 1)
     base_mask = cpi.index.year == base_year
     us_ratio = cpi["USA"].dropna().iloc[-1] / cpi.loc[base_mask, "USA"].mean()
@@ -491,4 +491,5 @@ def ppp(base_year: int = Query(2005, ge=2000, le=2020)):
                 "gap": fair / spot - 1,
             }
         )
-    return _safe({"base_year": base_year, "rows": rows})
+    missing = [iso for iso, (area, _) in PPP_MAP.items() if area not in cpi]
+    return _safe({"base_year": base_year, "rows": rows, "missing": missing})
