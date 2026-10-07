@@ -239,23 +239,25 @@ def country_key(raw) -> str | None:
 
 @cached(ttl=3600)
 def econ_calendar(days: int = 14) -> list[dict]:
-    """Economic events for the next `days`. Yahoo returns 12 rows unless asked, so page through up to 300."""
+    """Economic events for the next `days` (Yahoo returns 12 rows a call unless asked for more)."""
     import yfinance as yf  # noqa: PLC0415
 
+    # Yahoo caps each call at 100 rows, so ask in two-day windows to cover every day.
     start = date.today()
-    end = start + timedelta(days=days)
-    cal = yf.Calendars(start=start.isoformat(), end=end.isoformat())
     frames = []
-    for off in (0, 100, 200):
-        df = cal.get_economic_events_calendar(start=start.isoformat(), end=end.isoformat(), limit=100, offset=off, force=True)
-        if df is None or df.empty:
-            break
-        frames.append(df.reset_index())
-        if len(df) < 100:
-            break
+    for k in range(0, days, 2):
+        a, b = start + timedelta(days=k), start + timedelta(days=min(k + 2, days))
+        try:
+            df = yf.Calendars(start=a.isoformat(), end=b.isoformat()).get_economic_events_calendar(
+                start=a.isoformat(), end=b.isoformat(), limit=100, force=True)
+        except Exception as e:  # noqa: BLE001
+            log.warning("calendar %s failed: %s", a, e)
+            continue
+        if df is not None and not df.empty:
+            frames.append(df.reset_index())
     if not frames:
         return []
-    df = pd.concat(frames, ignore_index=True)
+    df = pd.concat(frames, ignore_index=True).drop_duplicates()
     rows = []
     for _, r in df.iterrows():
         rows.append({
