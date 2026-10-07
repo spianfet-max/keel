@@ -531,6 +531,22 @@ def implied_vol(symbol: str, target_days: int = 365, rate: float = 0.04, div_yie
 OECD_CPI_URL = ("https://sdmx.oecd.org/public/rest/data/OECD.SDD.TPS,DSD_PRICES@DF_PRICES_ALL,1.0/"
                 "{areas}.{freq}.N.CPI.IX._T.N._Z?startPeriod={start}&dimensionAtObservation=AllDimensions")
 OECD_QUARTERLY = {"AUS", "NZL"}
+OECD_GY_URL = ("https://sdmx.oecd.org/public/rest/data/OECD.SDD.TPS,DSD_PRICES@DF_PRICES_ALL,1.0/"
+               "{areas}.M.N.CPI.PA._T.N.GY?startPeriod={start}&dimensionAtObservation=AllDimensions")
+
+
+def extend_with_yoy(level: pd.Series, yoy: pd.Series) -> pd.Series:
+    """Carry a CPI index forward past its last value using year-on-year % changes:
+    I(t) = I(t-12) x (1 + yoy(t)/100). Used where the OECD index level stops early (Japan)."""
+    lv = level.dropna().copy()
+    for t, g in yoy.dropna().sort_index().items():
+        if t <= lv.index[-1]:
+            continue
+        prev = t - pd.offsets.MonthEnd(12)
+        if prev not in lv.index:
+            break
+        lv.loc[t] = lv.loc[prev] * (1 + g / 100)
+    return lv.sort_index()
 
 
 def parse_oecd_cpi_csv(text: str) -> pd.DataFrame:
@@ -557,10 +573,10 @@ def parse_oecd_cpi_csv(text: str) -> pd.DataFrame:
 
 
 @cached(ttl=24 * 3600)
-def _cpi_csv(areas: tuple[str, ...], freq: str, start: str) -> str | None:
+def _cpi_csv(areas: tuple[str, ...], freq: str, start: str, yoy: bool = False) -> str | None:
     """Raw SDMX-CSV for several areas in one request, cached a day; backs off once on HTTP 429."""
     headers = {"Accept": "application/vnd.sdmx.data+csv; charset=utf-8", "User-Agent": "keel/1.0"}
-    url = OECD_CPI_URL.format(areas="+".join(areas), freq=freq, start=start)
+    url = (OECD_GY_URL if yoy else OECD_CPI_URL).format(areas="+".join(areas), freq=freq, start=start)
     with httpx.Client(timeout=60, headers=headers) as c:
         for attempt in range(2):
             r = c.get(url)
@@ -595,4 +611,20 @@ def cpi_index(areas: tuple[str, ...], start: str = "2005-01") -> pd.DataFrame:
     if not frames:
         raise ValueError("OECD returned no CPI data")
     df = pd.concat(frames, axis=1).sort_index()
-    return df[df.index >= pd.Timestamp(start + "-01")]
+    # Monthly index levels that stopped more than 6 months ago: extend with the YoY series.
+    cut = pd.Timestamp(date.today()) - pd.DateOffset(months=6)
+    lagging = tuple(sorted(a for a in monthly if a in df and df[a].last_valid_index() is not None
+                           and df[a].last_valid_index() < cut))
+    if lagging:
+        try:
+            t = _cpi_csv(lagging, "M", start, yoy=True)
+            if t:
+                gy = parse_oecd_cpi_csv(t)
+                for a in lagging:
+                    if a in gy:
+                        ext = extend_with_yoy(df[a], gy[a])
+                        df = df.reindex(df.index.union(ext.index))
+                        df[a] = ext
+        except Exception as e:  # noqa: BLE001
+            log.warning("OECD YoY extension failed: %s", e)
+    return df[df.index >= pd.Timestamp(start + "-01")].sort_index()

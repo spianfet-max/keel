@@ -140,6 +140,16 @@ def test_parse_oecd_cpi():
     assert "EA20" not in df
 
 
+def test_extend_with_yoy():
+    idx = pd.date_range("2020-01-31", "2021-06-30", freq="ME")
+    level = pd.Series(np.linspace(100, 101.7, len(idx)), index=idx)
+    yoy = pd.Series(3.0, index=pd.date_range("2021-07-31", "2022-12-31", freq="ME"))
+    ext = A_ext = D.extend_with_yoy(level, yoy)
+    assert ext.index[-1] == pd.Timestamp("2022-12-31")
+    assert ext.loc["2022-06-30"] == pytest.approx(level.loc["2021-06-30"] * 1.03)
+    assert ext.loc["2022-12-31"] == pytest.approx(ext.loc["2021-12-31"] * 1.03)
+
+
 def test_parse_mof():
     df = D.parse_mof_csv(MOF_SAMPLE)
     assert list(df.columns)[:3] == [1.0, 2.0, 3.0]
