@@ -19,6 +19,18 @@
 .stale{color:var(--warn);font-size:12px}
 .outcome{display:flex;height:22px;width:100%;margin-top:14px;font-size:11px;color:#fff;font-variant-numeric:tabular-nums}
 .outcome span{display:flex;align-items:center;justify-content:center;overflow:hidden;white-space:nowrap}
+
+/* Reverse convertible: steel = paid back at par, red = paid back in shares, grey dashes = simply holding the shares. */
+.rcbar{display:flex;gap:12px 26px;flex-wrap:wrap;align-items:flex-end;margin-bottom:6px}
+.rcbar .term{min-width:0}
+.rcbar input[type=number]{width:72px}
+.rck{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));border-top:1px solid var(--rule);margin-top:14px}
+.rck .kpi{padding-top:12px}
+.rcsay{font-size:14px;line-height:1.55;max-width:80ch;margin:14px 0 4px}
+.rcsay b{font-weight:500}
+.chlab{font-size:12px;color:var(--mute);margin:0 0 6px}
+svg.ch .mk{stroke:var(--mute);stroke-dasharray:2 3}
+svg.ch .mkt{font-size:11px}
 </style>
 
 <div class="app">
@@ -59,6 +71,26 @@
     <div class="tw"><table id="tbl"></table></div>
   </section>
 
+  <section class="sec" id="rcSec">
+    <div class="sh"><h2 data-ja="単一銘柄のリバース・コンバーチブル">Single-name reverse convertible</h2><p data-ja="固定クーポンを受け取る代わりに、満期に株価が行使価格を下回る（バリア型ではバリアに触れた）場合は額面を下回る価値の株式で償還されます。クーポンは参考値（手数料控除前）。">A fixed coupon in exchange for the share’s downside: if it ends below the strike (and, with a barrier, has touched the barrier), you are repaid in shares worth less than par. The coupon is indicative, before fees.</p></div>
+    <div class="rcbar">
+      <div class="term"><span class="lbl" data-ja="原資産">Underlying</span><div class="seg" id="rcSym"></div></div>
+      <div class="term"><span class="lbl" data-ja="タイプ">Type</span><div class="seg" id="rcKind"><button data-k="am" data-ja="バリア（毎日）">Barrier, daily</button><button data-k="eu" data-ja="バリア（満期のみ）">Barrier at maturity</button><button data-k="none" data-ja="バリアなし">No barrier</button></div></div>
+    </div>
+    <div class="rcbar">
+      <div class="term"><span class="lbl" data-ja="行使価格">Strike</span><div class="row"><input type="range" id="rcK" min="70" max="110" step="1"><output id="rcKO"></output></div></div>
+      <div class="term" id="rcBT"><span class="lbl" data-ja="バリア">Barrier</span><div class="row"><input type="range" id="rcB" min="40" max="100" step="1"><output id="rcBO"></output></div></div>
+      <div class="term"><span class="lbl" data-ja="ボラティリティ">Volatility</span><div class="row"><input type="range" id="rcV" min="8" max="80" step="0.5"><output id="rcVO"></output></div></div>
+      <div class="term"><span class="lbl" data-ja="金利">Rate</span><div class="row"><input type="number" id="rcR" step="0.05" min="-1" max="15" aria-label="Interest rate, percent"><span class="lbl">%</span></div></div>
+    </div>
+    <div class="rck" id="rcKpi"></div>
+    <p class="rcsay" id="rcSay"></p>
+    <div class="two even" style="margin-top:12px">
+      <div style="min-width:0"><p class="chlab" id="rcPayT"></p><svg class="ch" id="rcPay" height="300"></svg><div class="leg" id="rcPayLeg"></div></div>
+      <div style="min-width:0"><p class="chlab" id="rcHistT"></p><svg class="ch" id="rcHist" height="300"></svg><div class="leg" id="rcHistLeg"></div></div>
+    </div>
+  </section>
+
   <section class="sec two even">
     <div style="min-width:0">
       <div class="sh"><h2 data-ja="相関（日次リターン、1年）">Correlation (daily returns, 1 year)</h2><p data-ja="相関が低いほどワーストオブのクーポンは高く、ノックインも起きやすくなります。">Lower correlation pays a higher worst-of coupon and knocks in more often.</p></div>
@@ -88,7 +120,7 @@ try{const j=JSON.parse(localStorage.getItem('barrier')||'null');if(j&&Array.isAr
 const save=()=>{try{localStorage.setItem('barrier',JSON.stringify(S))}catch(e){}};
 let DATA=SAMPLE,LIVE=false;
 
-function segs(){[['tenor','tenor'],['ac','ac'],['obs','obs'],['yrs','yrs']].forEach(([id,k])=>$$('#'+id+' button').forEach(b=>{b.classList.toggle('on',+b.dataset.v===S[k]);b.onclick=()=>{S[k]=+b.dataset.v;save();segs();dirty()}}));
+function segs(){[['tenor','tenor'],['ac','ac'],['obs','obs'],['yrs','yrs']].forEach(([id,k])=>$$('#'+id+' button').forEach(b=>{b.classList.toggle('on',+b.dataset.v===S[k]);b.onclick=()=>{S[k]=+b.dataset.v;save();segs();dirty();if(k==='tenor')rcRender()}}));
   $('#ki').value=S.ki;$('#kiO').textContent=S.ki+'%'}
 function chips(){$('#chips').innerHTML=S.syms.map(s=>`<span class="chip"><span>${esc(s)}</span><button aria-label="Remove ${esc(s)}" data-x="${esc(s)}">×</button></span>`).join('');
   $$('#chips [data-x]').forEach(b=>b.onclick=()=>{S.syms=S.syms.filter(x=>x!==b.dataset.x);S.preset='';chips();presets();save();dirty()})}
@@ -146,13 +178,137 @@ function render(){
   $('#method').innerHTML=T(`<b>Method.</b> A note is started on every trading day in the history window. It is called on the first observation date where every underlying is at or above the autocall level. If not called, it knocks in when the worst performer closes below the barrier on any day, and loses the worst performer’s fall at maturity if that ends below 100%. Closing prices stand in for a continuous barrier; coupons, funding and fees are left out. This describes what happened in the past; it is not a probability of what will happen. Prices from Yahoo Finance through OpenBB; implied vols from listed options where available.`,
    `<b>算出方法。</b>検証期間の毎営業日に仮想ノートを組成。全銘柄が早期償還水準以上となった最初の観測日に償還。償還されない場合、最低銘柄の終値がバリアを下回った日にノックインし、満期時に100%未満なら最低銘柄の下落分の元本割れ。連続観測バリアを終値で近似し、クーポン・調達・手数料は考慮していません。過去の結果であり、将来の確率ではありません。価格はOpenBB経由のYahoo Finance、インプライド・ボラは上場オプションがある場合のみ。`);
   dirty();
+  rcRender();
 }
+
+/* ===== Single-name reverse convertible ===== */
+const ncdf2=x=>{const t=1/(1+.2316419*Math.abs(x)),d=.3989423*Math.exp(-x*x/2),p=d*t*(.3193815+t*(-.3565638+t*(1.781478+t*(-1.821256+t*1.330274))));return x>0?1-p:p};
+function bsPut(S,K,T,r,q,v){const s=v*Math.sqrt(T),d1=(Math.log(S/K)+(r-q+v*v/2)*T)/s,d2=d1-s;return K*Math.exp(-r*T)*ncdf2(-d2)-S*Math.exp(-q*T)*ncdf2(-d1)}
+/* Down-and-in put, continuous monitoring, H < K (Hull) */
+function diPut(S,K,H,T,r,q,v){if(H>=S||H>=K)return bsPut(S,K,T,r,q,v);const s=v*Math.sqrt(T),lam=(r-q+v*v/2)/(v*v);
+  const y=Math.log(H*H/(S*K))/s+lam*s,x1=Math.log(S/H)/s+lam*s,y1=Math.log(H/S)/s+lam*s,a=Math.pow(H/S,2*lam),b=Math.pow(H/S,2*lam-2);
+  return -S*Math.exp(-q*T)*ncdf2(-x1)+K*Math.exp(-r*T)*ncdf2(-x1+s)+S*Math.exp(-q*T)*a*(ncdf2(y)-ncdf2(y1))-K*Math.exp(-r*T)*b*(ncdf2(y-s)-ncdf2(y1-s))}
+/* Barrier checked at maturity only: Put(B) + (K-B) x cash-or-nothing put(B) */
+function euKiPut(S,K,B,T,r,q,v){if(B>=K)return bsPut(S,K,T,r,q,v);const s=v*Math.sqrt(T),d2=(Math.log(S/B)+(r-q-v*v/2)*T)/s;return bsPut(S,B,T,r,q,v)+(K-B)*Math.exp(-r*T)*ncdf2(-d2)}
+const isJP=s=>/\.T$|^\^N225$|^\^TOPX/.test(s);
+let RC={sym:null,kind:'am',K:100,B:65,vol:null,rate:null};
+try{const j=JSON.parse(localStorage.getItem('barrier-rc')||'null');if(j)RC={...RC,kind:j.kind||'am',K:j.K||100,B:j.B||65,sym:j.sym||null}}catch(e){}
+const rcSave=()=>{try{localStorage.setItem('barrier-rc',JSON.stringify({kind:RC.kind,K:RC.K,B:RC.B,sym:RC.sym}))}catch(e){}};
+const rcRow=()=>(DATA.rows||[]).find(r=>r.symbol===RC.sym&&!r.error);
+function rcDefaults(force){const rows=(DATA.rows||[]).filter(r=>!r.error);if(!rows.length)return;
+  if(!rcRow()){RC.sym=rows[0].symbol;force=true}
+  const r=rcRow();if(force||RC.vol==null)RC.vol=+(r.atm_iv||r.vol_1y||25).toFixed(1);
+  if(force||RC.rate==null){const R=DATA.rates||{};RC.rate=+((isJP(RC.sym)?R.jpy:R.usd)??(isJP(RC.sym)?1:4)).toFixed(2)}}
+function rcPrice(){const T=S.tenor/12,r=RC.rate/100,row=rcRow(),q=((row&&row.div_yield)||0)/100,v=Math.max(.01,RC.vol/100),K=RC.K,B=Math.min(RC.B,K);
+  let opt;if(RC.kind==='none')opt=bsPut(100,K,T,r,q,v);else if(RC.kind==='eu')opt=euKiPut(100,K,B,T,r,q,v);
+  else opt=diPut(100,K,B*Math.exp(-.5826*v*Math.sqrt(1/252)),T,r,q,v);/* daily-close barrier (Broadie-Glasserman-Kou) */
+  const c=((100+(100/K)*opt)*Math.exp(r*T)-100)/(100*T);return{c,T,K,B,cp:c*T*100,opt}}
+function rcRed(f,m,P){const{K,B,cp}=P;let base;if(RC.kind==='none')base=f>=K?100:100*f/K;else if(RC.kind==='eu')base=f>=B?100:100*f/K;else base=(m<B&&f<K)?100*f/K:100;return base+cp}
+function rcRender(){
+  const sec=$('#rcSec');const rows=(DATA.rows||[]).filter(r=>!r.error);if(!rows.length){sec.hidden=true;return}sec.hidden=false;
+  rcDefaults(false);const row=rcRow();
+  $('#rcSym').innerHTML=rows.map(r=>`<button data-s="${esc(r.symbol)}" class="${r.symbol===RC.sym?'on':''}">${esc(nm(r.symbol,r.name).replace(' Group','').replace(' Corporation',''))}</button>`).join('');
+  $$('#rcSym button').forEach(b=>b.onclick=()=>{RC.sym=b.dataset.s;rcDefaults(true);rcSave();rcRender()});
+  $$('#rcKind button').forEach(b=>b.classList.toggle('on',b.dataset.k===RC.kind));
+  $('#rcBT').style.visibility=RC.kind==='none'?'hidden':'visible';
+  $('#rcK').value=RC.K;$('#rcKO').textContent=RC.K+'%';$('#rcB').max=RC.K;if(RC.B>RC.K)RC.B=RC.K;$('#rcB').value=RC.B;$('#rcBO').textContent=RC.B+'%';
+  $('#rcV').value=RC.vol;$('#rcVO').textContent=num(RC.vol,1)+'%';if(document.activeElement!==$('#rcR'))$('#rcR').value=RC.rate;
+  const P=rcPrice(),tm=S.tenor,name=nm(row.symbol,row.name);
+  /* history */
+  const W=row.windows||[],ht=(DATA.params||{}).tenor_m;
+  const H=W.map(([f,m])=>{const red=rcRed(f*100,m*100,P);return{red,ret:red-100,sh:f*100-100,fin:f*100,low:m*100,hit:RC.kind==='am'?m*100<P.B:RC.kind==='eu'?f*100<P.B:f*100<P.K}});
+  const n=H.length,full=H.filter(h=>h.red>=100+P.cp-1e-6).length,loss=H.filter(h=>h.red<100-1e-9),hitN=H.filter(h=>h.hit).length;
+  const avg=n?H.reduce((a,h)=>a+h.ret,0)/n:null,avgSh=n?H.reduce((a,h)=>a+h.sh,0)/n:null;
+  const avgLoss=loss.length?loss.reduce((a,h)=>a+h.red-100,0)/loss.length:null,worst=n?Math.min(...H.map(h=>h.ret)):null;
+  const prot=RC.kind==='none'?T('None below the strike','行使価格以下は保護なし'):RC.kind==='eu'?T(`Down to ${P.B}%, checked at maturity`,`満期時点で${P.B}%まで`):T(`Until the share touches ${P.B}%`,`株価が${P.B}%に触れるまで`);
+  $('#rcKpi').innerHTML=[
+    [T('Coupon, per year','クーポン（年率）'),num(P.c*100,1)+'%',T(`${num(P.cp,1)}% over ${tm} months · indicative, before fees`,`${tm}か月で${num(P.cp,1)}% · 参考値（手数料前）`)],
+    [T('Capital protection','元本の保護'),RC.kind==='none'?'—':P.B+'%',prot],
+    [T('Paid back in full, history','全額償還（過去）'),n?pct(full/n*100,0,false):'—',n?T(`of ${n} notes on ${name}`,`${name}の${n}本中`):T('Run the back-test for history','検証を実行してください')],
+    [T('Lost capital, history','元本割れ（過去）'),n?pct(loss.length/n*100,0,false):'—',n&&loss.length?T(`average ${pct(avgLoss,0)}, worst ${pct(worst,0)} incl. coupon`,`平均${pct(avgLoss,0)}、最大${pct(worst,0)}（クーポン込み）`):n?T('none in this history','この期間ではなし'):''],
+  ].map(([l,v,s2])=>`<div class="kpi"><span class="lbl">${l}</span><span class="v">${v}</span><span class="s">${s2}</span></div>`).join('');
+  $('#rcSay').innerHTML=n?T(`Over ${n} ${ht}-month notes on <b>${esc(name)}</b>, the note returned <b>${pct(avg,1)}</b> on average against <b>${pct(avgSh,1)}</b> for holding the shares${row.backtest?.from?` (${fdate(row.backtest.from,{month:'short',year:'numeric'})}–${fdate(row.backtest.to,{month:'short',year:'numeric'})})`:''}. ${RC.kind==='none'?'Without a barrier every fall below the strike is passed on.':RC.kind==='eu'?'Only the closing level at maturity matters; a dip that recovers costs nothing.':`The barrier was touched in ${pct(hitN/n*100,0,false)} of them.`}${ht!==tm?` History uses ${ht}-month terms; run the back-test to switch to ${tm}.`:''}`,
+    `<b>${esc(name)}</b>の${ht}か月物${n}本では、ノートの平均リターンは<b>${pct(avg,1)}</b>、株式保有は<b>${pct(avgSh,1)}</b>。${RC.kind==='none'?'バリアがないため、行使価格を下回る下落はすべて反映されます。':RC.kind==='eu'?'満期時点の水準だけが判定対象で、途中で下落しても戻れば損失はありません。':`バリアに触れたのは${pct(hitN/n*100,0,false)}。`}${ht!==tm?` 過去分析は${ht}か月物です。${tm}か月にするには検証を実行してください。`:''}`):'';
+  rcPayoff(P);rcHist(H,P,avgSh);
+}
+function rcPayoff(P){
+  const svg=$('#rcPay'),w=W(svg),h=300,m={l:44,r:14,t:22,b:30};
+  const x0=Math.max(10,Math.min(40,(RC.kind==='none'?P.K:P.B)-20)),x1=140;
+  const X=v=>m.l+(v-x0)/(x1-x0)*(w-m.l-m.r);
+  const ys=[100*x0/P.K+P.cp,x0,x1,100+P.cp];const yt=niceTicks(Math.min(...ys),Math.max(...ys),5),y0=yt[0],y1=yt[yt.length-1];
+  const Y=v=>m.t+(1-(v-y0)/(y1-y0))*(h-m.t-m.b);
+  const cR=cssv('--red'),cS=cssv('--steel'),cM=cssv('--mute');
+  const path=pts=>pts.map((p,i)=>(i?'L':'M')+X(p[0]).toFixed(1)+' '+Y(p[1]).toFixed(1)).join('');
+  let g='';
+  yt.forEach(v=>g+=`<line class="grd" x1="${m.l}" x2="${w-m.r}" y1="${Y(v)}" y2="${Y(v)}"/><text x="${m.l-6}" y="${Y(v)+4}" text-anchor="end">${v}</text>`);
+  [20,40,60,80,100,120,140].filter(v=>v>=x0).forEach(v=>g+=`<text x="${X(v)}" y="${h-10}" text-anchor="middle">${v}%</text>`);
+  g+=`<line class="ax" x1="${m.l}" x2="${w-m.r}" y1="${h-m.b}" y2="${h-m.b}"/>`;
+  g+=`<line class="zero" x1="${m.l}" x2="${w-m.r}" y1="${Y(100)}" y2="${Y(100)}"/><text x="${m.l+4}" y="${Y(100)-5}">${T('par','額面')}</text>`;
+  const mk=(v,lab)=>`<line class="mk" x1="${X(v)}" x2="${X(v)}" y1="${m.t-6}" y2="${h-m.b}"/><text class="mkt" x="${X(v)}" y="${m.t-10}" text-anchor="middle">${lab}</text>`;
+  g+=mk(P.K,T('strike ','行使 ')+P.K+'%');if(RC.kind!=='none'&&P.B<P.K-3)g+=mk(P.B,T('barrier ','バリア ')+P.B+'%');
+  g+=`<path d="${path([[x0,x0],[x1,x1]])}" fill="none" stroke="${cM}" stroke-width="1.2" stroke-dasharray="5 4"/>`;
+  const top=100+P.cp,fall=[[x0,100*x0/P.K+P.cp],[P.K,top],[x1,top]];
+  const leg=[];
+  if(RC.kind==='none'){g+=`<path d="${path(fall)}" fill="none" stroke="${cR}" stroke-width="2.2"/>`;leg.push([T('The note','ノート'),cR])}
+  else if(RC.kind==='eu'){g+=`<path d="${path([[x0,100*x0/P.K+P.cp],[P.B,100*P.B/P.K+P.cp]])}" fill="none" stroke="${cR}" stroke-width="2.2"/>`;
+    g+=`<line x1="${X(P.B)}" x2="${X(P.B)}" y1="${Y(100*P.B/P.K+P.cp)}" y2="${Y(top)}" stroke="${cM}" stroke-width="1" stroke-dasharray="1 3"/>`;
+    g+=`<path d="${path([[P.B,top],[x1,top]])}" fill="none" stroke="${cS}" stroke-width="2.2"/><circle cx="${X(P.B)}" cy="${Y(top)}" r="3" fill="${cS}"/><circle cx="${X(P.B)}" cy="${Y(100*P.B/P.K+P.cp)}" r="3" fill="var(--bg)" stroke="${cR}" stroke-width="1.5"/>`;
+    leg.push([T('Ends above the barrier: par + coupon','満期にバリア以上：額面＋クーポン'),cS],[T('Ends below: shares + coupon','バリア未満：株式＋クーポン'),cR])}
+  else{g+=`<path d="${path(fall.slice(0,2))}" fill="none" stroke="${cR}" stroke-width="2.2"/><path d="${path([[P.B,top],[x1,top]])}" fill="none" stroke="${cS}" stroke-width="2.2"/>`;
+    leg.push([T('Barrier never touched','バリア非接触'),cS],[T('Barrier touched','バリア接触'),cR])}
+  leg.push([T('Holding the shares','株式を保有'),cM,1]);
+  g+=`<line id="rcPay-hv" class="ax" x1="0" x2="0" y1="${m.t}" y2="${h-m.b}" visibility="hidden"/><rect class="hit" x="${m.l}" y="${m.t}" width="${w-m.l-m.r}" height="${h-m.t-m.b}" fill="transparent"/>`;
+  svg.setAttribute('viewBox',`0 0 ${w} ${h}`);svg.innerHTML=g;
+  $('#rcPayT').textContent=T(`Repayment at maturity, % of the amount invested, by where the share ends (${S.tenor} months)`,`満期償還額（投資額比）と満期時の株価水準（${S.tenor}か月）`);
+  $('#rcPayLeg').innerHTML=leg.map(([n2,c,d])=>`<span><i class="${d?'d':''}" style="background:${c};border-color:${c}"></i>${esc(n2)}</span>`).join('');
+  const hit=svg.querySelector('.hit'),hv=svg.querySelector('#rcPay-hv');
+  hit.onmousemove=ev=>{const r=svg.getBoundingClientRect(),vx=(ev.clientX-r.left)/r.width*w,xv=Math.round(x0+(vx-m.l)/(w-m.l-m.r)*(x1-x0));
+    hv.setAttribute('x1',X(xv));hv.setAttribute('x2',X(xv));hv.setAttribute('visibility','visible');
+    const below=100*xv/P.K+P.cp,lines=RC.kind==='none'?[[T('Note','ノート'),xv>=P.K?top:below,cR]]:RC.kind==='eu'?[[T('Note','ノート'),xv>=P.B?top:below,xv>=P.B?cS:cR]]:
+      (xv>=P.K?[[T('Note','ノート'),top,cS]]:[[T('Not touched','非接触'),xv>=P.B?top:null,cS],[T('Touched','接触'),below,cR]]);
+    tip(`<div class="m">${T('Share ends at','満期株価')} ${xv}%</div>`+lines.filter(l=>l[1]!=null).map(([n2,v,c])=>`<div><span style="color:${c}">■</span> ${n2} <b>${num(v,1)}</b></div>`).join('')+`<div><span style="color:${cM}">■</span> ${T('Shares','株式')} <b>${xv}</b></div>`,ev)};
+  hit.onmouseleave=()=>{hv.setAttribute('visibility','hidden');tip(null)};
+}
+function rcHist(H,P,avgSh){
+  /* One dot per historical note: lowest level reached (x) against final level (y). The shaded area is where the note loses capital. */
+  const svg=$('#rcHist'),w=W(svg),h=300,m={l:44,r:14,t:22,b:30};
+  $('#rcHistT').textContent=T(`Every ${(DATA.params||{}).tenor_m}-month note in this share’s history: lowest level during the term against the final level`,`過去のすべての${(DATA.params||{}).tenor_m}か月物ノート：期間中の最安値と満期時の水準`);
+  if(!H.length){svg.setAttribute('viewBox',`0 0 ${w} 60`);svg.setAttribute('height',60);svg.innerHTML=`<text x="${w/2}" y="34" text-anchor="middle">${T('No history for this underlying','この原資産の履歴なし')}</text>`;$('#rcHistLeg').innerHTML='';return}
+  svg.setAttribute('height',h);
+  const lows=H.map(x=>x.low),fins=H.map(x=>x.fin);
+  const xt=niceTicks(Math.min(...lows,P.B-5,P.K-5),100,4),yt=niceTicks(Math.min(...fins,P.B-5),Math.max(...fins,P.K+5),5);
+  const xa=xt[0],xb=100,ya=yt[0],yb=yt[yt.length-1];
+  const X=v=>m.l+(v-xa)/(xb-xa)*(w-m.l-m.r),Y=v=>m.t+(1-(v-ya)/(yb-ya))*(h-m.t-m.b);
+  const cR=cssv('--red'),cS=cssv('--steel'),cM=cssv('--mute');let g='';
+  /* loss region */
+  const rx0=X(xa),ry1=Y(ya);
+  if(RC.kind==='am')g+=`<rect x="${rx0}" y="${Y(P.K)}" width="${X(P.B)-rx0}" height="${ry1-Y(P.K)}" fill="${cR}" fill-opacity=".07"/>`;
+  else{const lim=RC.kind==='eu'?P.B:P.K;g+=`<rect x="${rx0}" y="${Y(lim)}" width="${X(xb)-rx0}" height="${ry1-Y(lim)}" fill="${cR}" fill-opacity=".07"/>`}
+  yt.forEach(v=>g+=`<line class="grd" x1="${m.l}" x2="${w-m.r}" y1="${Y(v)}" y2="${Y(v)}"/><text x="${m.l-6}" y="${Y(v)+4}" text-anchor="end">${v}%</text>`);
+  xt.forEach(v=>g+=`<text x="${X(v)}" y="${h-10}" text-anchor="middle">${v}%</text>`);
+  g+=`<line class="ax" x1="${m.l}" x2="${w-m.r}" y1="${h-m.b}" y2="${h-m.b}"/>`;
+  const hl=(v,lab)=>v>=ya&&v<=yb?`<line class="mk" x1="${m.l}" x2="${w-m.r}" y1="${Y(v)}" y2="${Y(v)}"/><text class="mkt" x="${w-m.r}" y="${Y(v)-4}" text-anchor="end">${lab}</text>`:'';
+  g+=hl(P.K,T('strike ','行使 ')+P.K+'%');
+  if(RC.kind==='am')g+=`<line class="mk" x1="${X(P.B)}" x2="${X(P.B)}" y1="${m.t-6}" y2="${h-m.b}"/><text class="mkt" x="${X(P.B)}" y="${m.t-10}" text-anchor="middle">${T('barrier ','バリア ')}${P.B}%</text>`;
+  if(RC.kind==='eu'&&P.B<P.K-2)g+=hl(P.B,T('barrier ','バリア ')+P.B+'%');
+  H.forEach((x,i)=>{const lost=x.red<100-1e-9;g+=`<circle cx="${X(x.low).toFixed(1)}" cy="${Y(x.fin).toFixed(1)}" r="${lost?3:2.4}" fill="${lost?cR:cS}" fill-opacity="${lost?.9:.45}" data-i="${i}"/>`});
+  svg.setAttribute('viewBox',`0 0 ${w} ${h}`);svg.innerHTML=g;
+  svg.querySelectorAll('circle[data-i]').forEach(c=>{const x=H[+c.dataset.i];c.onmousemove=ev=>tip(`<div class="m">${T('Lowest','最安値')} ${num(x.low,0)}% · ${T('final','満期')} ${num(x.fin,0)}%</div>${T('Note','ノート')} <b>${pct(x.ret,1)}</b> · ${T('shares','株式')} ${pct(x.sh,1)}`,ev);c.onmouseleave=()=>tip(null)});
+  const lossN=H.filter(x=>x.red<100-1e-9).length;
+  $('#rcHistLeg').innerHTML=[[T(`Paid back in full (${H.length-lossN})`,`全額償還（${H.length-lossN}）`),cS],[T(`Lost capital (${lossN})`,`元本割れ（${lossN}）`),cR]].map(([n2,c])=>`<span><i style="background:${c};height:8px;width:8px;border-radius:50%"></i>${esc(n2)}</span>`).join('')+`<span>${T('Shaded: where the note loses','網掛け：元本割れの領域')}</span>`;
+}
+$$('#rcKind button').forEach(b=>b.onclick=()=>{RC.kind=b.dataset.k;rcSave();rcRender()});
+$('#rcK').oninput=e=>{RC.K=+e.target.value;rcSave();rcRender()};
+$('#rcB').oninput=e=>{RC.B=+e.target.value;rcSave();rcRender()};
+$('#rcV').oninput=e=>{RC.vol=+e.target.value;rcRender()};
+$('#rcR').oninput=e=>{const v=parseFloat(e.target.value);if(isFinite(v)){RC.rate=v;rcRender()}};
+
 window.redraw=render;
 async function run(){
   if(!S.syms.length)return;setStatus('busy');$('#run').disabled=true;
   const r=await keel('api_sp_screen',{symbols:S.syms.join(','),tenor_m:S.tenor,ki:S.ki,autocall:S.ac,obs_m:S.obs,years:S.yrs,iv:true});
   $('#run').disabled=false;
-  if(r.ok&&r.data&&r.data.rows){DATA=r.data;LIVE=true;setStatus('live')}else{DATA=SAMPLE;LIVE=false;setStatus(r.code==='no_mcp'?'sample':'err',r.code,r.message)}
+  if(r.ok&&r.data&&r.data.rows){DATA=r.data;LIVE=true;setStatus('live');RC.vol=null;RC.rate=null}else{DATA=SAMPLE;LIVE=false;setStatus(r.code==='no_mcp'?'sample':'err',r.code,r.message)}
   render();
 }
 $('#ki').oninput=e=>{S.ki=+e.target.value;$('#kiO').textContent=S.ki+'%';save();dirty()};
