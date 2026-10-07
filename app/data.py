@@ -215,8 +215,9 @@ def _norm_news(item: dict, sym: str) -> dict | None:
 
 
 @cached(ttl=900)
-def news(symbol: str, limit: int = 6) -> list[dict]:
-    """Ticker news feed (yfinance, as OpenBB's company-news fetcher does); falls back to a keyword search."""
+def news(symbol: str, limit: int = 6, query: str | None = None) -> list[dict]:
+    """Ticker news feed (yfinance, as OpenBB's company-news fetcher does); falls back to a keyword
+    search on `query`, a known phrase for FX/indices, or the company name."""
     import yfinance as yf  # noqa: PLC0415
 
     items: list[dict] = []
@@ -225,7 +226,7 @@ def news(symbol: str, limit: int = 6) -> list[dict]:
     except Exception as e:  # noqa: BLE001
         log.warning("news feed %s failed: %s", symbol, e)
     if not items:
-        q = NEWS_QUERY.get(symbol)
+        q = query or NEWS_QUERY.get(symbol)
         if q:
             try:
                 df = _df(obb().yfinance.news(query=q, limit=limit, fetch_body=False))
@@ -260,19 +261,22 @@ def econ_calendar(days: int = 14) -> list[dict]:
     """Economic events for the next `days` (Yahoo returns 12 rows a call unless asked for more)."""
     import yfinance as yf  # noqa: PLC0415
 
-    # Yahoo caps each call at 100 rows, so ask in two-day windows to cover every day.
+    # Yahoo returns 12 rows unless asked and caps a page at 100; page through the whole range.
     start = date.today()
+    end = start + timedelta(days=days)
+    cal = yf.Calendars(start=start.isoformat(), end=end.isoformat())
     frames = []
-    for k in range(0, days, 2):
-        a, b = start + timedelta(days=k), start + timedelta(days=min(k + 2, days))
+    for off in range(0, 600, 100):
         try:
-            df = yf.Calendars(start=a.isoformat(), end=b.isoformat()).get_economic_events_calendar(
-                start=a.isoformat(), end=b.isoformat(), limit=100, force=True)
+            df = cal.get_economic_events_calendar(start=start.isoformat(), end=end.isoformat(), limit=100, offset=off, force=True)
         except Exception as e:  # noqa: BLE001
-            log.warning("calendar %s failed: %s", a, e)
-            continue
-        if df is not None and not df.empty:
-            frames.append(df.reset_index())
+            log.warning("calendar page %d failed: %s", off, e)
+            break
+        if df is None or df.empty:
+            break
+        frames.append(df.reset_index())
+        if len(df) < 100:
+            break
     if not frames:
         return []
     df = pd.concat(frames, ignore_index=True).drop_duplicates()

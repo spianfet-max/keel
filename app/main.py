@@ -62,6 +62,16 @@ def _syms(s: str, cap: int = 25) -> list[str]:
     return seen[:cap]
 
 
+def _short_name(n):
+    """'Nintendo Co., Ltd.' -> 'Nintendo' for news search."""
+    if not n:
+        return None
+    import re  # noqa: PLC0415
+
+    n = re.sub(r"[,.]?\s*(Co\.?|Ltd\.?|Inc\.?|Corporation|Corp\.?|Holdings?|Group|plc|N\.V\.|S\.A\.)\b.*$", "", n, flags=re.I)
+    return n.strip() or None
+
+
 def _safe(v):
     """JSON-safe floats (NaN/inf -> None), rounded."""
     if isinstance(v, float):
@@ -236,7 +246,8 @@ def brief(
     errors = []
 
     news_items: list[dict] = []
-    got = D._pool(lambda s: D.news(s, 5), syms)
+    names = {it["symbol"]: _short_name(it.get("name")) for it in snap["items"]}
+    got = D._pool(lambda s: D.news(s, 5, names.get(s)), syms)
     if not any(got.values()):
         errors.append("news: no headlines returned")
     for s in syms:
@@ -264,6 +275,8 @@ def brief(
             k = D.country_key(ev.get("country"))
             if not keep or (k and k in keep):
                 cal.append({**ev, "country": k or ev.get("country")})
+        if not allev:
+            errors.append("economic calendar: no events returned")
         if allev and not cal:
             errors.append(f"economic calendar: {len(allev)} events, none for {sorted(keep)}")
     except Exception as e:  # noqa: BLE001
