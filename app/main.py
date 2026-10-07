@@ -342,6 +342,12 @@ def sp_screen(
         usd_rate = float(h[1.0].dropna().iloc[-1]) / 100
     except Exception:  # noqa: BLE001
         pass
+    jpy_rate = None
+    try:
+        jp = D.jgb_history().dropna(how="all").iloc[-1]
+        jpy_rate = A.interp_curve({float(k): float(v) for k, v in jp.items() if pd.notna(v)}, tenor_m / 12) / 100
+    except Exception:  # noqa: BLE001
+        pass
 
     def _iv(s):
         dy = (meta.get(s, {}).get("dividend_yield") or 0) / 100  # Yahoo gives percent
@@ -379,6 +385,7 @@ def sp_screen(
     return _safe(
         {
             "params": {"tenor_m": tenor_m, "ki": ki, "autocall": autocall, "obs_m": obs_m, "years": years},
+            "rates": {"usd": usd_rate * 100, "jpy": jpy_rate * 100 if jpy_rate is not None else None},
             "rows": rows,
             "basket": basket,
             "corr": A.correlation_matrix(prices),
