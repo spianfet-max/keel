@@ -181,6 +181,7 @@ def client(monkeypatch):
     cpi["JPN"] = np.linspace(100, 112, len(cpi_idx))
     cpi["USA"] = np.linspace(100, 170, len(cpi_idx))
     monkeypatch.setattr(D, "cpi_index", lambda names, start="2000-01-01": cpi)
+    monkeypatch.setattr(D, "monthly_closes", lambda syms, years=22: {s: fake_closes(s).resample("ME").last() for s in syms})
     return TestClient(M.app)
 
 

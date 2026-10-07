@@ -142,8 +142,25 @@ def closes(symbol: str, years: float = 3) -> pd.Series:
 
 
 def many_closes(symbols: list[str], years: float = 3) -> dict[str, pd.Series]:
-    got = _pool(lambda s: closes(s, years), symbols)
+    got = _pool(lambda s: closes(s, years), symbols, workers=3)
     return {k: v for k, v in got.items() if v is not None and len(v) > 0}
+
+
+@cached(ttl=6 * 3600)
+def monthly_closes(symbols: tuple[str, ...], years: float = 22) -> dict[str, pd.Series]:
+    """Month-end closes for many symbols in ONE Yahoo request (avoids rate limits)."""
+    start = (date.today() - timedelta(days=int(365.25 * years))).isoformat()
+    res = obb().yfinance.equity.price.historical(symbol=",".join(symbols), start_date=start, interval="1M")
+    df = _df(res)
+    out: dict[str, pd.Series] = {}
+    if df.empty or "close" not in df:
+        return out
+    if "symbol" not in df:
+        df["symbol"] = symbols[0]
+    for sym, g in df.groupby("symbol"):
+        s = pd.Series(pd.to_numeric(g["close"], errors="coerce").values, index=pd.to_datetime(g["date"]))
+        out[str(sym)] = s[~s.index.duplicated(keep="last")].sort_index().dropna()
+    return out
 
 
 @cached(ttl=3600)
