@@ -229,6 +229,21 @@ def test_history(client):
     assert len(j["series"]["USDJPY=X"]) >= 12
 
 
+def test_ppp_matches_dates_and_drops_stale(client, monkeypatch):
+    idx = pd.date_range("2005-01-31", "2026-08-31", freq="ME")
+    cpi = pd.DataFrame({"USA": np.linspace(100, 170, len(idx)), "JPN": np.linspace(100, 112, len(idx)),
+                        "MEX": np.linspace(100, 200, len(idx))}, index=idx)
+    cpi.loc[cpi.index > "2021-06-30", "JPN"] = np.nan  # Japan's series stops in 2021
+    cpi.loc[cpi.index > "2025-12-31", "MEX"] = np.nan  # Mexico lags 9 months
+    monkeypatch.setattr(D, "cpi_index", lambda names, start="2000-01-01": cpi)
+    j = client.get("/api/ppp").json()
+    isos = {r["iso"]: r for r in j["rows"]}
+    assert "JPN" not in isos and "JPN" in j["missing"]
+    mex = isos["MEX"]
+    us_at = cpi.loc["2025-12-31", "USA"] / cpi.loc[cpi.index.year == 2005, "USA"].mean()
+    assert mex["cpi_us"] == pytest.approx(us_at, rel=1e-3) and mex["stale"] is True
+
+
 def test_ppp_sign(client):
     j = client.get("/api/ppp").json()
     jp = next(r for r in j["rows"] if r["iso"] == "JPY" or r["iso"] == "JPN")

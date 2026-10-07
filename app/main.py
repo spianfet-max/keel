@@ -468,18 +468,32 @@ def ppp(base_year: int = Query(2005, ge=2000, le=2020)):
     except Exception as e:  # noqa: BLE001
         raise HTTPException(503, f"FX history unavailable: {e}") from e
     base_mask = cpi.index.year == base_year
-    us_ratio = cpi["USA"].dropna().iloc[-1] / cpi.loc[base_mask, "USA"].mean()
-    rows = []
-    for iso, (name, ccy) in PPP_MAP.items():
+    us = cpi["USA"].dropna()
+    us_base = cpi.loc[base_mask, "USA"].mean()
+    stale_cut = pd.Timestamp(date.today()) - pd.DateOffset(months=24)
+    rows, skipped = [], []
+    for iso, (area, ccy) in PPP_MAP.items():
         s = fx.get(f"{ccy}=X")
-        if name not in cpi or s is None:
+        if area not in cpi or s is None:
+            skipped.append(iso)
             continue
-        loc = cpi[name].dropna()
+        loc = cpi[area].dropna()
         b = loc[loc.index.year == base_year]
         fb = s[s.index.year == base_year]
         if b.empty or fb.empty or loc.empty:
+            skipped.append(iso)
+            continue
+        asof = loc.index[-1]
+        if asof < stale_cut:  # the OECD index for this country stopped being updated
+            skipped.append(iso)
+            continue
+        # Compare both price levels at the same date, so a lagging series is not set against newer US data.
+        us_then = us[us.index <= asof]
+        if us_then.empty:
+            skipped.append(iso)
             continue
         ratio = loc.iloc[-1] / b.mean()
+        us_ratio = us_then.iloc[-1] / us_base
         fair = float(fb.mean()) * ratio / us_ratio
         spot = float(s.iloc[-1])
         rows.append(
@@ -490,10 +504,12 @@ def ppp(base_year: int = Query(2005, ge=2000, le=2020)):
                 "fx_base": float(fb.mean()),
                 "cpi_local": float(ratio),
                 "cpi_us": float(us_ratio),
-                "cpi_asof": str(loc.index[-1].date()),
+                "cpi_asof": str(asof.date()),
                 "fair": fair,
                 "gap": fair / spot - 1,
+                "stale": bool(asof < pd.Timestamp(date.today()) - pd.DateOffset(months=9)),
             }
         )
-    missing = [iso for iso, (area, _) in PPP_MAP.items() if area not in cpi]
-    return _safe({"base_year": base_year, "rows": rows, "missing": missing})
+    return _safe({"base_year": base_year, "rows": rows, "missing": skipped,
+                  "note": "Prices compared at each country's latest CPI month; series more than 24 months old are left out."})
+
