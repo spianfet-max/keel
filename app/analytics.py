@@ -272,6 +272,24 @@ def barrier_backtest(
     }
 
 
+def tenor_windows(closes: pd.Series, tenor_days: int = 252, max_points: int = 400) -> list[list[float]]:
+    """[final, lowest] of each rolling tenor window, as fractions of the start level.
+
+    Lets a page price any single-name payoff (reverse convertible, with or without a
+    barrier) against history without another server call. Thinned to max_points.
+    """
+    c = pd.to_numeric(closes, errors="coerce").dropna().values
+    n = len(c) - tenor_days
+    if n <= 0:
+        return []
+    step = max(1, n // max_points)
+    out = []
+    for s in range(0, n, step):
+        path = c[s : s + tenor_days + 1] / c[s]
+        out.append([round(float(path[-1]), 4), round(float(path.min()), 4)])
+    return out
+
+
 def min_distance_path(closes: pd.Series, tenor_days: int = 252) -> float | None:
     """Worst rolling-tenor drawdown from start, in % (how close history came to a KI)."""
     c = pd.to_numeric(closes, errors="coerce").dropna().values

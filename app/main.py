@@ -372,6 +372,7 @@ def sp_screen(
                 "max_dd_1y": A.max_drawdown(c.iloc[-252:]),
                 "worst_tenor_drop": A.min_distance_path(c, td),
                 "backtest": bt,
+                "windows": A.tenor_windows(c, td),  # [final, lowest] per rolling window
             }
         )
     basket = A.barrier_backtest(prices, td, ki / 100, autocall / 100, ob) if len(prices) >= 2 else None

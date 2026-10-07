@@ -86,6 +86,13 @@ def test_fix_splits():
     assert A.fix_splits(crash).iloc[0] == 100
 
 
+def test_tenor_windows():
+    up = pd.Series(np.linspace(100, 200, 600), index=pd.bdate_range("2020-01-01", periods=600))
+    w = A.tenor_windows(up, 252, 100)
+    assert 90 <= len(w) <= 400 and all(f > 1 and m == 1.0 for f, m in w)
+    assert A.tenor_windows(up.iloc[:100], 252) == []
+
+
 def test_monthly_return_stats():
     st = A.monthly_return_stats({"A": gbm(seed=4), "B": gbm(seed=5, vol=0.1)})
     assert st["months"] > 100
@@ -232,6 +239,7 @@ def test_sp_screen(client):
     j = client.get("/api/sp/screen", params={"symbols": "^N225,7203.T", "tenor_m": 12, "ki": 60}).json()
     assert len(j["rows"]) == 2 and j["basket"]["windows"] > 0
     assert j["rows"][0]["atm_iv"] == 22.0
+    assert j["rows"][0]["windows"] and len(j["rows"][0]["windows"][0]) == 2
     assert len(j["corr"]["matrix"]) == 2
 
 
