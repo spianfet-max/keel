@@ -4,7 +4,7 @@ A small market-data service on top of the [OpenBB Open Data Platform](https://gi
 
 | Tool | What it does | Keel call |
 |------|--------------|-----------|
-| **Carry** (artifact) | UST / EUR AAA / JGB curves and yen-hedged yields, hedge-cost history | `api_yields` |
+| **Carry** (artifact) | Currency back-tester: spot and spot + 3M carry total return from a home currency into one currency or a blend; Sharpe, drawdowns, holding-period win rates, correlation, stress episodes | `api_fxcarry` |
 | **Meeting Brief** (artifact) | One-page market pack for a client meeting: moves, talking points, calendar, news | `api_brief` |
 | **Barrier** (artifact) | Historical autocall / knock-in / loss rates for worst-of notes, vol, skew, correlation | `api_sp_screen` |
 | **Arcade** (artifact) | Japanese games-maker peer board and a zero-cost collar planner | `api_comps` |
@@ -34,7 +34,7 @@ claude.ai → Settings → Connectors → **Add custom connector**
 
 Then open any of the artifacts and allow Keel when asked. Until then they show clearly labelled sample figures.
 
-In chat, Claude gets the Keel tools (`api_yields`, `api_brief`, `api_sp_screen`, `api_comps`, `api_returns`, `api_history`, `api_ppp`, `api_snapshot`) and OpenBB's own `openbb_list_commands` / `openbb_dispatch` for everything else the installed providers offer. `mcp_prompt.txt` tells it about symbols and conventions.
+In chat, Claude gets the Keel tools (`api_fxcarry`, `api_yields`, `api_brief`, `api_sp_screen`, `api_comps`, `api_returns`, `api_history`, `api_ppp`, `api_snapshot`) and OpenBB's own `openbb_list_commands` / `openbb_dispatch` for everything else the installed providers offer. `mcp_prompt.txt` tells it about symbols and conventions.
 
 ## Data sources
 
@@ -45,6 +45,8 @@ In chat, Claude gets the Keel tools (`api_yields`, `api_brief`, `api_sp_screen`,
 | Euro-area AAA curve | OpenBB `ecb` | no |
 | CPI | OECD SDMX API, called directly (OpenBB's `oecd` extension needs more memory than the free tier) | no |
 | JGB curve | Japan Ministry of Finance CSV (not in OpenBB) | no |
+| 3-month interbank rates | OECD SDMX (financial market indicators), called directly | no |
+| Policy rates (proxy where the OECD has no 3M rate: TRY, SAR, HKD) | BIS SDMX | no |
 | Option implied vols | `yfinance` library bundled with OpenBB's extension; thin for Japanese single stocks | no |
 
 Free sources can be delayed or wrong. Nothing here is investment advice.

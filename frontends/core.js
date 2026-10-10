@@ -32,7 +32,7 @@ const unwrap=p=>{if(p&&typeof p==='object'&&!Array.isArray(p)&&Object.keys(p).le
 /* Outside claude.ai (GitHub Pages, a local file, VS Code Live Server) there is no connector:
    call the Keel REST API directly. Address can be changed with localStorage 'keel-url'. */
 let KEEL_URL='https://keel-api-tqpz.onrender.com';try{KEEL_URL=localStorage.getItem('keel-url')||KEEL_URL}catch(e){}
-const REST={api_yields:'/api/yields',api_brief:'/api/brief',api_sp_screen:'/api/sp/screen',api_comps:'/api/comps',api_history:'/api/history',api_returns:'/api/returns',api_ppp:'/api/ppp',api_snapshot:'/api/snapshot'};
+const REST={api_yields:'/api/yields',api_brief:'/api/brief',api_sp_screen:'/api/sp/screen',api_comps:'/api/comps',api_history:'/api/history',api_returns:'/api/returns',api_ppp:'/api/ppp',api_snapshot:'/api/snapshot',api_fxcarry:'/api/fxcarry'};
 let VIA=null;
 async function keelRest(tool,input){
   const path=REST[tool];if(!path)return{ok:false,code:'no_mcp'};
