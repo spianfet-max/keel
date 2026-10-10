@@ -21,12 +21,13 @@ select{border:1px solid var(--line);background:var(--card);min-height:34px;paddi
 .wsum.bad{color:var(--neg)}
 .verdict{font-size:17px;line-height:1.55;max-width:78ch;margin:0;text-wrap:pretty}
 .verdict b{font-weight:500}
-.verdict .r{color:var(--red)} .verdict .s{color:var(--steel)}
-.mtab td{padding:6px 8px}
+.verdict .r{color:var(--red)} .verdict .s{color:var(--steel)} .verdict .g{color:var(--gold)}
+.mtab{font-size:13.5px}.mtab td{padding:6px 7px}.mtab th{padding-inline:7px}
 .mtab td:first-child{color:var(--mute)}
 .mtab td.hl{font-weight:500}
 .mtab th.hl{color:var(--red)}
 .mtab th.sp{color:var(--steel)}
+.mtab th.bm{color:var(--gold)}
 .cwrap{min-width:0}
 .stat{font-size:12.5px;line-height:1.5;color:var(--mute);margin-top:8px;max-width:70ch}
 .stat b{color:var(--ink);font-weight:500;font-variant-numeric:tabular-nums}
@@ -70,6 +71,7 @@ select{border:1px solid var(--line);background:var(--card);min-height:34px;paddi
       <div class="seg" id="perSeg"><button data-v="1" data-ja="1年">1Y</button><button data-v="3" data-ja="3年">3Y</button><button data-v="5" data-ja="5年">5Y</button><button data-v="10" data-ja="10年">10Y</button><button data-v="15" data-ja="15年">15Y</button><button data-v="0" data-ja="全期間">Max</button></div></div>
     <div class="ctl" id="rebCtl"><span class="lbl" data-ja="リバランス">Rebalance</span>
       <div class="seg" id="rebSeg"><button data-v="M" data-ja="毎月">Monthly</button><button data-v="Q" data-ja="四半期">Quarterly</button><button data-v="A" data-ja="毎年">Yearly</button><button data-v="N" data-ja="しない">None</button></div></div>
+    <div class="ctl"><span class="lbl" data-ja="ベンチマーク（自国通貨建て）">Benchmark (in home currency)</span><select id="bench" aria-label="Benchmark"></select></div>
   </div>
   <div class="bar">
     <div class="ctl" style="flex:1 1 420px"><span class="lbl"><span data-ja="投資先通貨（ウェイト %）">Invest into (weight %)</span> <span class="wsum" id="wsum"></span></span>
@@ -89,6 +91,8 @@ select{border:1px solid var(--line);background:var(--card);min-height:34px;paddi
     <div class="cwrap">
       <div class="sh"><h2 data-ja="主要指標">Risk and return</h2><p id="mtabSub"></p></div>
       <div class="tw"><table class="mtab" id="mtab"></table></div>
+      <div id="relWrap"><div class="sh" style="margin-top:20px"><h2 id="relH"></h2><p id="relSub"></p></div>
+      <div class="tw"><table class="mtab" id="rel"></table></div></div>
     </div>
   </section>
 
@@ -138,9 +142,10 @@ select{border:1px solid var(--line);background:var(--card);min-height:34px;paddi
       <div class="stat" id="histStat"></div>
     </div>
     <div class="cwrap">
-      <div class="sh"><h2 data-ja="ローリング12か月：ボラティリティとシャープレシオ">Rolling 12 months: volatility and Sharpe</h2><p data-ja="過去12か月の月次リターンから年率換算。">Annualised from the trailing 12 monthly returns.</p></div>
+      <div class="sh"><h2 data-ja="ローリング12か月：ボラティリティ、シャープレシオ、ベンチマークとの相関">Rolling 12 months: volatility, Sharpe and correlation to the benchmark</h2><p data-ja="過去12か月の月次リターンから年率換算。シャープレシオは±5で表示を打ち切り。">Annualised from the trailing 12 monthly returns. Sharpe is capped at ±5 for display.</p></div>
       <svg class="ch" id="rvol" height="140"></svg>
       <svg class="ch" id="rsh" height="140" style="margin-top:6px"></svg>
+      <svg class="ch" id="rcor" height="140" style="margin-top:6px"></svg>
       <div class="leg" id="rollLeg"></div>
     </div>
   </section>
@@ -186,7 +191,31 @@ const STRESS=[
   {en:'Yen carry unwind',ja:'円キャリー巻き戻し',a:'2024-06',b:'2024-08'}];
 
 /* ----- state (remembered per viewer) ----- */
-let S={home:'JPY',basket:[['USD',100]],mode:'carry',years:10,rebal:'M',amount:null};
+let S={home:'JPY',basket:[['MXN',100]],mode:'carry',years:10,rebal:'M',amount:null,bench:null};
+const BN={GOLD:['Gold','金','Gold (USD, front-month future)','金（ドル建て・先物期近）'],SILVER:['Silver','銀','Silver (USD, front-month future)','銀（ドル建て・先物期近）'],OIL:['WTI oil','WTI原油','WTI crude oil (USD, front-month future)','WTI原油（ドル建て・先物期近）'],
+  SPX:['S&P 500','S&P500','S&P 500, dividends reinvested (USD)','S&P500 配当込み（ドル建て）'],NKY:['Nikkei 225','日経平均','Nikkei 225, price index (JPY)','日経平均株価・価格指数（円建て）'],SX5E:['Euro Stoxx 50','ユーロ・ストックス50','Euro Stoxx 50, price index (EUR)','ユーロ・ストックス50・価格指数（ユーロ建て）'],AGG:['US bonds (AGG)','米国債券（AGG）','US aggregate bond index, AGG ETF with distributions reinvested (USD)','米国総合債券（AGG ETF・分配金再投資、ドル建て）']};
+const defBench=H=>H==='USD'?'fx:JPY':'fx:USD';
+const benchKey=()=>{const b=S.bench||defBench(S.home);if(b==='none')return b;if(b.startsWith('fx:')){const c=b.slice(3);return c!==S.home&&DATA.spot[c]?b:defBench(S.home)}return DATA.bench&&DATA.bench[b.slice(2)]?b:defBench(S.home)};
+const bname=(b,long)=>{if(!b||b==='none')return'';if(b.startsWith('fx:'))return `${b.slice(3)}/${S.home}`+T(' + carry',' ＋キャリー');const n=BN[b.slice(2)];return n?n[(long?2:0)+(JA()?1:0)]:b};
+/* Benchmark value path from i0 in home currency: nulls until its data starts, then 1 and onwards */
+function benchPath(b,H,i0){
+  if(!b||b==='none')return null;
+  let g;
+  if(b.startsWith('fx:')){const c=b.slice(3);g=t=>legG(c,H,t,true)}
+  else{const B=DATA.bench[b.slice(2)];const px=t=>{const v=B.v[t],f=P(B.ccy,H,t);return v!=null&&f!=null?v*f:null};g=t=>{const a=px(t-1),c=px(t);return a!=null&&c!=null?c/a:null}}
+  const V=[null];let started=false;
+  for(let t=i0+1;t<N();t++){const x=g(t);
+    if(!started){if(x!=null){started=true;V[V.length-1]=1;V.push(x)}else V.push(null)}
+    else V.push(V[V.length-1]*(x==null?1:x))}
+  const j0=V.findIndex(v=>v!=null);return j0<0?null:{V,j0}}
+/* Basket against benchmark over their common months */
+function relStats(A,B,j0){
+  const a=A.slice(j0),b=B.slice(j0),ra=rets(a),rb=rets(b),d=ra.map((x,i)=>x-rb[i]);
+  const mb=mean(rb),ma=mean(ra);let cov=0,vb=0;for(let i=0;i<ra.length;i++){cov+=(ra[i]-ma)*(rb[i]-mb);vb+=(rb[i]-mb)**2}
+  const yrs=ra.length/12,cg=v=>Math.pow(v[v.length-1]/v[0],1/Math.max(yrs,1/12))-1;
+  const te=sd(d)*Math.sqrt(12);const up=rb.map((x,i)=>x>0?i:-1).filter(i=>i>=0),dn=rb.map((x,i)=>x<0?i:-1).filter(i=>i>=0);
+  const cap=ix=>ix.length?mean(ix.map(i=>ra[i]))/mean(ix.map(i=>rb[i])):NaN;
+  return{corr:corr(ra,rb),beta:cov/vb,ex:cg(a)-cg(b),te,ir:mean(d)*12/te,beat:d.filter(x=>x>0).length/d.length,up:cap(up),dn:cap(dn),n:ra.length}}
 try{const s=JSON.parse(localStorage.getItem('keel-fxcarry')||'null');if(s&&s.home&&Array.isArray(s.basket))S=Object.assign(S,s)}catch(e){}
 const save=()=>{try{localStorage.setItem('keel-fxcarry',JSON.stringify(S))}catch(e){}};
 
@@ -250,7 +279,9 @@ function run(){
   const st=stats(Vs,null),tt=stats(Vt,Vc),cs=stats(Vc,null);
   const tw=legs.reduce((s,[,w])=>s+w,0);
   const gapNow=legs.reduce((s,[c,w])=>s+(w/tw)*((rate(c,N()-1)??NaN)-(rate(H,N()-1)??0)),0);
-  return{H,legs,names,i0,Vs,Vt,Vc,st,tt,cs,carry,P:carry?tt:st,V:carry?Vt:Vs,gapNow,
+  const bk=benchKey(),bp=benchPath(bk,H,i0);let bs=null,rel=null;
+  if(bp&&bp.V.length-bp.j0>6){const Vb=bp.V.slice(bp.j0);bs=stats(Vb,carry?Vc.slice(bp.j0).map(v=>v/Vc[bp.j0]):null);rel=relStats(carry?Vt:Vs,bp.V,bp.j0)}
+  return{H,legs,names,i0,Vs,Vt,Vc,st,tt,cs,carry,P:carry?tt:st,V:carry?Vt:Vs,gapNow,bk,bp:bs?bp:null,bs,rel,
     noRate:names.filter(c=>!hasRate(c)),homeNoRate:!hasRate(H)}}
 
 /* ----- controls ----- */
@@ -258,8 +289,14 @@ function buildControls(){
   $('#home').innerHTML=DATA.ccys.map(c=>`<option value="${c}">${c} · ${esc(cname(c))}</option>`).join('');$('#home').value=S.home;
   $('#presets').innerHTML=PRESETS.map((p,i)=>`<button data-i="${i}">${esc(JA()?p.ja:p.en)}</button>`).join('');
   $$('#presets button').forEach(b=>b.onclick=()=>{S.basket=PRESETS[+b.dataset.i].f(S.home);save();renderBasket();render()});
-  syncSegs();renderBasket();
+  syncSegs();renderBasket();buildBench();
   const a=S.amount||DEF_AMT[S.home]||100000;$('#amount').value=num(a,0);
+}
+function buildBench(){
+  const H=S.home,fx=DATA.ccys.filter(c=>c!==H);
+  $('#bench').innerHTML=`<option value="none">${T('None','なし')}</option><optgroup label="${T('Currency, spot + carry','通貨（為替＋キャリー）')}">${fx.map(c=>`<option value="fx:${c}">${c}/${H} · ${esc(cname(c))}</option>`).join('')}</optgroup>`+
+    `<optgroup label="${T('Other assets','その他の資産')}">${Object.keys(DATA.bench||{}).filter(k=>BN[k]).map(k=>`<option value="b:${k}">${esc(BN[k][JA()?3:2])}</option>`).join('')}</optgroup>`;
+  $('#bench').value=benchKey();
 }
 function syncSegs(){
   $$('#modeSeg button').forEach(b=>b.classList.toggle('on',b.dataset.v===S.mode));
@@ -294,7 +331,7 @@ function bars(svg,cats,groups,o={}){
   cats.forEach((c,i)=>{const x0=m.l+i*bw+(bw-gw)/2;
     groups.forEach((gr,j)=>{const v=gr.vals[i];if(v==null||!isFinite(v))return;const y=Y(Math.max(v,0)),hh=Math.abs(Y(v)-Y(0));
       g+=`<rect x="${(x0+j*each+.5).toFixed(1)}" y="${y.toFixed(1)}" width="${Math.max(1,each-1).toFixed(1)}" height="${Math.max(.5,hh).toFixed(1)}" fill="${typeof gr.color==='function'?gr.color(v):gr.color}" data-i="${i}"/>`});
-    if(o.dots)o.dots.forEach(d=>{const v=d.vals[i];if(v!=null&&isFinite(v))g+=`<circle cx="${(x0+gw/2).toFixed(1)}" cy="${Y(v).toFixed(1)}" r="3.2" fill="${d.color}" stroke="${cssv('--bg')}" stroke-width="1.2"/>`});
+    if(o.dots)o.dots.forEach((d,j)=>{const v=d.vals[i];if(v!=null&&isFinite(v))g+=`<circle cx="${(x0+gw/2+(o.dots.length>1?(j-.5)*Math.min(8,gw/3):0)).toFixed(1)}" cy="${Y(v).toFixed(1)}" r="3.2" fill="${d.color}" stroke="${cssv('--bg')}" stroke-width="1.2"/>`});
     if(i%every===0)g+=`<text x="${(m.l+i*bw+bw/2).toFixed(1)}" y="${h-8}" text-anchor="middle">${esc(c)}</text>`});
   if(lo<0&&hi>0)g+=`<line class="ax" x1="${m.l}" x2="${w-m.r}" y1="${Y(0)}" y2="${Y(0)}"/>`;
   if(o.vlines)o.vlines.forEach(L=>{const x=m.l+L.at*(w-m.l-m.r);g+=`<line x1="${x}" x2="${x}" y1="${m.t}" y2="${h-m.b}" stroke="${L.color}" stroke-width="1.5" ${L.dash?'stroke-dasharray="4 3"':''}/>`});
@@ -318,11 +355,13 @@ function render(){
   /* verdict */
   const recTxt=k.ddRec!=null?T(`, recovered by ${fm(dt(R.i0+k.ddRec))}`,`、${fm(dt(R.i0+k.ddRec))}までに回復`):T(', not yet recovered','、まだ回復していません');
   $('#verdict').innerHTML=T(
-    `${money(amt,H)} put into <b>${esc(lname)}</b> at the end of ${fm(d0)} was worth <b class="r">${money(amt*R.Vt[R.Vt.length-1],H)}</b> by ${fm(d1)} with carry (<b class="r">${pc(tt.cagr)}</b> a year), and <b class="s">${money(amt*R.Vs[R.Vs.length-1],H)}</b> on the currency move alone (<b class="s">${pc(st.cagr)}</b> a year). Carry added <b>${pc(cAdd)}</b> a year; staying in ${H} cash returned ${pc(cs.cagr)} a year. Worst drawdown ${pc(k.mdd)} (${fm(dt(R.i0+k.ddB))})${recTxt}.`,
-    `${fm(d0)}末に<b>${esc(R.legs.length===1?R.legs[0][0]:'このバスケット')}</b>へ${money(amt,H)}を投資すると、${fm(d1)}時点でキャリー込み<b class="r">${money(amt*R.Vt[R.Vt.length-1],H)}</b>（年率<b class="r">${pc(tt.cagr)}</b>）、為替のみでは<b class="s">${money(amt*R.Vs[R.Vs.length-1],H)}</b>（年率<b class="s">${pc(st.cagr)}</b>）。キャリーの上乗せは年率<b>${pc(cAdd)}</b>、${H}の現金で運用した場合は年率${pc(cs.cagr)}。最大ドローダウンは${pc(k.mdd)}（${fm(dt(R.i0+k.ddB))}）${recTxt}。`);
+    `${money(amt,H)} put into <b>${esc(lname)}</b> at the end of ${fm(d0)} was worth <b class="r">${money(amt*R.Vt[R.Vt.length-1],H)}</b> by ${fm(d1)} with carry (<b class="r">${pc(tt.cagr)}</b> a year), and <b class="s">${money(amt*R.Vs[R.Vs.length-1],H)}</b> on the currency move alone (<b class="s">${pc(st.cagr)}</b> a year). Carry added <b>${pc(cAdd)}</b> a year; staying in ${H} cash returned ${pc(cs.cagr)} a year. Worst drawdown ${pc(k.mdd)} (${fm(dt(R.i0+k.ddB))})${recTxt}.${R.bs?` The benchmark, ${esc(bname(R.bk,1))}, returned <b class="g">${pc(R.bs.cagr)}</b> a year${R.bp.j0?` from ${fm(dt(R.i0+R.bp.j0))}`:''}.`:''}`,
+    `${fm(d0)}末に<b>${esc(R.legs.length===1?R.legs[0][0]:'このバスケット')}</b>へ${money(amt,H)}を投資すると、${fm(d1)}時点でキャリー込み<b class="r">${money(amt*R.Vt[R.Vt.length-1],H)}</b>（年率<b class="r">${pc(tt.cagr)}</b>）、為替のみでは<b class="s">${money(amt*R.Vs[R.Vs.length-1],H)}</b>（年率<b class="s">${pc(st.cagr)}</b>）。キャリーの上乗せは年率<b>${pc(cAdd)}</b>、${H}の現金で運用した場合は年率${pc(cs.cagr)}。最大ドローダウンは${pc(k.mdd)}（${fm(dt(R.i0+k.ddB))}）${recTxt}。${R.bs?`ベンチマーク（${esc(bname(R.bk,1))}）は${R.bp.j0?fm(dt(R.i0+R.bp.j0))+'から':''}年率<b class="g">${pc(R.bs.cagr)}</b>。`:''}`);
   const w=[];
   if(R.noRate.length)w.push(T(`No 3-month rate source for ${R.noRate.join(', ')}: carry for ${R.noRate.length>1?'these is':'it is'} counted as zero.`,`${R.noRate.join('、')}は3か月金利のデータがないため、キャリーをゼロとして計算しています。`));
   if(R.homeNoRate)w.push(T(`No 3-month rate for ${H}: home cash is taken as earning nothing.`,`${H}の3か月金利がないため、自国通貨の現金リターンはゼロとしています。`));
+  if(R.bk!=='none'&&!R.bs)w.push(T(`No data for the benchmark in this period.`,`この期間のベンチマークのデータがありません。`));
+  else if(R.bp&&R.bp.j0)w.push(T(`Benchmark data starts ${fm(dt(R.i0+R.bp.j0))}; comparisons use the months both have.`,`ベンチマークのデータは${fm(dt(R.i0+R.bp.j0))}から。比較は共通の期間で行っています。`));
   if(S.years>0&&N()-1-R.i0<12*S.years)w.push(T(`History for this choice starts ${fm(d0)}, shorter than the period picked.`,`この組み合わせのデータは${fm(d0)}からで、選択した期間より短くなっています。`));
   $('#warns').textContent=w.join(' ');
   /* KPIs */
@@ -332,14 +371,24 @@ function render(){
     [T('Volatility','ボラティリティ'),pc(k.vol,1).replace('+',''),T('annualised','年率'),null],
     [T('Sharpe ratio','シャープレシオ'),ratio(k.sh),carry?T(`over ${H} cash`,`${H}現金対比`):T('spot, no cash rate','為替のみ'),null],
     [T('Max drawdown','最大ドローダウン'),pc(k.mdd),fm(dt(R.i0+k.ddB)),k.mdd]];
+  if(R.rel)K.push([T('Against benchmark','ベンチマーク比'),pc(R.rel.ex),T(`a year vs ${bname(R.bk)}`,`年率・対 ${bname(R.bk)}`),R.rel.ex]);
   $('#kpis').innerHTML=K.map(([a,v,s,sg])=>`<div class="kpi"><span class="lbl">${a}</span><span class="v ${sg==null?'':cls(sg)}">${v}</span><span class="s">${s}</span></div>`).join('');
   /* metrics table */
   const rows=[[T('Total return','トータルリターン'),x=>pc(x.tot)],[T('Return a year (CAGR)','年率リターン'),x=>pc(x.cagr)],[T('Volatility','ボラティリティ'),x=>pc(x.vol).replace('+','')],
     [T('Sharpe ratio','シャープレシオ'),x=>ratio(x.sh)],[T('Sortino ratio','ソルティノレシオ'),x=>ratio(x.so)],[T('Max drawdown','最大ドローダウン'),x=>pc(x.mdd)],[T('Calmar ratio','カルマーレシオ'),x=>ratio(x.calmar)],
     [T('Months up','上昇した月の割合'),x=>num(x.hit*100,0)+'%'],[T('Best month','最良月'),x=>pc(x.best)],[T('Worst month','最悪月'),x=>pc(x.worst)],
     [T('95% VaR, 1 month','95% VaR（1か月）'),x=>pc(-x.var95)],[T('95% CVaR, 1 month','95% CVaR（1か月）'),x=>pc(-x.cvar)],[T('Skew','歪度'),x=>ratio(x.skew)]];
-  $('#mtab').innerHTML=`<tr><th></th><th class="sp">${T('Spot only','為替のみ')}</th><th class="hl">${T('Spot + carry','為替＋キャリー')}</th><th>${T(H+' cash',H+'現金')}</th></tr>`+
-    rows.map(([l,f],i)=>`<tr><td>${l}</td><td class="${carry?'':'hl'}">${f(st)}</td><td class="${carry?'hl':''}">${f(tt)}</td><td>${[3,4,6,12].includes(i)?'—':f(cs)}</td></tr>`).join('');
+  $('#mtab').innerHTML=`<tr><th></th><th class="sp">${T('Spot only','為替のみ')}</th><th class="hl">${T('Spot + carry','為替＋キャリー')}</th><th>${T(H+' cash',H+'現金')}</th>${R.bs?`<th class="bm" title="${esc(bname(R.bk,1))}">${T('Benchmark','ベンチマーク')}</th>`:''}</tr>`+
+    rows.map(([l,f],i)=>`<tr><td>${l}</td><td class="${carry?'':'hl'}">${f(st)}</td><td class="${carry?'hl':''}">${f(tt)}</td><td>${[3,4,6,12].includes(i)?'—':f(cs)}</td>${R.bs?`<td>${f(R.bs)}</td>`:''}</tr>`).join('');
+  /* against the benchmark */
+  $('#relWrap').hidden=!R.rel;
+  if(R.rel){const r=R.rel,mode=carry?T('spot + carry','為替＋キャリー'):T('spot only','為替のみ');
+    $('#relH').textContent=T(`Against ${bname(R.bk)}`,`${bname(R.bk)}との比較`);
+    $('#relSub').textContent=T(`Your selection (${mode}) against the benchmark, both in ${H}, over ${r.n} common months.`,`選択中の通貨（${mode}）とベンチマーク、いずれも${H}建て、共通の${r.n}か月。`);
+    const RR=[[T('Excess return a year','年率超過リターン'),pc(r.ex)],[T('Correlation','相関'),ratio(r.corr)],[T('Beta to the benchmark','ベータ'),ratio(r.beta)],
+      [T('Tracking error','トラッキング・エラー'),pc(r.te).replace('+','')],[T('Information ratio','インフォメーション・レシオ'),ratio(r.ir)],[T('Months ahead of the benchmark','ベンチマークを上回った月'),num(r.beat*100,0)+'%'],
+      [T('Up-market capture','上昇局面の追随率'),num(r.up*100,0)+'%'],[T('Down-market capture','下落局面の追随率'),num(r.dn*100,0)+'%']];
+    $('#rel').innerHTML=RR.map(([l,v])=>`<tr><td>${l}</td><td class="hl">${v}</td></tr>`).join('')}
   $('#mtabSub').textContent=T(`${R.st.n} monthly returns. Sharpe and Sortino with carry are measured over ${H} 3-month cash; spot-only figures use no cash rate, so they read as the currency’s own risk and return.`,`月次リターン${R.st.n}本。キャリー込みのシャープ・ソルティノは${H}の3か月金利を差し引いた超過リターンで計算。為替のみは通貨自体のリスクとリターンを示します。`);
   /* growth */
   $('#growthH').textContent=T(`Growth of ${money(amt,H)}`,`${money(amt,H)}の推移`);
@@ -347,14 +396,16 @@ function render(){
   const gs=[{name:T('Spot + carry','為替＋キャリー'),color:col.tot,width:2,pts:R.Vt.map((v,i)=>({x:gx[i],y:v*amt}))},
     {name:T('Spot only','為替のみ'),color:col.spot,pts:R.Vs.map((v,i)=>({x:gx[i],y:v*amt}))},
     {name:T(`${H} cash`,`${H}現金`),color:col.cash,dash:1,pts:R.Vc.map((v,i)=>({x:gx[i],y:v*amt}))}];
+  let BG=null;if(R.bp){const base=R.V[R.bp.j0];BG=R.bp.V.map(v=>v==null?null:v*base);gs.push({name:bname(R.bk),color:col.gold,pts:BG.map((v,i)=>({x:gx[i],y:v==null?null:v*amt}))})}
   lineChart($('#growth'),gs,{h:320,xType:'date',ml:62,yFmt:v=>big(v),tipFmt:v=>money(v,H)});
   /* shade the carry gap */
-  shadeGap($('#growth'),R.Vs,R.Vt,amt,gx);
+  shadeGap($('#growth'),R.Vs,R.Vt,amt,gx,BG);
   legend($('#growthLeg'),gs);
   /* holding-period win rates */
   const HP=[1,3,6,12,24,36,60].filter(h=>h<=R.Vt.length-2);
   const win=(V,h,C)=>{let n=0,k2=0;for(let i=0;i+h<V.length;i++){n++;if(C?V[i+h]/V[i]>C[i+h]/C[i]:V[i+h]>V[i])k2++}return n?k2/n:null};
-  const wg=[{name:T('Spot only: gain','為替のみ：プラス'),color:col.spot,vals:HP.map(h=>win(R.Vs,h))},{name:T('Spot + carry: gain','キャリー込み：プラス'),color:col.tot,vals:HP.map(h=>win(R.Vt,h))},{name:T(`Spot + carry: beat ${H} cash`,`キャリー込み：${H}現金を上回る`),color:col.gold,vals:HP.map(h=>win(R.Vt,h,R.Vc))}];
+  const wg=[{name:T('Spot only: gain','為替のみ：プラス'),color:col.spot,vals:HP.map(h=>win(R.Vs,h))},{name:T('Spot + carry: gain','キャリー込み：プラス'),color:col.tot,vals:HP.map(h=>win(R.Vt,h))},{name:T(`Spot + carry: beat ${H} cash`,`キャリー込み：${H}現金を上回る`),color:col.cash,vals:HP.map(h=>win(R.Vt,h,R.Vc))}];
+  if(R.bp){const A=R.V.slice(R.bp.j0),B=R.bp.V.slice(R.bp.j0);wg.push({name:T(`Beat ${bname(R.bk)}`,`${bname(R.bk)}を上回る`),color:col.gold,vals:HP.map(h=>h<=A.length-2?win(A,h,B):null)})}
   const hl=h=>h<12?T(h+'M',h+'か月'):T(h/12+'Y',h/12+'年');
   bars($('#win'),HP.map(hl),wg,{h:260,lo:0,hi:1,yFmt:v=>num(v*100,0)+'%',tipHead:i=>T(`Held ${hl(HP[i])}`,`${hl(HP[i])}保有`)});
   legend($('#winLeg'),wg);
@@ -366,16 +417,19 @@ function render(){
   lineChart($('#cush'),cs2,{h:260,xType:'date',zero:1,yFmt:v=>num(v,0)+'%',tipFmt:v=>pct(v,1)});legend($('#cushLeg'),cs2);
   $('#cushStat').innerHTML=nn?T(`Spot loss beat carry in <b>${num(wiped/nn*100,0)}%</b> of 12-month windows. Today the rate gap is <b>${isFinite(R.gapNow)?pct(R.gapNow,2):'—'}</b> a year: the currency can fall that much over a year before carry is used up.`,`12か月の期間のうち<b>${num(wiped/nn*100,0)}%</b>で為替損が金利差を上回りました。現在の金利差は年<b>${isFinite(R.gapNow)?pct(R.gapNow,2):'—'}</b>。1年でこの幅までの通貨安ならキャリーで吸収できます。`):'';
   /* drawdown */
-  lineChart($('#dd'),[{name:T('Drawdown','ドローダウン'),color:carry?col.tot:col.spot,area:1,pts:k.DD.map((v,i)=>({x:gx[i],y:v*100}))}],{h:240,xType:'date',zero:1,yFmt:v=>num(v,0)+'%',tipFmt:v=>pct(v,1)});
+  const dds=[{name:T('Your selection','選択中の通貨'),color:carry?col.tot:col.spot,area:1,pts:k.DD.map((v,i)=>({x:gx[i],y:v*100}))}];
+  if(R.bp){let pk=-Infinity;dds.push({name:bname(R.bk),color:col.gold,dash:1,pts:R.bp.V.map((v,i)=>{if(v==null)return{x:gx[i],y:null};pk=Math.max(pk,v);return{x:gx[i],y:(v/pk-1)*100}})})}
+  lineChart($('#dd'),dds,{h:240,xType:'date',zero:1,yFmt:v=>num(v,0)+'%',tipFmt:v=>pct(v,1)});
   const ddm=k.ddRec!=null?k.ddRec-k.ddA:null;
-  $('#ddStat').innerHTML=T(`Worst: <b>${pc(k.mdd)}</b>, from ${fm(dt(R.i0+k.ddA))} to ${fm(dt(R.i0+k.ddB))}. `,`最大：<b>${pc(k.mdd)}</b>（${fm(dt(R.i0+k.ddA))}〜${fm(dt(R.i0+k.ddB))}）。`)+(ddm!=null?T(`Back to the old high after <b>${ddm}</b> months.`,`<b>${ddm}</b>か月で高値を回復。`):T('Not back to the old high yet.','まだ高値を回復していません。'));
+  $('#ddStat').innerHTML=(R.bs?T(`Benchmark worst: <b>${pc(R.bs.mdd)}</b>. `,`ベンチマーク最大：<b>${pc(R.bs.mdd)}</b>。`):'')+T(`Your selection worst: <b>${pc(k.mdd)}</b>, from ${fm(dt(R.i0+k.ddA))} to ${fm(dt(R.i0+k.ddB))}. `,`選択中の通貨の最大：<b>${pc(k.mdd)}</b>（${fm(dt(R.i0+k.ddA))}〜${fm(dt(R.i0+k.ddB))}）。`)+(ddm!=null?T(`Back to the old high after <b>${ddm}</b> months.`,`<b>${ddm}</b>か月で高値を回復。`):T('Not back to the old high yet.','まだ高値を回復していません。'));
   /* years */
   const yrs={};for(let i=1;i<R.Vt.length;i++){const y=gx[i].getFullYear();(yrs[y]=yrs[y]||{s:1,t:1,c:1,n:0});yrs[y].s*=R.Vs[i]/R.Vs[i-1];yrs[y].t*=R.Vt[i]/R.Vt[i-1];yrs[y].c*=R.Vc[i]/R.Vc[i-1];yrs[y].n++}
   const YK=Object.keys(yrs);
   const yg=[{name:T('Spot','為替'),color:col.spot,vals:YK.map(y=>yrs[y].s-1)},{name:T('Carry over cash','キャリー（金利差）'),color:col.tot,vals:YK.map(y=>yrs[y].t/yrs[y].s/yrs[y].c-1)}];
   const yd=[{name:T('Total with carry','キャリー込み合計'),color:col.ink,vals:YK.map(y=>yrs[y].t-1)}];
-  bars($('#yrs'),YK.map(y=>yrs[y].n<12?y+'*':y),yg,{h:240,dots:yd,extra:yd[0].vals,lw:34,tipFmt:v=>pc(v),tipHead:i=>YK[i]+(yrs[YK[i]].n<12?T(` (${yrs[YK[i]].n} months)`,`（${yrs[YK[i]].n}か月）`):'')});
-  legend($('#yrsLeg'),[...yg,{name:yd[0].name+' ●',color:col.ink}]);
+  if(R.bp){const by={};for(let i=Math.max(1,R.bp.j0+1);i<R.bp.V.length;i++){const y=gx[i].getFullYear();by[y]=(by[y]||1)*R.bp.V[i]/R.bp.V[i-1]}yd.push({name:bname(R.bk),color:col.gold,vals:YK.map(y=>by[y]==null?null:by[y]-1)})}
+  bars($('#yrs'),YK.map(y=>yrs[y].n<12?y+'*':y),yg,{h:240,dots:yd,extra:yd.flatMap(d=>d.vals).filter(v=>v!=null),lw:34,tipFmt:v=>pc(v),tipHead:i=>YK[i]+(yrs[YK[i]].n<12?T(` (${yrs[YK[i]].n} months)`,`（${yrs[YK[i]].n}か月）`):'')});
+  legend($('#yrsLeg'),[...yg,...yd.map(d=>({name:d.name+' ●',color:d.color}))]);
   /* scatter */
   scatter();
   /* correlation */
@@ -384,19 +438,21 @@ function render(){
   histo(k.r,k,col);
   /* rolling */
   const rv=[],rs=[];const ex=R.P.r.map((x,i)=>carry?x-(R.Vc[i+1]/R.Vc[i]-1):x);
-  for(let i=12;i<=R.P.r.length;i++){const w2=R.P.r.slice(i-12,i),e2=ex.slice(i-12,i);rv.push({x:gx[i],y:sd(w2)*Math.sqrt(12)*100});rs.push({x:gx[i],y:mean(e2)/sd(e2)*Math.sqrt(12)})}
+  for(let i=12;i<=R.P.r.length;i++){const w2=R.P.r.slice(i-12,i),e2=ex.slice(i-12,i);rv.push({x:gx[i],y:sd(w2)*Math.sqrt(12)*100});rs.push({x:gx[i],y:Math.max(-5,Math.min(5,mean(e2)/sd(e2)*Math.sqrt(12)))})}
   const lc=carry?col.tot:col.spot;
   lineChart($('#rvol'),[{name:T('12M volatility','12か月ボラティリティ'),color:lc,pts:rv}],{h:140,xType:'date',yt:3,yFmt:v=>num(v,0)+'%',tipFmt:v=>num(v,1)+'%'});
   lineChart($('#rsh'),[{name:T('12M Sharpe','12か月シャープレシオ'),color:col.ink,pts:rs}],{h:140,xType:'date',yt:3,zero:1,yFmt:v=>num(v,1),tipFmt:v=>num(v,2)});
-  legend($('#rollLeg'),[{name:T('12M volatility (top)','12か月ボラティリティ（上）'),color:lc},{name:T('12M Sharpe (bottom)','12か月シャープレシオ（下）'),color:col.ink}]);
+  const rc=[];if(R.bp){const rb=rets(R.bp.V.map(v=>v==null?NaN:v));for(let i=Math.max(12,R.bp.j0+12);i<=R.P.r.length;i++)rc.push({x:gx[i],y:corr(R.P.r.slice(i-12,i),rb.slice(i-12,i))})}
+  $('#rcor').hidden=!rc.length;if(rc.length)lineChart($('#rcor'),[{name:T(`12M correlation to ${bname(R.bk)}`,`${bname(R.bk)}との12か月相関`),color:col.gold,pts:rc}],{h:140,xType:'date',yt:3,zero:1,yFmt:v=>num(v,1),tipFmt:v=>num(v,2)});
+  legend($('#rollLeg'),[{name:T('12M volatility','12か月ボラティリティ'),color:lc},{name:T('12M Sharpe','12か月シャープレシオ'),color:col.ink},...(rc.length?[{name:T(`12M correlation to ${bname(R.bk)}`,`${bname(R.bk)}との12か月相関`),color:col.gold}]:[])]);
   calendar(k.r);
   stress();
   method();
 }
-function shadeGap(svg,Vs,Vt,amt,gx){
+function shadeGap(svg,Vs,Vt,amt,gx,BG){
   /* Same scale as lineChart (left margin 62, five nice ticks over all three series, time on x) */
   const vb=svg.getAttribute('viewBox').split(' ').map(Number),w=vb[2],h=vb[3],m={l:62,r:14,t:12,b:26};
-  const all=[...Vs,...Vt,...R.Vc].map(v=>v*amt);let y0=Math.min(...all),y1=Math.max(...all);const pad=(y1-y0)*.06||1;const yt=niceTicks(y0-pad,y1+pad,5);y0=yt[0];y1=yt[yt.length-1];
+  const all=[...Vs,...Vt,...R.Vc,...(BG||[]).filter(v=>v!=null)].map(v=>v*amt);let y0=Math.min(...all),y1=Math.max(...all);const pad=(y1-y0)*.06||1;const yt=niceTicks(y0-pad,y1+pad,5);y0=yt[0];y1=yt[yt.length-1];
   const x0=+gx[0],x1=+gx[gx.length-1],X=i=>m.l+(x1>x0?(+gx[i]-x0)/(x1-x0):.5)*(w-m.l-m.r),Y=v=>m.t+(1-(v*amt-y0)/(y1-y0))*(h-m.t-m.b);
   const n=Vs.length;let d='M'+Vt.map((v,i)=>X(i).toFixed(1)+' '+Y(v).toFixed(1)).join('L');
   for(let i=n-1;i>=0;i--)d+='L'+X(i).toFixed(1)+' '+Y(Vs[i]).toFixed(1);
@@ -412,6 +468,7 @@ function scatter(){
     const s=stats(V,carry?R.Vc:null);
     pts.push({c,x:s.vol,y:s.cagr,sh:s.sh,gap:(rate(c,N()-1)??NaN)-(rate(H,N()-1)??0),sel:R.names.includes(c)})}
   if(R.legs.length>1)pts.push({c:T('Basket','バスケット'),x:R.P.vol,y:R.P.cagr,sh:R.P.sh,gap:R.gapNow,sel:true,basket:true});
+  if(R.bs&&!(R.bk.startsWith('fx:')&&pts.some(p=>p.c===R.bk.slice(3)&&(p.isb=true))))pts.push({c:bname(R.bk),x:R.bs.vol,y:R.bs.cagr,sh:R.bs.sh,gap:NaN,sel:true,bench:true});
   $('#scatSub').textContent=T(`${carry?'Spot + carry':'Spot only'}, ${H} investor, same period as above. Dot size is today’s 3-month rate gap over ${H} (hollow when negative).`,`${carry?'為替＋キャリー':'為替のみ'}、${H}建て投資家、上と同じ期間。円の大きさは現在の${H}との3か月金利差（マイナスは白抜き）。`);
   const w=W(svg),h=340,m={l:46,r:16,t:14,b:34};
   if(!pts.length){svg.innerHTML='';return}
@@ -425,16 +482,16 @@ function scatter(){
   g+=`<line class="ax" x1="${m.l}" x2="${w-m.r}" y1="${h-m.b}" y2="${h-m.b}"/>`;
   const boxes=[];const gmax=Math.max(1,...pts.map(p=>Math.abs(p.gap)).filter(isFinite));
   const rad=p=>4+10*Math.sqrt(isFinite(p.gap)?Math.abs(p.gap)/gmax:0);
-  [...pts].sort((a,b)=>b.sel-a.sel).forEach(p=>{const tx=X(p.x)+(p.basket?9:rad(p)+3),ty=Y(p.y)+4,tw=p.c.length*7+2;
-    p.lab=p.sel||!boxes.some(b=>tx<b[0]+b[2]&&tx+tw>b[0]&&Math.abs(ty-b[1])<11);if(p.lab)boxes.push([tx,ty,tw]);p.tx=tx;p.ty=ty});
+  [...pts].sort((a,b)=>b.sel-a.sel).forEach(p=>{const tx=X(p.x)+(p.basket||p.bench?9:rad(p)+3),ty=Y(p.y)+4,tw=p.c.length*7+2;
+    p.lab=p.sel||p.isb||!boxes.some(b=>tx<b[0]+b[2]&&tx+tw>b[0]&&Math.abs(ty-b[1])<11);if(p.lab)boxes.push([tx,ty,tw]);p.tx=tx;p.ty=ty});
   pts.sort((a,b)=>a.sel-b.sel).forEach(p=>{const r=4+10*Math.sqrt(isFinite(p.gap)?Math.abs(p.gap)/gmax:0),c=p.sel?col.tot:col.spot,neg=isFinite(p.gap)&&p.gap<0;
-    g+=p.basket?`<rect x="${X(p.x)-6}" y="${Y(p.y)-6}" width="12" height="12" transform="rotate(45 ${X(p.x)} ${Y(p.y)})" fill="${col.ink}"/>`:
+    g+=p.bench?`<rect x="${X(p.x)-6}" y="${Y(p.y)-6}" width="12" height="12" fill="${col.gold}"/>`:p.basket?`<rect x="${X(p.x)-6}" y="${Y(p.y)-6}" width="12" height="12" transform="rotate(45 ${X(p.x)} ${Y(p.y)})" fill="${col.ink}"/>`:p.isb?`<circle cx="${X(p.x).toFixed(1)}" cy="${Y(p.y).toFixed(1)}" r="${r.toFixed(1)}" fill="${col.gold}" fill-opacity=".45" stroke="${col.gold}" stroke-width="1.6"/>`:
       `<circle cx="${X(p.x).toFixed(1)}" cy="${Y(p.y).toFixed(1)}" r="${r.toFixed(1)}" fill="${neg?cssv('--bg'):c}" fill-opacity="${neg?1:p.sel?.55:.28}" stroke="${c}" stroke-width="1.3"/>`;
     if(p.lab)g+=`<text x="${p.tx.toFixed(1)}" y="${p.ty.toFixed(1)}" style="fill:${p.sel?'var(--ink)':'var(--mute)'};font-weight:${p.sel?500:300}">${esc(p.c)}</text>`;
     g+=`<circle class="hp" cx="${X(p.x)}" cy="${Y(p.y)}" r="${Math.max(r,9)}" fill="transparent" data-c="${esc(p.c)}"/>`});
   svg.setAttribute('viewBox',`0 0 ${w} ${h}`);svg.setAttribute('height',h);svg.innerHTML=g;
   svg.querySelectorAll('.hp').forEach(el=>{const p=pts.find(q=>q.c===el.dataset.c);el.onmousemove=ev=>tip(`<div><b>${esc(p.c)}</b> ${p.basket?'':esc(cname(p.c))}</div><div class="m">${T('Return a year','年率リターン')} <b>${pc(p.y)}</b></div><div class="m">${T('Volatility','ボラティリティ')} <b>${pc(p.x).replace('+','')}</b></div><div class="m">${T('Sharpe','シャープ')} <b>${ratio(p.sh)}</b></div><div class="m">${T('Rate gap today','現在の金利差')} <b>${isFinite(p.gap)?pct(p.gap,2):'—'}</b></div>`,ev);el.onmouseleave=()=>tip(null)});
-  $('#scatLeg').innerHTML=`<span><i style="background:${col.tot}"></i>${T('In your selection','選択中の通貨')}</span><span><i style="background:${col.spot}"></i>${T('Others','その他')}</span>`+(R.legs.length>1?`<span><i style="background:${col.ink};width:9px;height:9px;transform:rotate(45deg)"></i>${T('Basket','バスケット')}</span>`:'');
+  $('#scatLeg').innerHTML=`<span><i style="background:${col.tot}"></i>${T('In your selection','選択中の通貨')}</span><span><i style="background:${col.spot}"></i>${T('Others','その他')}</span>`+(R.legs.length>1?`<span><i style="background:${col.ink};width:9px;height:9px;transform:rotate(45deg)"></i>${T('Basket','バスケット')}</span>`:'')+(R.bs?`<span><i style="background:${col.gold};width:9px;height:9px"></i>${T('Benchmark','ベンチマーク')}: ${esc(bname(R.bk))}</span>`:'');
 }
 function correl(){
   const H=S.home,carry=S.mode==='carry',i0=R.i0;
@@ -465,19 +522,19 @@ function calendar(r){
 }
 function stress(){
   const H=S.home,legs=R.legs;const i0=firstOK(R.names,H,true);
-  const Vs=path(legs,H,i0,false),Vt=path(legs,H,i0,true);
+  const Vs=path(legs,H,i0,false),Vt=path(legs,H,i0,true),BP=benchPath(R.bk,H,i0);
   const idx=ym=>{const k=M().findIndex(d=>d.slice(0,7)===ym);return k};
-  let h=`<tr><th>${T('Episode','局面')}</th><th>${T('Window','期間')}</th><th>${T('Spot only','為替のみ')}</th><th>${T('Spot + carry','為替＋キャリー')}</th><th>${T('Months to recover','回復までの月数')}</th></tr>`;
-  STRESS.forEach(e=>{const a=idx(e.a)-1,b=idx(e.b);if(a<i0||b<0||b<=a)return h+=`<tr><td>${esc(JA()?e.ja:e.en)}</td><td>${e.a} – ${e.b}</td><td colspan="3" style="color:var(--mute);text-align:left">${T('before this selection’s data starts','データ開始前')}</td></tr>`;
+  let h=`<tr><th>${T('Episode','局面')}</th><th>${T('Window','期間')}</th><th>${T('Spot only','為替のみ')}</th><th>${T('Spot + carry','為替＋キャリー')}</th><th>${T('Months to recover','回復までの月数')}</th>${BP?`<th class="bm" style="color:var(--gold)">${esc(bname(R.bk))}</th>`:''}</tr>`;
+  STRESS.forEach(e=>{const a=idx(e.a)-1,b=idx(e.b);if(a<i0||b<0||b<=a)return h+=`<tr><td>${esc(JA()?e.ja:e.en)}</td><td>${e.a} – ${e.b}</td><td colspan="${BP?4:3}" style="color:var(--mute);text-align:left">${T('before this selection’s data starts','データ開始前')}</td></tr>`;
     const V=S.mode==='carry'?Vt:Vs,j=t=>t-i0;const s=Vs[j(b)]/Vs[j(a)]-1,t=Vt[j(b)]/Vt[j(a)]-1;
     let rec='—';const vr=V[j(b)]/V[j(a)]-1;if(vr>=0)rec=T('no loss','損失なし');else{let k2=null;for(let q=j(b);q<V.length;q++)if(V[q]>=V[j(a)]){k2=q-j(b);break}rec=k2==null?T('not yet','未回復'):String(k2)}
-    h+=`<tr><td>${esc(JA()?e.ja:e.en)}</td><td>${e.a} – ${e.b}</td><td class="${s<0?'neg':'pos'}">${pc(s)}</td><td class="${t<0?'neg':'pos'}">${pc(t)}</td><td>${rec}</td></tr>`});
+    h+=`<tr><td>${esc(JA()?e.ja:e.en)}</td><td>${e.a} – ${e.b}</td><td class="${s<0?'neg':'pos'}">${pc(s)}</td><td class="${t<0?'neg':'pos'}">${pc(t)}</td><td>${rec}</td>${BP?(()=>{const x=BP.V[j(a)],y=BP.V[j(b)];if(x==null||y==null)return'<td>—</td>';const v=y/x-1;return `<td class="${v<0?'neg':'pos'}">${pc(v)}</td>`})():''}</tr>`});
   $('#stress').innerHTML=h;
 }
 function method(){
   const src=Object.entries(DATA.rate_src||{}).filter(([,v])=>v!=='oecd').map(([c,v])=>`${c} (${v==='bis'?T('BIS policy rate','BIS政策金利'):T('OECD, then BIS policy rate','OECD→BIS政策金利')})`);
-  $('#method').innerHTML=T(`<b>Method.</b> Month-end spot rates; every currency is valued in your home currency through its rate against the dollar. Spot only: the currency move. Spot + carry: the currency held as a 3-month deposit, earning last month’s 3-month rate for the month (close to rolling forwards, before the cross-currency basis and dealer spreads). Blends rebalance to their weights as chosen. Sharpe and Sortino with carry use returns over home-currency 3-month cash. Rates: OECD 3-month interbank${src.length?'; proxies for '+esc(src.join(', ')):''}${(DATA.errors||[]).length?'. Missing: '+esc(DATA.errors.join('; ')):''}. Spot: Yahoo month-end closes (CNH before 2011 is onshore CNY). Data to ${fdate(DATA.asof)}. Past returns, from free public sources; not a forecast or advice.`,
-    `<b>算出方法。</b>月末の為替レートを使用し、各通貨は対ドルレート経由で自国通貨建てに換算。為替のみ：通貨の値動き。為替＋キャリー：外貨を3か月預金として保有し、前月末の3か月金利を1か月分受け取る（クロスカレンシー・ベーシスとディーラースプレッドを除けば、フォワードのロールに近い）。複数通貨は選んだ頻度でウェイトにリバランス。キャリー込みのシャープ・ソルティノは自国通貨3か月金利に対する超過リターン。金利：OECDの3か月インターバンク金利${src.length?'。代替：'+esc(src.join('、')):''}${(DATA.errors||[]).length?'。欠損：'+esc(DATA.errors.join('; ')):''}。為替：Yahooの月末終値（2011年以前のCNHはオンショアのCNY）。データは${fdate(DATA.asof)}まで。無料の公開データによる過去の実績で、将来の予測や助言ではありません。`);
+  $('#method').innerHTML=T(`<b>Method.</b> Month-end spot rates; every currency is valued in your home currency through its rate against the dollar. Spot only: the currency move. Spot + carry: the currency held as a 3-month deposit, earning last month’s 3-month rate for the month (close to rolling forwards, before the cross-currency basis and dealer spreads). Blends rebalance to their weights as chosen. Sharpe and Sortino with carry use returns over home-currency 3-month cash. Rates: OECD 3-month interbank${src.length?'; proxies for '+esc(src.join(', ')):''}${(DATA.errors||[]).length?'. Missing: '+esc(DATA.errors.join('; ')):''}. Spot: Yahoo month-end closes (CNH before 2011 is onshore CNY). Benchmarks are converted into your home currency at month-end spot (unhedged); a currency benchmark is held with carry; gold, silver and WTI are front-month futures, so their history includes roll effects; the S&P 500 includes dividends, the Nikkei 225 and Euro Stoxx 50 are price indices, and AGG reinvests its distributions. Data to ${fdate(DATA.asof)}. Past returns, from free public sources; not a forecast or advice.`,
+    `<b>算出方法。</b>月末の為替レートを使用し、各通貨は対ドルレート経由で自国通貨建てに換算。為替のみ：通貨の値動き。為替＋キャリー：外貨を3か月預金として保有し、前月末の3か月金利を1か月分受け取る（クロスカレンシー・ベーシスとディーラースプレッドを除けば、フォワードのロールに近い）。複数通貨は選んだ頻度でウェイトにリバランス。キャリー込みのシャープ・ソルティノは自国通貨3か月金利に対する超過リターン。金利：OECDの3か月インターバンク金利${src.length?'。代替：'+esc(src.join('、')):''}${(DATA.errors||[]).length?'。欠損：'+esc(DATA.errors.join('; ')):''}。為替：Yahooの月末終値（2011年以前のCNHはオンショアのCNY）。ベンチマークは月末の為替レートで自国通貨建てに換算（為替ヘッジなし）。通貨のベンチマークはキャリー込み。金・銀・WTIは先物期近のためロールの影響を含みます。S&P500は配当込み、日経平均とユーロ・ストックス50は価格指数、AGGは分配金再投資。データは${fdate(DATA.asof)}まで。無料の公開データによる過去の実績で、将来の予測や助言ではありません。`);
 }
 window.redraw=render;
 
@@ -490,7 +547,8 @@ async function load(fresh){
   buildControls();render();
 }
 $('#how').innerHTML=howHtml();
-$('#home').onchange=e=>{const old=S.home;S.home=e.target.value;S.basket=S.basket.filter(([c])=>c!==S.home);if(!S.basket.length)S.basket=PRESETS[0].f(S.home);if(!S.amount||S.amount===(DEF_AMT[old]||100000))S.amount=null;$('#amount').value=num(S.amount||DEF_AMT[S.home]||100000,0);save();renderBasket();render()};
+$('#home').onchange=e=>{const old=S.home;S.home=e.target.value;if(S.bench==='fx:'+S.home)S.bench=null;S.basket=S.basket.filter(([c])=>c!==S.home);if(!S.basket.length)S.basket=PRESETS[0].f(S.home);if(!S.amount||S.amount===(DEF_AMT[old]||100000))S.amount=null;$('#amount').value=num(S.amount||DEF_AMT[S.home]||100000,0);save();renderBasket();buildBench();render()};
+$('#bench').onchange=e=>{S.bench=e.target.value;save();render()};
 $('#amount').onchange=e=>{const v=+String(e.target.value).replace(/[^\d.]/g,'');S.amount=v>0?v:null;e.target.value=num(S.amount||DEF_AMT[S.home]||100000,0);save();render()};
 $$('#modeSeg button').forEach(b=>b.onclick=()=>{S.mode=b.dataset.v;save();syncSegs();render()});
 $$('#perSeg button').forEach(b=>b.onclick=()=>{S.years=+b.dataset.v;save();syncSegs();render()});
