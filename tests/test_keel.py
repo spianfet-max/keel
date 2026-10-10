@@ -206,7 +206,7 @@ def client(monkeypatch):
     cpi["JPN"] = np.linspace(100, 112, len(cpi_idx))
     cpi["USA"] = np.linspace(100, 170, len(cpi_idx))
     monkeypatch.setattr(D, "cpi_index", lambda names, start="2000-01-01": cpi)
-    monkeypatch.setattr(D, "monthly_closes", lambda syms, years=22: {s: fake_closes(s).resample("ME").last() for s in syms})
+    monkeypatch.setattr(D, "monthly_closes", lambda syms, years=22, dividends=False: {s: fake_closes(s).resample("ME").last() for s in syms})
     return TestClient(M.app)
 
 
@@ -330,3 +330,5 @@ def test_fx_carry(client, monkeypatch):
     assert j["rate_src"]["USD"] == "oecd+bis"
     assert "SGD rate" in j["errors"]
     assert j["spot"]["USD"][0] == 1.0
+    assert set(j["bench"]) == set(M.FX_BENCH)
+    assert len(j["bench"]["GOLD"]["v"]) == n and j["bench"]["AGG"]["tr"] is True

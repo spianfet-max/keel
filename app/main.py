@@ -535,6 +535,12 @@ FX_CARRY = {
     "HUF": ("HUN", "HU"), "CZK": ("CZE", "CZ"), "SGD": (None, "SG"), "HKD": (None, "HK"),
 }
 FX_EURO_ALT = ("EA19", "EA")  # older OECD area codes for the euro area
+# Benchmarks: key -> (Yahoo symbol, quote currency, total return via dividend adjustment)
+FX_BENCH = {
+    "GOLD": ("GC=F", "USD", False), "SILVER": ("SI=F", "USD", False), "OIL": ("CL=F", "USD", False),
+    "SPX": ("^SP500TR", "USD", False), "NKY": ("^N225", "JPY", False), "SX5E": ("^STOXX50E", "EUR", False),
+    "AGG": ("AGG", "USD", True),
+}
 
 
 @app.get("/api/fxcarry", operation_id="fx_carry_data", dependencies=[Depends(check_token)])
@@ -625,6 +631,25 @@ def fx_carry(years: int = Query(22, ge=5, le=25)):
     out_spot = {"USD": [1.0] * len(grid)}
     out_spot.update({c: aligned(s, 1) for c, s in spot.items()})
     out_rate = {c: aligned(r, 6) for c, r in rate.items()}
+
+    # Benchmarks (best effort: a failure here never blocks the FX data)
+    bench = {}
+    for div in (False, True):
+        keys = [k for k, (_, _, d) in FX_BENCH.items() if d == div]
+        try:
+            got = D.monthly_closes(tuple(FX_BENCH[k][0] for k in keys), years + 1, dividends=True) if div else \
+                D.monthly_closes(tuple(FX_BENCH[k][0] for k in keys), years + 1)
+        except Exception as e:  # noqa: BLE001
+            errors.append(f"benchmarks: {e}")
+            continue
+        for k in keys:
+            sym, ccy, tr = FX_BENCH[k]
+            s = got.get(sym)
+            if s is None or s.empty:
+                errors.append(f"{k} benchmark")
+                continue
+            s = D.despike(s[s > 0].resample("ME").last(), 0.5)
+            bench[k] = {"sym": sym, "ccy": ccy, "tr": tr, "v": aligned(s, 1)}
     return _safe(
         {
             "asof": str(grid[-1].date()),
@@ -634,8 +659,11 @@ def fx_carry(years: int = Query(22, ge=5, le=25)):
             "rate": out_rate,
             "rate_src": src,
             "rate_asof": rate_asof,
+            "bench": bench,
             "errors": errors,
             "note": "Spot: Yahoo month-end closes, units per USD (CNH before 2011 = onshore CNY). "
-            "Rates: OECD 3-month interbank, % p.a.; 'bis' = BIS central-bank policy rate used as a proxy.",
+            "Rates: OECD 3-month interbank, % p.a.; 'bis' = BIS central-bank policy rate used as a proxy. "
+            "Benchmarks: month-end prices in their own currency (gold, silver, WTI = front-month futures; "
+            "S&P 500 total return; Nikkei 225 and Euro Stoxx 50 price indices; AGG with distributions reinvested).",
         }
     )

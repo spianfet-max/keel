@@ -147,10 +147,12 @@ def many_closes(symbols: list[str], years: float = 3) -> dict[str, pd.Series]:
 
 
 @cached(ttl=6 * 3600)
-def monthly_closes(symbols: tuple[str, ...], years: float = 22) -> dict[str, pd.Series]:
-    """Month-end closes for many symbols in ONE Yahoo request (avoids rate limits)."""
+def monthly_closes(symbols: tuple[str, ...], years: float = 22, dividends: bool = False) -> dict[str, pd.Series]:
+    """Month-end closes for many symbols in ONE Yahoo request (avoids rate limits).
+    `dividends=True` adjusts for distributions too, i.e. a total-return series for funds."""
     start = (date.today() - timedelta(days=int(365.25 * years))).isoformat()
-    res = obb().yfinance.equity.price.historical(symbol=",".join(symbols), start_date=start, interval="1M")
+    kw = {"adjustment": "splits_and_dividends"} if dividends else {}
+    res = obb().yfinance.equity.price.historical(symbol=",".join(symbols), start_date=start, interval="1M", **kw)
     df = _df(res)
     out: dict[str, pd.Series] = {}
     if df.empty or "close" not in df:
