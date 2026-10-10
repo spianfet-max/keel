@@ -287,3 +287,46 @@ def test_token(monkeypatch, client):
 
 def test_bad_input(client):
     assert client.get("/api/snapshot", params={"symbols": " , "}).status_code == 400
+
+
+# --------------------------------------------------------------------------- #
+# FX carry
+# --------------------------------------------------------------------------- #
+
+RATE_CSV = """DATAFLOW,REF_AREA,FREQ,MEASURE,UNIT_MEASURE,TIME_PERIOD,OBS_VALUE
+X,JPN,M,IR3TIB,PA,2026-07,0.6
+X,JPN,M,IR3TIB,PA,2026-08,0.65
+X,USA,M,IR3TIB,PA,2026-08,4.1
+X,USA,Q,IR3TIB,PA,2026-Q3,4.0
+X,USA,M,IRLT,PA,2026-08,4.4
+"""
+
+
+def test_parse_rate_csv():
+    df = D._parse_rate_csv(RATE_CSV)
+    assert df.loc["2026-08-31", "JPN"] == pytest.approx(0.65)
+    assert df.loc["2026-08-31", "USA"] == pytest.approx(4.1)
+    assert len(df) == 2
+
+
+def test_despike():
+    s = pd.Series([100, 101, 300, 102, 103.0], index=pd.date_range("2020-01-31", periods=5, freq="ME"))
+    assert list(D.despike(s).values) == [100, 101, 102, 103]
+
+
+def test_fx_carry(client, monkeypatch):
+    idx = pd.date_range("2004-01-31", "2026-03-31", freq="ME")
+    oecd = pd.DataFrame({a: 2.0 for a, _ in M.FX_CARRY.values() if a}, index=idx)
+    oecd["JPN"] = 0.1
+    bis = pd.DataFrame({"SA": 5.0, "HK": 4.0, "US": 3.0}, index=pd.date_range("2004-01-31", "2026-09-30", freq="ME"))
+    monkeypatch.setattr(D, "oecd_3m_rates", lambda areas, start="2000-01": oecd)
+    monkeypatch.setattr(D, "bis_policy_rates", lambda areas, start="2000-01": bis)
+    j = client.get("/api/fxcarry").json()
+    n = len(j["months"])
+    assert j["ccys"][0] == "USD" and "MXN" in j["ccys"]
+    assert all(len(v) == n for v in j["spot"].values())
+    assert all(len(v) == n for v in j["rate"].values())
+    assert j["rate_src"]["SAR"] == "bis" and j["rate_src"]["JPY"] == "oecd"
+    assert j["rate_src"]["USD"] == "oecd+bis"
+    assert "SGD rate" in j["errors"]
+    assert j["spot"]["USD"][0] == 1.0

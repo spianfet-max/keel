@@ -521,3 +521,121 @@ def ppp(base_year: int = Query(2005, ge=2000, le=2020)):
     return _safe({"base_year": base_year, "rows": rows, "missing": skipped,
                   "note": "Prices compared at each country's latest CPI month; series more than 24 months old are left out."})
 
+
+
+# --------------------------------------------------------------------------- #
+# FX carry back-test data
+# --------------------------------------------------------------------------- #
+
+# Deliverable currencies only. (OECD area for the 3M interbank rate, BIS area for a policy-rate proxy)
+FX_CARRY = {
+    "USD": ("USA", "US"), "EUR": ("EA20", "XM"), "JPY": ("JPN", "JP"), "GBP": ("GBR", "GB"),
+    "CAD": ("CAN", "CA"), "AUD": ("AUS", "AU"), "CNH": ("CHN", "CN"), "MXN": ("MEX", "MX"),
+    "ZAR": ("ZAF", "ZA"), "TRY": ("TUR", "TR"), "SAR": (None, "SA"), "PLN": ("POL", "PL"),
+    "HUF": ("HUN", "HU"), "CZK": ("CZE", "CZ"), "SGD": (None, "SG"), "HKD": (None, "HK"),
+}
+FX_EURO_ALT = ("EA19", "EA")  # older OECD area codes for the euro area
+
+
+@app.get("/api/fxcarry", operation_id="fx_carry_data", dependencies=[Depends(check_token)])
+def fx_carry(years: int = Query(22, ge=5, le=25)):
+    """Month-end spot rates (units per USD) and 3-month rates (% p.a.) for deliverable G20 and EM
+    currencies, aligned on one month grid, for spot and spot-plus-carry back-tests.
+
+    Rates: OECD 3-month interbank where it exists; otherwise (or after the OECD series stops)
+    the BIS central-bank policy rate as a proxy. `rate_src` says which, per currency.
+    """
+    start = f"{date.today().year - years}-01"
+    errors = []
+    # Spot: Yahoo "XXX=X" quotes are units of XXX per USD. CNH history is short; CNY fills in before it.
+    syms = tuple(sorted({f"{c}=X" for c in FX_CARRY if c not in ("USD", "CNH")} | {"CNH=X", "CNY=X"}))
+    try:
+        fx = D.monthly_closes(syms, years + 1)
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(503, f"FX history unavailable: {e}") from e
+    spot = {}
+    for c in FX_CARRY:
+        if c == "USD":
+            continue
+        s = fx.get(f"{c}=X")
+        if c == "CNH":
+            cny = fx.get("CNY=X")
+            if s is None or s.empty:
+                s = cny
+            elif cny is not None and not cny.empty:
+                s = pd.concat([cny[cny.index < s.index[0]], s]).sort_index()
+        if s is None or s.empty:
+            errors.append(f"{c} spot")
+            continue
+        s = D.despike(s.resample("ME").last())
+        spot[c] = s
+    if not spot:
+        raise HTTPException(503, "Yahoo returned no FX history; try again in a minute")
+
+    # Rates
+    oecd_areas = tuple(sorted({a for a, _ in FX_CARRY.values() if a} | {FX_EURO_ALT[0]}))
+    bis_areas = tuple(sorted({b for _, b in FX_CARRY.values() if b} | {FX_EURO_ALT[1]}))
+    try:
+        oecd = D.oecd_3m_rates(oecd_areas, start)
+    except Exception as e:  # noqa: BLE001
+        oecd = pd.DataFrame()
+        errors.append(f"OECD rates: {e}")
+    try:
+        bis = D.bis_policy_rates(bis_areas, start)
+    except Exception as e:  # noqa: BLE001
+        bis = pd.DataFrame()
+        errors.append(f"BIS rates: {e}")
+    if oecd.empty and bis.empty:
+        errors.append("no 3M rate source answered; carry is unavailable")
+
+    def col(df, *names):
+        for n in names:
+            if n and n in df and df[n].notna().any():
+                return df[n].dropna()
+        return None
+
+    stale = pd.Timestamp(date.today()) - pd.DateOffset(months=4)
+    rate, src, rate_asof = {}, {}, {}
+    for c, (oa, ba) in FX_CARRY.items():
+        o = col(oecd, oa, FX_EURO_ALT[0] if c == "EUR" else None)
+        b = col(bis, ba, FX_EURO_ALT[1] if c == "EUR" else None)
+        if o is not None and b is not None and o.index[-1] < stale:
+            r, how = pd.concat([o, b[b.index > o.index[-1]]]).sort_index(), "oecd+bis"
+        elif o is not None:
+            r, how = o, "oecd"
+        elif b is not None:
+            r, how = b, "bis"
+        else:
+            r, how = None, None
+        if r is None:
+            errors.append(f"{c} rate")
+            continue
+        rate_asof[c] = str(r.index[-1].date())
+        rate[c], src[c] = r, how
+
+    # One month grid: from the start to the latest spot month; rates carried forward at most 6 months.
+    end = max(s.index[-1] for s in spot.values())
+    grid = pd.date_range(pd.Timestamp(start + "-01") + pd.offsets.MonthEnd(0), end, freq="ME")
+
+    def aligned(s, ffill):
+        x = s.reindex(s.index.union(grid)).sort_index()
+        x = x.ffill(limit=ffill) if ffill else x
+        return [None if pd.isna(v) else float(v) for v in x.reindex(grid).values]
+
+    out_spot = {"USD": [1.0] * len(grid)}
+    out_spot.update({c: aligned(s, 1) for c, s in spot.items()})
+    out_rate = {c: aligned(r, 6) for c, r in rate.items()}
+    return _safe(
+        {
+            "asof": str(grid[-1].date()),
+            "months": [str(d.date()) for d in grid],
+            "ccys": [c for c in FX_CARRY if c in out_spot],
+            "spot": out_spot,
+            "rate": out_rate,
+            "rate_src": src,
+            "rate_asof": rate_asof,
+            "errors": errors,
+            "note": "Spot: Yahoo month-end closes, units per USD (CNH before 2011 = onshore CNY). "
+            "Rates: OECD 3-month interbank, % p.a.; 'bis' = BIS central-bank policy rate used as a proxy.",
+        }
+    )

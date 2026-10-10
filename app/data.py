@@ -658,3 +658,95 @@ def cpi_index(areas: tuple[str, ...], start: str = "2005-01") -> pd.DataFrame:
         except Exception as e:  # noqa: BLE001
             log.warning("OECD YoY extension failed: %s", e)
     return df[df.index >= pd.Timestamp(start + "-01")].sort_index()
+
+
+# --------------------------------------------------------------------------- #
+# Short-term (3-month) interest rates, for FX carry
+# --------------------------------------------------------------------------- #
+
+# OECD Financial market indicators: IR3TIB = 3-month interbank rate, % p.a., monthly.
+# The key layout has varied between dataflow versions, so a few shapes are tried in turn.
+OECD_FINMARK_URLS = (
+    "https://sdmx.oecd.org/public/rest/data/OECD.SDD.STES,DSD_STES@DF_FINMARK,4.0/"
+    "{areas}.M.IR3TIB.PA.....?startPeriod={start}&dimensionAtObservation=AllDimensions",
+    "https://sdmx.oecd.org/public/rest/data/OECD.SDD.STES,DSD_STES@DF_FINMARK,/"
+    "{areas}.M.IR3TIB.PA.....?startPeriod={start}&dimensionAtObservation=AllDimensions",
+    "https://sdmx.oecd.org/public/rest/data/OECD.SDD.STES,DSD_STES@DF_FINMARK,4.0/"
+    "{areas}.M.IR3TIB......?startPeriod={start}&dimensionAtObservation=AllDimensions",
+)
+# BIS central-bank policy rates: a proxy where the OECD has no 3-month rate.
+BIS_CBPOL_URLS = (
+    "https://stats.bis.org/api/v1/data/BIS,WS_CBPOL,1.0/M.{areas}/all?startPeriod={start}&format=csv",
+    "https://stats.bis.org/api/v1/data/WS_CBPOL/M.{areas}/all?startPeriod={start}&format=csv",
+)
+
+
+def _parse_rate_csv(text: str, area_col_hint: str = "REF_AREA") -> pd.DataFrame:
+    """SDMX-CSV (OECD or BIS) -> month-end rates in %, one column per area code."""
+    df = pd.read_csv(io.StringIO(text))
+    cols = {c.split(":")[0].strip(): c for c in df.columns}
+    t, v = cols.get("TIME_PERIOD"), cols.get("OBS_VALUE")
+    a = cols.get(area_col_hint) or cols.get("REF_AREA")
+    if not (t and v and a):
+        return pd.DataFrame()
+    if "MEASURE" in cols:
+        df = df[df[cols["MEASURE"]].astype(str).str.split(":").str[0].str.strip() == "IR3TIB"]
+    if "FREQ" in cols:
+        df = df[df[cols["FREQ"]].astype(str).str.split(":").str[0].str.strip() == "M"]
+    df = df[[a, t, v]].dropna()
+    out = {}
+    for area, g in df.groupby(a):
+        code = str(area).split(":")[0].strip()
+        idx = pd.PeriodIndex(g[t].astype(str).str[:7], freq="M").to_timestamp(how="end").normalize()
+        s = pd.Series(pd.to_numeric(g[v], errors="coerce").values, index=idx).dropna()
+        out[code] = s[~s.index.duplicated(keep="last")].sort_index()
+    return pd.DataFrame(out).sort_index()
+
+
+def _get_csv(urls: tuple[str, ...], areas: tuple[str, ...], start: str, accept: str) -> str | None:
+    """First URL shape that answers with SDMX-CSV wins; backs off once on HTTP 429."""
+    headers = {"Accept": accept, "User-Agent": "keel/1.0"}
+    with httpx.Client(timeout=60, headers=headers, follow_redirects=True) as c:
+        for tmpl in urls:
+            url = tmpl.format(areas="+".join(areas), start=start)
+            r = None
+            for attempt in range(2):
+                try:
+                    r = c.get(url)
+                except Exception as e:  # noqa: BLE001
+                    log.warning("rates %s failed: %s", url, e)
+                    r = None
+                    break
+                if r.status_code == 429 and attempt == 0:
+                    time.sleep(min(float(r.headers.get("Retry-After") or 5), 10))
+                    continue
+                break
+            if r is not None and r.status_code == 200 and "TIME_PERIOD" in r.text[:4000]:
+                return r.text
+            log.warning("rates %s: HTTP %s", url, None if r is None else r.status_code)
+    return None
+
+
+@cached(ttl=12 * 3600)
+def oecd_3m_rates(areas: tuple[str, ...], start: str = "2000-01") -> pd.DataFrame:
+    """Monthly 3-month interbank rates (% p.a.) from the OECD, ISO3 area codes (euro area = EA20)."""
+    t = _get_csv(OECD_FINMARK_URLS, areas, start, "application/vnd.sdmx.data+csv; charset=utf-8")
+    return _parse_rate_csv(t) if t else pd.DataFrame()
+
+
+@cached(ttl=12 * 3600)
+def bis_policy_rates(areas: tuple[str, ...], start: str = "2000-01") -> pd.DataFrame:
+    """Monthly central-bank policy rates (% p.a.) from the BIS, ISO2 area codes."""
+    t = _get_csv(BIS_CBPOL_URLS, areas, start, "text/csv")
+    return _parse_rate_csv(t) if t else pd.DataFrame()
+
+
+def despike(s: pd.Series, limit: float = 0.3) -> pd.Series:
+    """Drop isolated bad prints in a month-end FX series: a jump of more than `limit` in log terms
+    that reverses the next month."""
+    s = s.dropna().copy()
+    if len(s) < 3:
+        return s
+    lr = np.log(s).diff()
+    bad = (lr.abs() > limit) & (lr.shift(-1).abs() > limit) & (np.sign(lr) != np.sign(lr.shift(-1)))
+    return s[~bad]
