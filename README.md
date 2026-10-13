@@ -11,6 +11,7 @@ A small market-data service on top of the [OpenBB Open Data Platform](https://gi
 | **Claude via MCP** | Ask Claude market questions answered from these tools plus the wider OpenBB catalogue | all of the above |
 | **Frontier** | "Calibrate from history": vol and correlations from 10 years of ETF proxies | `api_returns` |
 | **Parity** | "Second opinion: inflation": CPI-based relative PPP next to the Big Mac gap | `api_ppp` |
+| **Regime** (artifact) | Growth × inflation regimes and how assets behaved in each; the macro model uses OECD CLI and CPI | `api_history`, `api_macro` |
 | **Cadence** | "Themes against the market": meeting themes vs USD/JPY, US 10Y, Nikkei | `api_history` |
 
 Only public market data passes through Keel. Pages send ticker symbols and parameters; no client data.
@@ -34,7 +35,7 @@ claude.ai → Settings → Connectors → **Add custom connector**
 
 Then open any of the artifacts and allow Keel when asked. Until then they show clearly labelled sample figures.
 
-In chat, Claude gets the Keel tools (`api_fxcarry`, `api_yields`, `api_brief`, `api_sp_screen`, `api_comps`, `api_returns`, `api_history`, `api_ppp`, `api_snapshot`) and OpenBB's own `openbb_list_commands` / `openbb_dispatch` for everything else the installed providers offer. `mcp_prompt.txt` tells it about symbols and conventions.
+In chat, Claude gets the Keel tools (`api_fxcarry`, `api_yields`, `api_brief`, `api_sp_screen`, `api_comps`, `api_returns`, `api_history`, `api_ppp`, `api_snapshot`, `api_macro`) and OpenBB's own `openbb_list_commands` / `openbb_dispatch` for everything else the installed providers offer. `mcp_prompt.txt` tells it about symbols and conventions.
 
 ## Data sources
 

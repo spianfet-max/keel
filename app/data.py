@@ -743,6 +743,67 @@ def bis_policy_rates(areas: tuple[str, ...], start: str = "2000-01") -> pd.DataF
     return _parse_rate_csv(t) if t else pd.DataFrame()
 
 
+# --------------------------------------------------------------------------- #
+# Macro regimes: OECD composite leading indicator and CPI inflation
+# --------------------------------------------------------------------------- #
+
+# CLI, amplitude adjusted (long-term average = 100). Key: REF_AREA.FREQ.MEASURE.UNIT_MEASURE.
+# ACTIVITY.ADJUSTMENT.TRANSFORMATION.TIME_HORIZ.METHODOLOGY. Shapes tried in turn, as for FINMARK.
+OECD_CLI_URLS = (
+    "https://sdmx.oecd.org/public/rest/data/OECD.SDD.STES,DSD_STES@DF_CLI,4.1/"
+    "{areas}.M.LI...AA...H?startPeriod={start}&dimensionAtObservation=AllDimensions",
+    "https://sdmx.oecd.org/public/rest/data/OECD.SDD.STES,DSD_STES@DF_CLI,/"
+    "{areas}.M.LI...AA...H?startPeriod={start}&dimensionAtObservation=AllDimensions",
+    "https://sdmx.oecd.org/public/rest/data/OECD.SDD.STES,DSD_STES@DF_CLI,4.1/"
+    "{areas}.M.LI......?startPeriod={start}&dimensionAtObservation=AllDimensions",
+)
+
+
+def _code(v) -> str:
+    """'AA: Amplitude adjusted' -> 'AA' (SDMX-CSV with labels) and plain codes unchanged."""
+    return str(v).split(":")[0].strip()
+
+
+def parse_cli_csv(text: str) -> pd.DataFrame:
+    """SDMX-CSV from the OECD CLI dataflow -> month-end CLI levels, one column per area.
+
+    Keeps the amplitude-adjusted leading indicator; when a wildcard query returned several
+    variants, the amplitude-adjusted / methodology 'H' rows win."""
+    df = pd.read_csv(io.StringIO(text))
+    cols = {_code(c): c for c in df.columns}
+    t, v, a = cols.get("TIME_PERIOD"), cols.get("OBS_VALUE"), cols.get("REF_AREA")
+    if not (t and v and a):
+        return pd.DataFrame()
+    for dim, want in (("MEASURE", "LI"), ("FREQ", "M"), ("ADJUSTMENT", "AA"), ("METHODOLOGY", "H")):
+        c = cols.get(dim)
+        if c is None:
+            continue
+        keep = df[c].map(_code) == want
+        if keep.any():
+            df = df[keep]
+    out = {}
+    for area, g in df[[a, t, v]].dropna().groupby(a):
+        idx = pd.PeriodIndex(g[t].astype(str).str[:7], freq="M").to_timestamp(how="end").normalize()
+        s = pd.Series(pd.to_numeric(g[v], errors="coerce").values, index=idx).dropna()
+        out[_code(area)] = s[~s.index.duplicated(keep="last")].sort_index()
+    return pd.DataFrame(out).sort_index()
+
+
+@cached(ttl=12 * 3600)
+def oecd_cli(areas: tuple[str, ...], start: str = "2000-01") -> pd.DataFrame:
+    """Monthly OECD composite leading indicators (amplitude adjusted, 100 = long-term trend)."""
+    t = _get_csv(OECD_CLI_URLS, areas, start, "application/vnd.sdmx.data+csv; charset=utf-8")
+    return parse_cli_csv(t) if t else pd.DataFrame()
+
+
+def cpi_yoy(areas: tuple[str, ...], start: str = "2000-01") -> pd.DataFrame:
+    """Monthly CPI inflation, % year on year, from the OECD (ISO3 codes; euro area = EA20)."""
+    t = _cpi_csv(tuple(sorted(areas)), "M", start, yoy=True)
+    if not t:
+        raise ValueError("OECD returned no CPI inflation data")
+    return parse_oecd_cpi_csv(t)
+
+
 def despike(s: pd.Series, limit: float = 0.3) -> pd.Series:
     """Drop isolated bad prints in a month-end FX series: a jump of more than `limit` in log terms
     that reverses the next month."""

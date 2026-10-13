@@ -667,3 +667,65 @@ def fx_carry(years: int = Query(22, ge=5, le=25)):
             "S&P 500 total return; Nikkei 225 and Euro Stoxx 50 price indices; AGG with distributions reinvested).",
         }
     )
+
+
+# --------------------------------------------------------------------------- #
+# Macro regimes (growth x inflation)
+# --------------------------------------------------------------------------- #
+
+# Short code -> (OECD CLI area codes to try, OECD CPI area code)
+MACRO_AREAS = {
+    "US": (("USA",), "USA"), "JP": (("JPN",), "JPN"), "EA": (("EA20", "EA19"), "EA20"),
+    "UK": (("GBR",), "GBR"), "DE": (("DEU",), "DEU"), "CN": (("CHN",), "CHN"),
+}
+
+
+@app.get("/api/macro", operation_id="macro_regime_data", dependencies=[Depends(check_token)])
+def macro(
+    areas: str = Query("US,JP", description="Comma-separated: US, JP, EA, UK, DE, CN"),
+    start: str = Query("2000-01", pattern=r"^\d{4}-\d{2}$", description="First month, YYYY-MM"),
+):
+    """Monthly OECD composite leading indicator (amplitude adjusted, 100 = long-term trend) and
+    CPI inflation (% year on year) per area, for growth x inflation regime work.
+
+    Both series are published with a lag of about one to two months; `asof` gives each
+    series' latest month so callers can lag their signals accordingly."""
+    want = [a for a in _syms(areas.upper(), 6) if a in MACRO_AREAS]
+    if not want:
+        raise HTTPException(400, f"Areas must be among {', '.join(MACRO_AREAS)}")
+    errors: list[str] = []
+    cli_codes = tuple(sorted({c for a in want for c in MACRO_AREAS[a][0]}))
+    try:
+        cli = D.oecd_cli(cli_codes, start)
+    except Exception as e:  # noqa: BLE001
+        cli = pd.DataFrame()
+        errors.append(f"OECD CLI: {e}")
+    try:
+        cpi = D.cpi_yoy(tuple(sorted({MACRO_AREAS[a][1] for a in want})), start)
+    except Exception as e:  # noqa: BLE001
+        cpi = pd.DataFrame()
+        errors.append(f"OECD CPI: {e}")
+    if cli.empty and cpi.empty:
+        raise HTTPException(503, "OECD macro data unavailable right now; " + "; ".join(errors or ["empty answer"]))
+
+    def pts(s: pd.Series | None) -> list[dict]:
+        if s is None:
+            return []
+        s = s.dropna()
+        return [{"d": str(i.date()), "v": float(v)} for i, v in s.items()]
+
+    series, asof, missing = {}, {}, []
+    for a in want:
+        cli_s = next((cli[c] for c in MACRO_AREAS[a][0] if c in cli and cli[c].notna().any()), None)
+        cpi_s = cpi[MACRO_AREAS[a][1]] if MACRO_AREAS[a][1] in cpi else None
+        if cli_s is None and cpi_s is None:
+            missing.append(a)
+            continue
+        series[a] = {"cli": pts(cli_s), "cpi_yoy": pts(cpi_s)}
+        asof[a] = {k: (v[-1]["d"] if v else None) for k, v in series[a].items()}
+    return _safe({
+        "series": series, "asof": asof, "missing": missing, "errors": errors,
+        "note": "OECD composite leading indicator (amplitude adjusted, long-term average = 100) and "
+                "CPI all items, % change on a year earlier. Month-end dates. Both are revised and published "
+                "with a lag of about 1-2 months.",
+    })
