@@ -8,6 +8,7 @@ Prefer the Keel tools first; they return clean, computed answers:
 - api_comps: peer valuation and returns (e.g. Japanese gaming: 7974.T Nintendo, 6758.T Sony, 9697.T Capcom, 7832.T Bandai Namco, 9766.T Konami, 6460.T Sega Sammy, 9684.T Square Enix, 3635.T Koei Tecmo).
 - api_returns: annualised return, vol and correlation from monthly data.
 - api_ppp: CPI-based relative PPP fair values versus USD.
+- api_macro: monthly OECD leading indicator (CLI) and CPI inflation for US, JP, EA, UK, DE, CN: growth × inflation regimes.
 For anything else, openbb_list_commands / openbb_describe_command / openbb_dispatch reach the wider OpenBB catalogue.
 
 Symbols are Yahoo style: Tokyo stocks end in .T, FX pairs end in =X (USDJPY=X), indices start with ^ (^N225, ^GSPC, ^TNX).

@@ -332,3 +332,40 @@ def test_fx_carry(client, monkeypatch):
     assert j["spot"]["USD"][0] == 1.0
     assert set(j["bench"]) == set(M.FX_BENCH)
     assert len(j["bench"]["GOLD"]["v"]) == n and j["bench"]["AGG"]["tr"] is True
+
+
+# --------------------------------------------------------------------------- #
+# Macro regimes
+# --------------------------------------------------------------------------- #
+
+CLI_CSV = """DATAFLOW,REF_AREA,FREQ,MEASURE,UNIT_MEASURE,ACTIVITY,ADJUSTMENT,TRANSFORMATION,TIME_HORIZ,METHODOLOGY,TIME_PERIOD,OBS_VALUE
+X,USA,M,LI,IX,_Z,AA,IX,_Z,H,2026-07,100.4
+X,USA,M,LI,IX,_Z,AA,IX,_Z,H,2026-08,100.6
+X,USA,M,LI,IX,_Z,NOR,IX,_Z,H,2026-08,99.0
+X,JPN,M,LI,IX,_Z,AA,IX,_Z,H,2026-08,99.1
+X,JPN,M,BCICP,IX,_Z,AA,IX,_Z,H,2026-08,50.0
+"""
+
+
+def test_parse_cli_csv():
+    df = D.parse_cli_csv(CLI_CSV)
+    assert df.loc["2026-08-31", "USA"] == pytest.approx(100.6)
+    assert df.loc["2026-08-31", "JPN"] == pytest.approx(99.1)
+    assert len(df) == 2
+
+
+def test_macro(client, monkeypatch):
+    idx = pd.date_range("2000-01-31", "2026-08-31", freq="ME")
+    cli = pd.DataFrame({"USA": 100 + np.sin(np.arange(len(idx)) / 6), "EA19": 100.0}, index=idx)
+    cpi = pd.DataFrame({"USA": 2.5, "JPN": 1.0, "EA20": 2.0}, index=idx)
+    monkeypatch.setattr(D, "oecd_cli", lambda areas, start="2000-01": cli)
+    monkeypatch.setattr(D, "cpi_yoy", lambda areas, start="2000-01": cpi)
+    j = client.get("/api/macro", params={"areas": "US,JP,EA"}).json()
+    assert len(j["series"]["US"]["cli"]) == len(idx) and j["series"]["US"]["cpi_yoy"][-1]["v"] == 2.5
+    assert j["series"]["JP"]["cli"] == [] and j["series"]["JP"]["cpi_yoy"]
+    assert j["series"]["EA"]["cli"][0]["v"] == 100.0  # EA19 fallback
+    assert j["asof"]["US"]["cli"] == "2026-08-31"
+    assert client.get("/api/macro", params={"areas": "XX"}).status_code == 400
+    monkeypatch.setattr(D, "oecd_cli", lambda areas, start="2000-01": pd.DataFrame())
+    monkeypatch.setattr(D, "cpi_yoy", lambda areas, start="2000-01": (_ for _ in ()).throw(ValueError("down")))
+    assert client.get("/api/macro").status_code == 503
