@@ -13,6 +13,8 @@ A small market-data service on top of the [OpenBB Open Data Platform](https://gi
 | **Parity** | "Second opinion: inflation": CPI-based relative PPP next to the Big Mac gap | `api_ppp` |
 | **Regime** (artifact) | Growth × inflation regimes and how assets behaved in each; the macro model uses OECD CLI and CPI | `api_history`, `api_macro` |
 | **Cadence** | "Themes against the market": meeting themes vs USD/JPY, US 10Y, Nikkei | `api_history` |
+| **Seasonality** (artifact) | Month, weekday, turn-of-month and calendar-path seasonality for FX, indices, commodities and UST/JGB yields | `api_history` |
+| **Intervention** (artifact) | USD/JPY intervention risk meter: speed, level against past MOF interventions, stretch, vol, move against the US–Japan 2Y gap | `api_history` |
 
 Only public market data passes through Keel. Pages send ticker symbols and parameters; no client data.
 
@@ -45,7 +47,7 @@ In chat, Claude gets the Keel tools (`api_fxcarry`, `api_yields`, `api_brief`, `
 | US Treasury curve | OpenBB `federal_reserve` (H.15) | no |
 | Euro-area AAA curve | OpenBB `ecb` | no |
 | CPI | OECD SDMX API, called directly (OpenBB's `oecd` extension needs more memory than the free tier) | no |
-| JGB curve | Japan Ministry of Finance CSV (not in OpenBB) | no |
+| JGB curve | Japan Ministry of Finance CSV (not in OpenBB); also daily JGB yields in `api_history` (JGB2Y, JGB10Y…) | no |
 | 3-month interbank rates | OECD SDMX (financial market indicators), called directly | no |
 | Policy rates (proxy where the OECD has no 3M rate: TRY, SAR, HKD) | BIS SDMX | no |
 | Option implied vols | `yfinance` library bundled with OpenBB's extension; thin for Japanese single stocks | no |

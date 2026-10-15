@@ -294,25 +294,58 @@ def brief(
     )
 
 
+# Government yields served by /api/history next to Yahoo symbols: name -> (source, tenor in years).
+# Values are yields in percent, so callers should take differences (bp), not returns.
+YIELD_SYMS = {
+    "UST2Y": ("ust", 2.0), "UST5Y": ("ust", 5.0), "UST10Y": ("ust", 10.0), "UST30Y": ("ust", 30.0),
+    "JGB2Y": ("jgb", 2.0), "JGB5Y": ("jgb", 5.0), "JGB10Y": ("jgb", 10.0), "JGB30Y": ("jgb", 30.0),
+}
+
+
+def _yield_series(sym: str, years: float) -> pd.Series | None:
+    src, tenor = YIELD_SYMS[sym]
+    df = D.ust_history(years) if src == "ust" else D.jgb_history()
+    if tenor not in df:
+        return None
+    s = pd.to_numeric(df[tenor], errors="coerce").dropna()
+    return s if not s.empty else None
+
+
 @app.get("/api/history", operation_id="price_history", dependencies=[Depends(check_token)])
 def history(
-    symbols: str = Query(..., description="Comma-separated Yahoo symbols"),
+    symbols: str = Query(..., description="Comma-separated Yahoo symbols, or government yields "
+                         "UST2Y, UST5Y, UST10Y, UST30Y, JGB2Y, JGB5Y, JGB10Y, JGB30Y (in %)"),
     start: str | None = Query(None, description="YYYY-MM-DD; default 2 years ago"),
     interval: str = Query("M", pattern="^(D|W|M)$", description="D, W or M (period-end closes)"),
 ):
-    """Closing prices per symbol, resampled to day, week or month end."""
+    """Closing prices per symbol, resampled to day, week or month end.
+
+    UST*/JGB* names return daily government yields in percent (Fed H.15 via OpenBB; Japan MOF);
+    `units` marks them 'pct' so callers use changes in bp rather than returns."""
     syms = _syms(symbols, 12)
     st = pd.Timestamp(start) if start else pd.Timestamp(date.today() - timedelta(days=730))
     years = max(1.0, (pd.Timestamp(date.today()) - st).days / 365.25 + 0.1)
+    ysyms = [s for s in syms if s.upper() in YIELD_SYMS]
+    psyms = [s for s in syms if s not in ysyms]
+    got = D.many_closes(psyms, years) if psyms else {}
+    for s in ysyms:
+        try:
+            ys = _yield_series(s.upper(), years)
+        except Exception as e:  # noqa: BLE001
+            log.warning("yield %s failed: %s", s, e)
+            ys = None
+        if ys is not None:
+            got[s] = ys
     out = {}
-    for s, c in D.many_closes(syms, years).items():
+    for s, c in got.items():
         c = c[c.index >= st]
         if interval == "W":
             c = c.resample("W-FRI").last()
         elif interval == "M":
             c = c.resample("ME").last()
         out[s] = [{"d": str(i.date()), "v": float(v)} for i, v in c.dropna().items()]
-    return _safe({"series": out, "missing": [s for s in syms if s not in out]})
+    units = {s: ("pct" if s in ysyms else "price") for s in out}
+    return _safe({"series": out, "units": units, "missing": [s for s in syms if s not in out]})
 
 
 @app.get("/api/sp/screen", operation_id="structured_product_screen", dependencies=[Depends(check_token)])
@@ -729,3 +762,65 @@ def macro(
                 "CPI all items, % change on a year earlier. Month-end dates. Both are revised and published "
                 "with a lag of about 1-2 months.",
     })
+
+
+# --------------------------------------------------------------------------- #
+# News-based measures (Bybee, Kelly, Manela and Xiu 2024): app/news.py
+# --------------------------------------------------------------------------- #
+from . import news as N  # noqa: E402
+
+
+@app.get("/api/newsmood", operation_id="news_sentiment", dependencies=[Depends(check_token)])
+def newsmood(start: str = Query("2000-01-01", description="YYYY-MM-DD"), daily_days: int = Query(730, ge=30, le=3700)):
+    """San Francisco Fed Daily News Sentiment Index: tone of economics articles in 24 US newspapers,
+    daily since 1980, updated about weekly. Returns month averages from `start` and the last
+    `daily_days` of daily values. Positive = more upbeat economic news than average."""
+    try:
+        s = N.news_sentiment()
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(503, f"SF Fed news sentiment unavailable: {e}") from e
+    s = s[s.index >= pd.Timestamp(start)]
+    m = s.resample("ME").mean().dropna()
+    d = s[s.index >= s.index[-1] - pd.Timedelta(days=daily_days)]
+    return _safe({
+        "asof": str(s.index[-1].date()),
+        "monthly": [{"d": str(i.date()), "v": float(v)} for i, v in m.items()],
+        "daily": [{"d": str(i.date()), "v": float(v)} for i, v in d.items()],
+        "source": "Federal Reserve Bank of San Francisco, Daily News Sentiment Index (Shapiro, Sudhof and Wilson)",
+        "note": "Month = average of daily values; the current month is partial.",
+    })
+
+
+@app.get("/api/fxnews", operation_id="fx_intervention_news", dependencies=[Depends(check_token)])
+def fxnews(days: int = Query(90, ge=14, le=180, description="Days of daily coverage counts"),
+           ladder_days: int = Query(30, ge=7, le=60, description="Days of headlines read for the verbal ladder")):
+    """Yen-intervention news from Google News RSS: daily count of Japanese headlines mentioning
+    為替介入 (coverage), and recent JA/EN headlines classified by how far official language has
+    escalated (2 urgency, 3 excessive/speculative, 4 decisive/all options, 5 rate check or
+    intervention reported). Headlines link to the articles."""
+    errors = []
+    cov = None
+    try:
+        cov = N.coverage("為替介入", "ja", days)
+        if cov["failed_windows"]:
+            errors.append(f"coverage: {cov['failed_windows']} of {cov['windows']} windows failed")
+    except Exception as e:  # noqa: BLE001
+        errors.append(f"coverage: {e}")
+    lad = N.ladder_headlines(ladder_days)
+    errors += lad["errors"]
+    if cov is None and not lad["items"]:
+        raise HTTPException(503, "Google News did not answer: " + "; ".join(errors))
+    return _safe({
+        "asof": datetime_now_jst(),
+        "coverage": cov,
+        "headlines": lad["items"][:120],
+        "ladder": [{"rung": r, "score": s, "pattern": p} for r, s, p in N.LADDER],
+        "errors": errors,
+        "note": "Headline counts depend on what Google News indexes; compare a day with its own history, not with other sources.",
+    })
+
+
+def datetime_now_jst() -> str:
+    from datetime import datetime  # noqa: PLC0415
+
+    return datetime.now(N.JST).isoformat(timespec="minutes")
