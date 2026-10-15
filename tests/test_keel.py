@@ -255,6 +255,14 @@ def test_history(client):
     assert len(j["series"]["USDJPY=X"]) >= 12
 
 
+def test_history_yields(client):
+    j = client.get("/api/history", params={"symbols": "USDJPY=X,UST2Y,JGB10Y", "start": "2025-01-01", "interval": "D"}).json()
+    assert j["units"] == {"USDJPY=X": "price", "UST2Y": "pct", "JGB10Y": "pct"}
+    assert j["series"]["UST2Y"][-1]["v"] == pytest.approx(4.04)
+    assert j["series"]["JGB10Y"][-1]["v"] == pytest.approx(1.5)
+    assert j["series"]["JGB10Y"][0]["d"] >= "2025-01-01" and not j["missing"]
+
+
 def test_ppp_matches_dates_and_drops_stale(client, monkeypatch):
     idx = pd.date_range("2005-01-31", "2026-08-31", freq="ME")
     cpi = pd.DataFrame({"USA": np.linspace(100, 170, len(idx)), "JPN": np.linspace(100, 112, len(idx)),
@@ -369,3 +377,71 @@ def test_macro(client, monkeypatch):
     monkeypatch.setattr(D, "oecd_cli", lambda areas, start="2000-01": pd.DataFrame())
     monkeypatch.setattr(D, "cpi_yoy", lambda areas, start="2000-01": (_ for _ in ()).throw(ValueError("down")))
     assert client.get("/api/macro").status_code == 503
+
+
+# --------------------------------------------------------------------------- #
+# news (Bybee et al. 2024 follow-ups): parsers and routes, no network
+# --------------------------------------------------------------------------- #
+from app import news as N  # noqa: E402
+
+RSS = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?><rss version="2.0"><channel><title>t</title>
+<item><title>Yen jumps as BOJ rate check raises intervention risk - Yahoo Finance</title><link>https://news.google.com/rss/articles/A1?oc=5</link><pubDate>Fri, 18 Sep 2026 16:03:53 GMT</pubDate><source url="https://finance.yahoo.com">Yahoo Finance</source></item>
+<item><title>日銀が「レートチェック」を実施 円安けん制か - NHKニュース</title><link>https://news.google.com/rss/articles/A2?oc=5</link><pubDate>Fri, 18 Sep 2026 07:00:00 GMT</pubDate><source url="https://www3.nhk.or.jp">NHKニュース</source></item>
+<item><title>財務相、投機的な動きに「断固たる措置」 為替 - 日本経済新聞</title><link>https://news.google.com/rss/articles/A3?oc=5</link><pubDate>Wed, 14 Oct 2026 23:30:00 GMT</pubDate><source url="https://www.nikkei.com">日本経済新聞</source></item>
+<item><title>日経平均が反落 - 日本経済新聞</title><link>https://news.google.com/rss/articles/A4?oc=5</link><pubDate>Wed, 14 Oct 2026 03:00:00 GMT</pubDate><source url="https://www.nikkei.com">日本経済新聞</source></item>
+</channel></rss>"""
+
+
+def test_parse_rss_and_ladder():
+    items = N.parse_rss(RSS)
+    assert len(items) == 4
+    assert items[0]["title"] == "Yen jumps as BOJ rate check raises intervention risk" and items[0]["source"] == "Yahoo Finance"
+    assert items[0]["d"] == "2026-09-19"  # 16:03 GMT is the next day in Tokyo
+    assert items[2]["d"] == "2026-10-15"
+    assert N.classify(items[0]["title"]) == (5, 100)
+    assert N.classify(items[1]["title"]) == (5, 100)
+    assert N.classify(items[2]["title"]) == (4, 80)  # 断固たる beats 投機的
+    assert N.classify(items[3]["title"]) is None  # not about FX
+    assert N.classify("Yen weakens; ministry watching markets with a sense of urgency") == (2, 30)
+    assert N.classify("日銀が「レートチェック」") == (5, 100)  # no FX word, but a rate check is FX by nature
+    assert N.classify("介入もレートチェックもいまのところ伝わらず＝ＮＹ為替") is None  # reports that nothing happened
+    assert N.classify("英財務相、ＥＵ産業政策で英国排除しないよう要請へ") is None  # not about the yen
+    assert N.classify("日米利上げ観測、円高行き過ぎに修正余地") is None  # yen strength
+
+
+def test_parse_sentiment_csv():
+    s = N.parse_sentiment_csv("date,Daily news sentiment\n01/01/1980,-0.04\n01/02/1980,-0.11\n10/11/2026,0.06\n")
+    assert len(s) == 3 and s.index[-1] == pd.Timestamp("2026-10-11") and s.iloc[0] == pytest.approx(-0.04)
+
+
+def test_coverage_dedupes_and_counts(monkeypatch):
+    from datetime import datetime, timedelta  # noqa: PLC0415
+
+    today = datetime.now(N.JST).date()
+    d1 = (today - timedelta(days=2)).isoformat()
+    calls = []
+
+    def fake(query, lang):
+        calls.append(query)
+        return [{"d": d1, "title": "a", "source": "x", "link": "L1"}, {"d": d1, "title": "b", "source": "y", "link": "L2"}]
+
+    monkeypatch.setattr(N, "_gnews", fake)
+    from app import data as Dm  # noqa: PLC0415
+
+    Dm._cache.clear()
+    c = N.coverage("為替介入", "ja", 14)
+    assert c["series"][-1]["d"] == today.isoformat()
+    assert sum(x["n"] for x in c["series"]) == 2  # same links in every window counted once
+    assert next(x["n"] for x in c["series"] if x["d"] == d1) == 2
+    assert all("after:" in q and "before:" in q for q in calls)
+
+
+def test_news_routes(client, monkeypatch):
+    idx = pd.date_range("2024-01-01", "2026-10-11", freq="D")
+    monkeypatch.setattr(N, "news_sentiment", lambda: pd.Series(0.05, index=idx))
+    j = client.get("/api/newsmood", params={"start": "2025-01-01"}).json()
+    assert j["asof"] == "2026-10-11" and j["monthly"][0]["d"] == "2025-01-31" and j["daily"]
+    monkeypatch.setattr(N, "coverage", lambda q, lang, days: {"series": [{"d": "2026-10-14", "n": 11}], "windows": 30, "failed_windows": 0, "capped_windows": []})
+    monkeypatch.setattr(N, "ladder_headlines", lambda days=30: {"items": [{"d": "2026-10-15", "title": "x", "rung": 4, "score": 80}], "errors": []})
+    j = client.get("/api/fxnews").json()
+    assert j["coverage"]["series"][0]["n"] == 11 and j["headlines"][0]["rung"] == 4 and len(j["ladder"]) == 4
