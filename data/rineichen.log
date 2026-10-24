@@ -1,0 +1,52 @@
+health True
+['ACWI', 'SPY', 'EWJ', 'EWG', 'EWQ', 'EWU'] ok 6 missing []
+['EWL', 'EWI', 'EWP', 'EWN', 'EWD', 'EWC'] ok 6 missing []
+['EWA', 'EWH', 'MCHI', 'EWY', 'EWT', 'INDA'] ok 6 missing []
+['EWZ', 'EWW', 'EIDO', 'EZA', 'EWS', 'THD'] ok 6 missing []
+['IXC', 'MXI', 'EXI', 'RXI', 'KXI', 'IXJ'] ok 6 missing []
+['IXG', 'IXN', 'IXP', 'JXI', 'REET', '1617.T'] ok 6 missing []
+['1618.T', '1619.T', '1620.T', '1621.T', '1622.T', '1623.T'] ok 6 missing []
+['1624.T', '1625.T', '1626.T', '1627.T', '1628.T', '1629.T'] ok 6 missing []
+['1630.T', '1631.T', '1632.T', '1633.T', '^VIX', '^MOVE'] ok 6 missing []
+/api/history HYG,IEF,LQD,USDJPY=X,EURJPY=X,GBPJPY=X 502 
+/api/history HYG,IEF,LQD,USDJPY=X,EURJPY=X,GBPJPY=X 502 <!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>502</title>
+    <style>@font-face {
+  font-family: "Roobert";
+  font-weight: 500;
+  font-style: normal;
+  font-stretch: normal;
+  src: url("data:fo
+/api/history HYG,IEF,LQD,USDJPY=X,EURJPY=X,GBPJPY=X 502 <!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>502</title>
+    <style>@font-face {
+  font-family: "Roobert";
+  font-weight: 500;
+  font-style: normal;
+  font-stretch: normal;
+  src: url("data:fo
+/api/history HYG,IEF,LQD,USDJPY=X,EURJPY=X,GBPJPY=X 502 <!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>502</title>
+    <style>@font-face {
+  font-family: "Roobert";
+  font-weight: 500;
+  font-style: normal;
+  font-stretch: normal;
+  src: url("data:fo
+['HYG', 'IEF', 'LQD'] ok 3 missing []
+['USDJPY=X', 'EURJPY=X', 'GBPJPY=X'] ok 3 missing []
+['AUDJPY=X', 'CHFJPY=X', 'EURUSD=X', 'CNY=X', 'GC=F', 'SI=F'] ok 6 missing []
+['HG=F', 'CL=F', 'NG=F', 'BTC-USD', 'ETH-USD', '^GSPC'] ok 6 missing []
+['^N225', '^STOXX50E', '^TPX', 'UST2Y', 'UST10Y', 'JGB10Y'] ok 5 missing ['^TPX']
