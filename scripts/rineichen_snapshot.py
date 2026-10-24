@@ -8,7 +8,8 @@ COUNTRIES = "ACWI SPY EWJ EWG EWQ EWU EWL EWI EWP EWN EWD EWC EWA EWH MCHI EWY E
 SECTORS = "IXC MXI EXI RXI KXI IXJ IXG IXN IXP JXI REET".split()
 TOPIX17 = [f"{c}.T" for c in range(1617, 1634)]
 OTHER = ("^VIX ^MOVE HYG IEF LQD USDJPY=X EURJPY=X GBPJPY=X AUDJPY=X CHFJPY=X EURUSD=X CNY=X "
-         "GC=F SI=F HG=F CL=F NG=F BTC-USD ETH-USD ^GSPC ^N225 ^STOXX50E ^TPX UST2Y UST10Y JGB10Y").split()
+         "GC=F SI=F HG=F CL=F NG=F BTC-USD ETH-USD ^GSPC ^N225 ^STOXX50E UST2Y UST10Y JGB10Y "
+         "IWM EEM TIP DX-Y.NYB RSP 1306.T JGB2Y").split()
 
 LOG = []
 import os, traceback
@@ -48,6 +49,24 @@ try:
         fetch(syms[i:i + 6])
     macro = get("/api/macro", {"areas": "US,JP,EA,CN,UK,DE", "start": "2000-01"}) or {"series": {}, "asof": None}
     mood = get("/api/newsmood", {"start": "2000-01-01", "daily_days": 30}) or {"monthly": [], "asof": None}
+
+    # OECD business / consumer confidence straight from Keel's own code (the deployed API may not have it yet)
+    conf = {}
+    try:
+        import sys; sys.path.insert(0, ".")
+        from app import data as KD
+        codes = {"US": "USA", "JP": "JPN", "DE": "DEU", "UK": "GBR", "CN": "CHN"}
+        for key, measure in (("bci", "BCICP"), ("cci", "CCICP")):
+            df = KD.oecd_confidence(tuple(codes.values()), measure, "2000-01")
+            log("confidence", measure, list(df.columns), len(df))
+            for a, c in codes.items():
+                if c in df:
+                    s_ = df[c].dropna()
+                    conf.setdefault(a, {})[key] = [{"d": str(i.date()), "v": float(v)} for i, v in s_.items()]
+    except Exception:
+        log("confidence", traceback.format_exc()[-600:])
+    for a, v in conf.items():
+        macro["series"].setdefault(a, {"cli": [], "cpi_yoy": []}).update(v)
 
     weights = {}
     try:
