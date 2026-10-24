@@ -1,0 +1,23 @@
+name: rineichen-snapshot
+on:
+  push:
+    branches: [rineichen-data]
+    paths: [scripts/rineichen_snapshot.py, .github/workflows/rineichen-snapshot.yml]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  snap:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - run: pip install requests yfinance
+      - run: python scripts/rineichen_snapshot.py
+      - run: |
+          git config user.name "rineichen-bot"; git config user.email "actions@github.com"
+          git add data/rineichen.json
+          git commit -m "Rineichen data snapshot" || exit 0
+          git push
