@@ -764,7 +764,7 @@ def _code(v) -> str:
     return str(v).split(":")[0].strip()
 
 
-def parse_cli_csv(text: str) -> pd.DataFrame:
+def parse_cli_csv(text: str, measure: str = "LI") -> pd.DataFrame:
     """SDMX-CSV from the OECD CLI dataflow -> month-end CLI levels, one column per area.
 
     Keeps the amplitude-adjusted leading indicator; when a wildcard query returned several
@@ -774,7 +774,7 @@ def parse_cli_csv(text: str) -> pd.DataFrame:
     t, v, a = cols.get("TIME_PERIOD"), cols.get("OBS_VALUE"), cols.get("REF_AREA")
     if not (t and v and a):
         return pd.DataFrame()
-    for dim, want in (("MEASURE", "LI"), ("FREQ", "M"), ("ADJUSTMENT", "AA"), ("METHODOLOGY", "H")):
+    for dim, want in (("MEASURE", measure), ("FREQ", "M"), ("ADJUSTMENT", "AA"), ("METHODOLOGY", "H")):
         c = cols.get(dim)
         if c is None:
             continue
@@ -794,6 +794,23 @@ def oecd_cli(areas: tuple[str, ...], start: str = "2000-01") -> pd.DataFrame:
     """Monthly OECD composite leading indicators (amplitude adjusted, 100 = long-term trend)."""
     t = _get_csv(OECD_CLI_URLS, areas, start, "application/vnd.sdmx.data+csv; charset=utf-8")
     return parse_cli_csv(t) if t else pd.DataFrame()
+
+
+OECD_CONF_URLS = (
+    "https://sdmx.oecd.org/public/rest/data/OECD.SDD.STES,DSD_STES@DF_CLI,4.1/"
+    "{areas}.M.{measure}...AA...H?startPeriod={start}&dimensionAtObservation=AllDimensions",
+    "https://sdmx.oecd.org/public/rest/data/OECD.SDD.STES,DSD_STES@DF_CLI,/"
+    "{areas}.M.{measure}......?startPeriod={start}&dimensionAtObservation=AllDimensions",
+)
+
+
+@cached(ttl=12 * 3600)
+def oecd_confidence(areas: tuple[str, ...], measure: str, start: str = "2000-01") -> pd.DataFrame:
+    """Monthly OECD business (BCICP) or consumer (CCICP) confidence, amplitude adjusted,
+    long-term average = 100. Same dataflow as the leading indicator."""
+    urls = tuple(u.replace("{measure}", measure) for u in OECD_CONF_URLS)
+    t = _get_csv(urls, areas, start, "application/vnd.sdmx.data+csv; charset=utf-8")
+    return parse_cli_csv(t, measure) if t else pd.DataFrame()
 
 
 def cpi_yoy(areas: tuple[str, ...], start: str = "2000-01") -> pd.DataFrame:

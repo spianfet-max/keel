@@ -718,8 +718,9 @@ def macro(
     areas: str = Query("US,JP", description="Comma-separated: US, JP, EA, UK, DE, CN"),
     start: str = Query("2000-01", pattern=r"^\d{4}-\d{2}$", description="First month, YYYY-MM"),
 ):
-    """Monthly OECD composite leading indicator (amplitude adjusted, 100 = long-term trend) and
-    CPI inflation (% year on year) per area, for growth x inflation regime work.
+    """Monthly OECD composite leading indicator (amplitude adjusted, 100 = long-term trend),
+    business and consumer confidence (`bci`, `cci`; amplitude adjusted, 100 = long-term average)
+    and CPI inflation (% year on year) per area, for growth x inflation regime work.
 
     Both series are published with a lag of about one to two months; `asof` gives each
     series' latest month so callers can lag their signals accordingly."""
@@ -738,6 +739,13 @@ def macro(
     except Exception as e:  # noqa: BLE001
         cpi = pd.DataFrame()
         errors.append(f"OECD CPI: {e}")
+    conf = {}
+    for key, measure in (("bci", "BCICP"), ("cci", "CCICP")):
+        try:
+            conf[key] = D.oecd_confidence(cli_codes, measure, start)
+        except Exception as e:  # noqa: BLE001
+            conf[key] = pd.DataFrame()
+            errors.append(f"OECD {measure}: {e}")
     if cli.empty and cpi.empty:
         raise HTTPException(503, "OECD macro data unavailable right now; " + "; ".join(errors or ["empty answer"]))
 
@@ -755,10 +763,12 @@ def macro(
             missing.append(a)
             continue
         series[a] = {"cli": pts(cli_s), "cpi_yoy": pts(cpi_s)}
+        for key, df in conf.items():
+            series[a][key] = pts(next((df[c] for c in MACRO_AREAS[a][0] if c in df and df[c].notna().any()), None))
         asof[a] = {k: (v[-1]["d"] if v else None) for k, v in series[a].items()}
     return _safe({
         "series": series, "asof": asof, "missing": missing, "errors": errors,
-        "note": "OECD composite leading indicator (amplitude adjusted, long-term average = 100) and "
+        "note": "OECD composite leading indicator and business/consumer confidence (amplitude adjusted, long-term average = 100) and "
                 "CPI all items, % change on a year earlier. Month-end dates. Both are revised and published "
                 "with a lag of about 1-2 months.",
     })
