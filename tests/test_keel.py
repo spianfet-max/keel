@@ -503,3 +503,71 @@ def test_news_routes(client, monkeypatch):
     monkeypatch.setattr(N, "ladder_headlines", lambda days=30: {"items": [{"d": "2026-10-15", "title": "x", "rung": 4, "score": 80}], "errors": []})
     j = client.get("/api/fxnews").json()
     assert j["coverage"]["series"][0]["n"] == 11 and j["headlines"][0]["rung"] == 4 and len(j["ladder"]) == 4
+
+
+# --------------------------------------------------------------------------- #
+# Sentiment sources
+# --------------------------------------------------------------------------- #
+from app import sentiment as S  # noqa: E402
+
+
+def test_parse_cot():
+    rows = [
+        {"report_date_as_yyyy_mm_dd": "2026-10-13T00:00:00.000", "cftc_contract_market_code": "097741",
+         "open_interest_all": "200000", "noncomm_positions_long_all": "30000", "noncomm_positions_short_all": "70000",
+         "comm_positions_long_all": "100000", "comm_positions_short_all": "50000"},
+        {"report_date_as_yyyy_mm_dd": "2026-10-06T00:00:00.000", "cftc_contract_market_code": "097741",
+         "open_interest_all": "0", "noncomm_positions_long_all": "1", "noncomm_positions_short_all": "1"},
+        {"report_date_as_yyyy_mm_dd": "2026-10-13T00:00:00.000", "cftc_contract_market_code": "999999",
+         "open_interest_all": "1", "noncomm_positions_long_all": "1", "noncomm_positions_short_all": "1"},
+    ]
+    c = S.parse_cot(rows)
+    assert list(c) == ["JPY"] and [r["d"] for r in c["JPY"]] == ["2026-10-06", "2026-10-13"]
+    assert c["JPY"][1]["net"] == -40000 and c["JPY"][1]["pct"] == -20.0 and c["JPY"][1]["cnet"] == 50000
+    assert c["JPY"][0]["pct"] is None
+
+
+def test_mof_week_parse():
+    txt = ('x,y\n,1. Portfolio\n'
+           '2005．1．2〜 1．8,"1,689 ","1,419 ",270 ,"23,929 ","15,051 ","8,878 ","9,149 ","1,662 ","1,001 ",662 ,"9,811 ",'
+           '"17,853 ","15,575 ","2,278 ","15,867 ","11,675 ","4,192 ","6,470 ","7,885 ","3,991 ","3,894 ","10,363 "\n'
+           '2025．12．28〜 1．3,1,1,-5 ,1,1,1,1,1,1,1,1,1,1,"-1,234 ",1,1,-7 ,1,1,1,1,1\n'
+           '   (Note 1),Transactions,,,,,,,,,,,,,,,,,,,,,\n')
+    r = S.parse_mof_week(txt)
+    assert r == [{"d": "2005-01-08", "fe": 2278.0, "fb": 4192.0, "re": 270.0},
+                 {"d": "2026-01-03", "fe": -1234.0, "fb": -7.0, "re": -5.0}]
+
+
+def test_margin_and_investor_parsers():
+    hist = pd.DataFrame([["月日", None, None, None, None], ["[東京・名古屋", None, None, None, None],
+                         [pd.Timestamp("2026-09-18"), 481794, 884462, 3497919, 6455988],
+                         ["[東京", None, None, None, None], [pd.Timestamp("2026-09-18"), 1, 1, 1, 1]])
+    assert S.parse_margin_hist(hist) == [{"d": "2026-09-18", "ss": 481794.0, "sv": 884462.0, "ls": 3497919.0, "lv": 6455988.0}]
+    wk = pd.DataFrame([[None] * 8 for _ in range(16)])
+    wk.iloc[0, 1] = pd.Timestamp("2026-10-16")
+    wk.iloc[13, 1] = "信用取引残高合計\nTotal"
+    wk.iloc[13, 4], wk.iloc[13, 6], wk.iloc[14, 4], wk.iloc[14, 6] = 366263, 3734445, 667053, 9.0e6
+    assert S.parse_margin_week(wk) == {"d": "2026-10-16", "ss": 366263.0, "ls": 3734445.0, "sv": 667053.0, "lv": 9.0e6}
+    iv = pd.DataFrame([[None] * 59 for _ in range(9)])
+    iv.iloc[7, 1], iv.iloc[8, 2] = "東証プライム\nTSE Prime", "金額 Value"
+    iv.iloc[8, 21], iv.iloc[8, 25], iv.iloc[8, 13], iv.iloc[8, 17] = -352159410, 8684813, 29421973, 183980265
+    iv.iloc[8, 53], iv.iloc[8, 33] = -76396056, 138108954
+    r = S.parse_investor_week(iv, "x/stock_1_w_20261013_20261016.xlsx")
+    assert r == {"d": "2026-10-16", "foreign": -3434.7, "indiv": 2134.0, "trust_bk": -764.0, "inv_trust": 1381.1}
+
+
+def test_sentiment_routes(client, monkeypatch):
+    monkeypatch.setattr(S, "cot", lambda keys, start: {"JPY": [{"d": "2026-10-13", "pct": -20.0}]})
+    j = client.get("/api/cot", params={"markets": "JPY,SPX,nope"}).json()
+    assert j["series"]["JPY"][0]["pct"] == -20.0 and j["missing"] == ["SPX"] and j["asof"] == "2026-10-13"
+    assert client.get("/api/cot", params={"markets": "nope"}).status_code == 400
+    monkeypatch.setattr(S, "mof_week", lambda: [{"d": "2004-12-31", "fe": 1}, {"d": "2026-10-17", "fe": -3000}])
+    monkeypatch.setattr(S, "jpx_margin", lambda: (_ for _ in ()).throw(ValueError("down")))
+    monkeypatch.setattr(S, "jpx_investors", lambda: [])
+    j = client.get("/api/jpflows").json()
+    assert j["mof"] == [{"d": "2026-10-17", "fe": -3000}] and j["margin"] == [] and "margin: down" in j["errors"][0]
+    monkeypatch.setattr(N, "_gnews", lambda q, lang: [{"d": "2026-10-20", "title": "a", "source": "s", "link": "1"},
+                                                      {"d": "2026-10-21", "title": "a", "source": "t", "link": "2"},
+                                                      {"d": "2026-10-21", "title": "b", "source": "t", "link": "3"}])
+    j = client.get("/api/headlines", params={"q": "stocks"}).json()
+    assert [i["title"] for i in j["items"]] == ["a", "b"] and j["items"][0]["d"] == "2026-10-21"
