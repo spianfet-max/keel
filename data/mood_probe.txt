@@ -1,0 +1,21 @@
+cftc_legacy 200 application/json;charset=utf-8 9369 '[{"id":"261020097741F","market_and_exchange_names":"JAPANESE YEN - CHICAGO MERCANTILE EXCHANGE","report_date_as_yyyy_mm_dd":"2026-10-20T00:00:00.000","yyyy_report_week_ww":"2026 Report Week 42","contract_market_name":"JAPANESE YEN","cftc_contract_market_code":"097741","cftc_market_code":"CME ","cft
+cftc_tff 200 application/json;charset=utf-8 3085 '[{"id":"26102013874AF","market_and_exchange_names":"E-MINI S&P 500 - CHICAGO MERCANTILE EXCHANGE","report_date_as_yyyy_mm_dd":"2026-10-20T00:00:00.000","yyyy_report_week_ww":"2026 Report Week 42","contract_market_name":"E-MINI S&P 500","cftc_contract_market_code":"13874A","cftc_market_code":"CME ",
+jpx_investor_type 200 text/html 37865 '<!DOCTYPE html>\r <html lang="ja">\r <head prefix="og: http://ogp.me/ns# fb: http://ogp.me/ns/fb# article: http://ogp.me/ns/article#">\r \r <meta charset="UTF-8">\r <meta name="viewport" content="width=device-width,initial-scale=1.0">\r <meta name="copyright" content="(C) Japan Exchange Group, Inc.
+jpx_margin 200 text/html 29356 '<!DOCTYPE html>\r <html lang="ja">\r <head prefix="og: http://ogp.me/ns# fb: http://ogp.me/ns/fb# article: http://ogp.me/ns/article#">\r \r <meta charset="UTF-8">\r <meta name="viewport" content="width=device-width,initial-scale=1.0">\r <meta name="copyright" content="(C) Japan Exchange Group, Inc.
+jpx_investor_type_en 200 text/html 34039 '<!DOCTYPE html>\r <html lang="en">\r <head prefix="og: http://ogp.me/ns# fb: http://ogp.me/ns/fb# article: http://ogp.me/ns/article#">\r \r <meta charset="UTF-8">\r <meta name="viewport" content="width=device-width,initial-scale=1.0">\r <meta name="copyright" content="(C) Japan Exchange Group, Inc.
+aaii_xls 403 text/html 965 '<html style="height:100%"><head><META NAME="ROBOTS" CONTENT="NOINDEX, NOFOLLOW"><meta name="format-detection" content="telephone=no"><meta name="viewport" content="initial-scale=1.0"><meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1"><script type="text/javascript" src="/_Incapsula_Resour
+gnews 200 application/xml; charset=utf-8 139442 '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><rss version="2.0" xmlns:media="http://search.yahoo.com/mrss/"><channel><generator>NFE/5.0</generator><title>"USD/JPY when:7d" - Google News</title><link>https://news.google.com/search?q=USD/JPY+when:7d&amp;hl=en-US&amp;gl=US&amp;ceid=US:en</li
+yahoo ^VIX9D 3975 2011-01-04 2026-10-23
+yahoo ^VIX 5489 2005-01-03 2026-10-23
+yahoo ^VIX3M 5101 2006-07-17 2026-10-23
+yahoo ^VIX6M 4733 2008-01-02 2026-10-23
+yahoo ^SKEW 5424 2005-01-03 2026-10-23
+yahoo ^JNIV 0 - -
+yahoo ^VXJ 0 - -
+yahoo SPLV 3891 2011-05-05 2026-10-23
+yahoo SPHB 3891 2011-05-05 2026-10-23
+yahoo XLY 5487 2005-01-03 2026-10-23
+yahoo XLP 5487 2005-01-03 2026-10-23
+yahoo AUDCHF=X 5655 2005-01-03 2026-10-25
+yahoo ^NKVI.OS 2129 2018-01-22 2026-10-23
+fred_umcsent ERR ReadTimeout(ReadTimeoutError("HTTPSConnectionPool(host='fred.stlouisfed.org', port=443): Read timed out. (read timeout=60)"))
