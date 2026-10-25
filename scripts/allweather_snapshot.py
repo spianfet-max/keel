@@ -9,7 +9,7 @@ LOG = []
 def log(*a):
     line = " ".join(str(x) for x in a); print(line, flush=True); LOG.append(line)
 
-ETFS = "SPY EFA EEM 1306.T IEF TLT TIP LQD HYG VNQ GLD DBC BTC-USD".split()
+ETFS = "SPY EFA EEM 1306.T EWJ IEF TLT TIP LQD HYG VNQ GLD DBC BTC-USD".split()
 RAW = "^IRX USDJPY=X".split()          # price/level series (no dividends)
 KEEL = "UST2Y UST10Y UST30Y JGB2Y JGB10Y JGB30Y".split()
 
