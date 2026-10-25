@@ -180,11 +180,12 @@ def test_parse_mof():
 
 @pytest.fixture
 def client(monkeypatch):
-    def fake_closes(sym, years=3):
+    def fake_closes(sym, years=3, dividends=False):
         seed = abs(hash(sym)) % 1000
         if sym.endswith("=X"):
             return gbm(n=5900, seed=seed, vol=0.1, s0=150 if "JPY" in sym else 1.1, start="2004-01-01")
-        return gbm(seed=seed, s0=5000)
+        s = gbm(seed=seed, s0=5000)
+        return s * np.exp(np.arange(len(s)) * 0.0002) if dividends else s
 
     monkeypatch.setattr(D, "closes", fake_closes)
     monkeypatch.setattr(
@@ -269,6 +270,13 @@ def test_ohlc(client, monkeypatch):
     m = client.get("/api/ohlc", params={"symbols": "USDJPY=X", "start": "2026-09-01", "interval": "M"}).json()["series"]["USDJPY=X"]
     sep = [x for x in d if x["d"].startswith("2026-09")]
     assert m[0]["h"] == max(x["h"] for x in sep) and m[0]["c"] == sep[-1]["c"] and m[0]["o"] == sep[0]["o"]
+
+
+def test_history_total_return(client):
+    p = client.get("/api/history", params={"symbols": "TLT", "start": "2025-01-01", "interval": "W"}).json()
+    t = client.get("/api/history", params={"symbols": "TLT", "start": "2025-01-01", "interval": "W", "total": "true"}).json()
+    assert t["total_return"] is True and p["total_return"] is False
+    assert t["series"]["TLT"][-1]["v"] > p["series"]["TLT"][-1]["v"]
 
 
 def test_history_yields(client):
