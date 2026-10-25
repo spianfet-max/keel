@@ -11,7 +11,7 @@ def log(*a):
 
 START = "1985-01-01"
 YAHOO = {  # key: yahoo symbol
-    "SPX": "^GSPC", "NKY": "^N225", "TOPIX": "1306.T", "NDX": "^NDX", "SX5E": "^STOXX50E", "DAX": "^GDAXI", "FTSE": "^FTSE",
+    "SPX": "^GSPC", "NKY": "^N225", "NDX": "^NDX", "SX5E": "^STOXX50E", "DAX": "^GDAXI", "FTSE": "^FTSE",
     "HSI": "^HSI", "KOSPI": "^KS11", "EEM": "EEM", "VIX": "^VIX", "GOLD": "GC=F", "OIL": "CL=F", "COPPER": "HG=F",
     "BTC": "BTC-USD", "DXY": "DX-Y.NYB", "UST10": "^TNX", "TLT": "TLT", "HYG": "HYG",
     "USDJPY": "USDJPY=X", "EURUSD": "EURUSD=X", "GBPUSD": "GBPUSD=X", "AUDJPY": "AUDJPY=X", "USDCNY": "CNY=X", "USDCHF": "CHF=X", "USDTRY": "TRY=X",
@@ -65,6 +65,26 @@ for k, sid in FRED.items():
             log(k, "FRED", sid, "attempt", attempt, repr(e)[:120]); time.sleep(3)
     else:
         if fred_ok and "f" not in out["s"].get(k, {}): fred_ok = False; log("FRED unreachable, skipping the rest")
+
+# Federal Reserve H.10 (noon buying rates in New York), daily since 1971: long FX history before Yahoo's
+H10 = {"USDJPY": "RXI_N.B.JA", "EURUSD": "RXI$US_N.B.EU", "GBPUSD": "RXI$US_N.B.UK", "USDCHF": "RXI_N.B.SZ", "DXY_BROAD": "JRXWTFB_N.B"}
+for k, sid in H10.items():
+    try:
+        u = ("https://www.federalreserve.gov/datadownload/Output.aspx?rel=H10&series=" + requests.utils.quote(sid, safe="") +
+             "&lastobs=&from=01/01/1985&to=12/31/2030&filetype=csv&label=omit&layout=seriescolumn")
+        r = requests.get("https://www.federalreserve.gov/datadownload/Output.aspx", timeout=60, headers={"User-Agent": "Mozilla/5.0 (keel research)"},
+                         params={"rel": "H10", "series": sid, "lastobs": "", "from": "01/01/1985", "to": "12/31/2030", "filetype": "csv", "label": "omit", "layout": "seriescolumn"})
+        r.raise_for_status()
+        lines = [l for l in r.text.splitlines() if l[:2] in ("19", "20")]
+        rows = []
+        for l in lines:
+            d, v = l.split(",")[:2]
+            try: rows.append([d, float(v)])
+            except ValueError: pass
+        out["s"].setdefault(k, {})["h"] = rows
+        log(k, "H10", sid, len(rows), rows[0] if rows else "-", rows[-1] if rows else "-")
+    except Exception as e:
+        log(k, "H10", sid, "fail", repr(e)[:150])
 
 for attempt in range(6):
     try:
