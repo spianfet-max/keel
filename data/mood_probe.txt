@@ -1,18 +1,8 @@
-USDJPY=X daily index tz None hourly tz Europe/London first hourly 2026-09-24 00:00:00+01:00
-2026-10-14 D o/h/l/c 158.315 158.942 158.128 158.322 | H(UTC day) o/h/l/c 158.313 158.950 157.875 157.978 | last hourly bar 23:00 first 00:00
-2026-10-15 D o/h/l/c 157.945 158.206 157.555 157.957 | H(UTC day) o/h/l/c 157.972 158.248 157.544 158.134 | last hourly bar 23:00 first 00:00
-2026-10-16 D o/h/l/c 158.131 158.175 157.694 158.143 | H(UTC day) o/h/l/c 158.131 158.340 157.687 157.987 | last hourly bar 20:00 first 00:00
-2026-10-19 D o/h/l/c 157.767 158.507 157.704 157.806 | H(UTC day) o/h/l/c 157.793 158.601 157.694 158.522 | last hourly bar 23:00 first 00:00
-2026-10-20 D o/h/l/c 158.518 158.592 157.877 158.523 | H(UTC day) o/h/l/c 158.524 158.604 157.821 158.282 | last hourly bar 23:00 first 00:00
-2026-10-21 D o/h/l/c 158.292 158.380 157.838 158.268 | H(UTC day) o/h/l/c 158.282 158.392 157.832 158.144 | last hourly bar 23:00 first 00:00
-2026-10-22 D o/h/l/c 158.150 158.241 156.694 158.132 | H(UTC day) o/h/l/c 158.143 158.254 156.389 156.536 | last hourly bar 23:00 first 00:00
-2026-10-23 D o/h/l/c 156.774 157.160 156.072 156.814 | H(UTC day) o/h/l/c 156.535 157.160 156.072 156.814 | last hourly bar 20:00 first 00:00
-EURUSD=X daily index tz None hourly tz Europe/London first hourly 2026-09-24 00:00:00+01:00
-2026-10-14 D o/h/l/c 1.120 1.121 1.111 1.120 | H(UTC day) o/h/l/c 1.120 1.121 1.112 1.120 | last hourly bar 23:00 first 00:00
-2026-10-15 D o/h/l/c 1.120 1.124 1.119 1.120 | H(UTC day) o/h/l/c 1.120 1.124 1.119 1.122 | last hourly bar 23:00 first 00:00
-2026-10-16 D o/h/l/c 1.121 1.127 1.121 1.121 | H(UTC day) o/h/l/c 1.121 1.127 1.121 1.124 | last hourly bar 21:00 first 00:00
-2026-10-19 D o/h/l/c 1.123 1.124 1.119 1.123 | H(UTC day) o/h/l/c 1.123 1.124 1.119 1.122 | last hourly bar 23:00 first 00:00
-2026-10-20 D o/h/l/c 1.121 1.126 1.121 1.122 | H(UTC day) o/h/l/c 1.122 1.126 1.121 1.123 | last hourly bar 23:00 first 00:00
-2026-10-21 D o/h/l/c 1.123 1.124 1.121 1.123 | H(UTC day) o/h/l/c 1.123 1.124 1.122 1.124 | last hourly bar 23:00 first 00:00
-2026-10-22 D o/h/l/c 1.123 1.126 1.119 1.123 | H(UTC day) o/h/l/c 1.124 1.126 1.119 1.122 | last hourly bar 23:00 first 00:00
-2026-10-23 D o/h/l/c 1.122 1.123 1.119 1.120 | H(UTC day) o/h/l/c 1.122 1.123 1.119 1.120 | last hourly bar 21:00 first 00:00
+2026-10-15 keel ohlc c 158.131 closes 158.131 | hourly last 158.134
+2026-10-16 keel ohlc c 157.767 closes 157.767 | hourly last 157.987
+2026-10-19 keel ohlc c 158.518 closes 158.518 | hourly last 158.522
+2026-10-20 keel ohlc c 158.292 closes 158.292 | hourly last 158.282
+2026-10-21 keel ohlc c 158.150 closes 158.150 | hourly last 158.144
+2026-10-22 keel ohlc c 156.774 closes 156.774 | hourly last 156.536
+2026-10-23 keel ohlc c 156.814 closes 156.814 | hourly last 156.814
+median body/range after fix 0.37
