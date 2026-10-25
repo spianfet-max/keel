@@ -969,3 +969,23 @@ def social_sentiment(
                   "from": ms[-1]["t"] if ms else None, "to": ms[0]["t"] if ms else None, "items": ms[:40]}
     return _safe({"series": out, "missing": [s for s in syms if not got.get(s)], "asof": datetime_now_jst(),
                   "source": "StockTwits public API; tags are chosen by each message's author"})
+
+
+@app.get("/api/reddit", operation_id="reddit_posts", dependencies=[Depends(check_token)])
+def reddit_posts(
+    subs: str = Query(",".join(S.REDDIT_SUBS), description="Subreddits, comma-separated"),
+    sort: str = Query("hot", pattern="^(hot|new|top)$"),
+    limit: int = Query(50, ge=5, le=100),
+):
+    """Recent Reddit post titles from investing subreddits (title, score, comments, flair, link), via
+    Reddit's official Data API. Needs REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET (a free 'script' app at
+    reddit.com/prefs/apps) on the server. Keel does not score tone."""
+    if not S.reddit_configured():
+        raise HTTPException(503, "Reddit is not configured: set REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET on the Keel server")
+    names = [x.strip().removeprefix("r/") for x in subs.split(",") if x.strip()][:8]
+    try:
+        got = S.reddit(tuple(names), sort, limit)
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(503, f"Reddit unavailable: {e}") from e
+    return _safe({"posts": got, "missing": [n for n in names if not got.get(n)], "sort": sort, "asof": datetime_now_jst(),
+                  "source": "Reddit Data API"})

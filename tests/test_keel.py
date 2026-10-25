@@ -582,3 +582,17 @@ def test_stocktwits_parse_and_route(client, monkeypatch):
     monkeypatch.setattr(S, "stocktwits", lambda syms, pages: {"SPY": p, "NOPE": []})
     r = client.get("/api/social", params={"symbols": "SPY,NOPE"}).json()
     assert r["series"]["SPY"]["bull_share"] == 0.5 and r["series"]["SPY"]["to"] == "2026-10-25T08:00:00Z" and r["missing"] == ["NOPE"]
+
+
+def test_reddit_parse_and_route(client, monkeypatch):
+    j = {"data": {"children": [{"data": {"stickied": True, "title": "Daily thread"}},
+                               {"data": {"created_utc": 1761379200, "title": "SPY  puts\\nprinting", "score": 42, "num_comments": 7,
+                                         "link_flair_text": "YOLO", "permalink": "/r/wallstreetbets/comments/x/"}}]}}
+    p = S.parse_reddit(j)
+    assert len(p) == 1 and p[0]["t"] == "2025-10-25T08:00:00Z" and p[0]["score"] == 42 and p[0]["link"].endswith("/comments/x/")
+    monkeypatch.delenv("REDDIT_CLIENT_ID", raising=False)
+    assert client.get("/api/reddit").status_code == 503
+    monkeypatch.setenv("REDDIT_CLIENT_ID", "a"); monkeypatch.setenv("REDDIT_CLIENT_SECRET", "b")
+    monkeypatch.setattr(S, "reddit", lambda subs, sort, limit: {"stocks": p, "investing": []})
+    r = client.get("/api/reddit", params={"subs": "r/stocks,investing"}).json()
+    assert r["posts"]["stocks"][0]["flair"] == "YOLO" and r["missing"] == ["investing"]
