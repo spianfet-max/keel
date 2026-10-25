@@ -381,3 +381,28 @@ def implied_vol_from_price(kind: str, price: float, s: float, k: float, t: float
         else:
             lo = mid
     return (lo + hi) / 2
+
+
+def fx_close_fix(df: pd.DataFrame) -> pd.DataFrame:
+    """Yahoo's daily FX bars (USDJPY=X etc.) carry a stale close: a quote from the start of the day, almost equal
+    to the open, while the high and low cover the whole day (checked against Yahoo's own hourly bars, Oct 2026).
+    FX trades around the clock, so the day's real close is the next bar's open. When the series shows the pattern
+    (median |close - open| under 8% of the high-low range over the last 250 bars), replace each close with the next
+    open and widen high/low to include it; the last bar keeps Yahoo's close, which is the latest quote.
+    Flat placeholder bars (open = high = low = close) are dropped first. A clean series is returned unchanged."""
+    need = {"open", "high", "low", "close"}
+    if not need <= set(df.columns) or len(df) < 30:
+        return df
+    flat = (df["high"] == df["low"]) & (df["open"] == df["close"]) & (df["high"] == df["close"])
+    df = df[~flat]
+    tail = df.iloc[-250:]
+    rng = (tail["high"] - tail["low"])
+    ratio = ((tail["close"] - tail["open"]).abs() / rng)[rng > 0]
+    if ratio.empty or ratio.median() >= 0.08:
+        return df
+    out = df.copy()
+    nxt = out["open"].shift(-1)
+    out.loc[out.index[:-1], "close"] = nxt.iloc[:-1].values
+    out["high"] = out[["high", "close"]].max(axis=1)
+    out["low"] = out[["low", "close"]].min(axis=1)
+    return out

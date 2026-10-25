@@ -596,3 +596,18 @@ def test_reddit_parse_and_route(client, monkeypatch):
     monkeypatch.setattr(S, "reddit", lambda subs, sort, limit: {"stocks": p, "investing": []})
     r = client.get("/api/reddit", params={"subs": "r/stocks,investing"}).json()
     assert r["posts"]["stocks"][0]["flair"] == "YOLO" and r["missing"] == ["investing"]
+
+
+def test_fx_close_fix():
+    from app.analytics import fx_close_fix  # noqa: PLC0415
+
+    idx = pd.date_range("2026-01-01", periods=60, freq="B")
+    rng = np.random.default_rng(1)
+    o = 150 + np.cumsum(rng.normal(0, .5, 60))
+    stale = pd.DataFrame({"open": o, "high": o + 1, "low": o - 1, "close": o + .01}, index=idx)
+    stale.iloc[10] = [stale.iloc[10, 0]] * 4  # a flat placeholder bar
+    f = fx_close_fix(stale)
+    assert len(f) == 59 and f["close"].iloc[0] == f["open"].iloc[1] and f["close"].iloc[-1] == stale["close"].iloc[-1]
+    assert (f["high"] >= f["close"]).all() and (f["low"] <= f["close"]).all()
+    clean = pd.DataFrame({"open": o, "high": o + 1, "low": o - 1, "close": o + .6}, index=idx)
+    assert fx_close_fix(clean).equals(clean)  # a healthy series is left alone
