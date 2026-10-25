@@ -1,24 +1,18 @@
-SPY 200 30 bull 3 bear 4 2026-10-25T05:28:48Z -> 2026-10-25T08:11:32Z {}
-QQQ 200 30 bull 7 bear 4 2026-10-25T04:06:42Z -> 2026-10-25T07:58:26Z {}
-IWM 200 30 bull 3 bear 0 2026-10-24T17:15:28Z -> 2026-10-25T05:49:32Z {}
-SPX 200 30 bull 4 bear 0 2026-10-23T23:34:43Z -> 2026-10-25T01:50:07Z {}
-EWJ 200 27 bull 16 bear 0 2026-09-20T15:15:50Z -> 2026-10-23T20:34:36Z {}
-DXJ 200 30 bull 7 bear 0 2025-04-25T20:20:11Z -> 2026-08-12T16:41:00Z {}
-NIKKEI 200 30 bull 1 bear 6 2026-08-04T00:50:49Z -> 2026-10-23T20:34:36Z {}
-N225 404 {}
-USDJPY 200 30 bull 1 bear 0 2026-10-22T06:55:06Z -> 2026-10-24T22:15:30Z {}
-USD.JPY 404 {}
-JPY 404 {}
-TOPIX 404 {}
-7203.T 404 {}
-TM 200 30 bull 12 bear 1 2026-09-24T05:32:36Z -> 2026-10-23T20:47:34Z {}
-SPY max 667204894 200 30 2026-10-23T10:50:26Z -> 2026-10-23T11:08:48Z bull 4 bear 8 {}
-SPY max 666304894 200 29 2026-10-12T18:02:58Z -> 2026-10-12T18:10:22Z bull 5 bear 3 {}
-SPY max 662304894 200 30 2026-08-19T16:17:26Z -> 2026-08-19T16:21:08Z bull 5 bear 9 {}
-SPY max 647304894 200 30 2026-03-12T03:41:15Z -> 2026-03-12T03:47:26Z bull 2 bear 8 {}
-SPY max 617304894 200 {}
-SPY max 567304894 200 {}
-SPY max 467304894 200 {}
-SPY max 367304894 200 {}
-SPY max 267304894 200 {}
-SPY 24h-ish pages 30 msgs 900 2026-10-25T08:11:32Z -> 2026-10-24T05:20:28Z {}
+USDJPY=X daily index tz None hourly tz Europe/London first hourly 2026-09-24 00:00:00+01:00
+2026-10-14 D o/h/l/c 158.315 158.942 158.128 158.322 | H(UTC day) o/h/l/c 158.313 158.950 157.875 157.978 | last hourly bar 23:00 first 00:00
+2026-10-15 D o/h/l/c 157.945 158.206 157.555 157.957 | H(UTC day) o/h/l/c 157.972 158.248 157.544 158.134 | last hourly bar 23:00 first 00:00
+2026-10-16 D o/h/l/c 158.131 158.175 157.694 158.143 | H(UTC day) o/h/l/c 158.131 158.340 157.687 157.987 | last hourly bar 20:00 first 00:00
+2026-10-19 D o/h/l/c 157.767 158.507 157.704 157.806 | H(UTC day) o/h/l/c 157.793 158.601 157.694 158.522 | last hourly bar 23:00 first 00:00
+2026-10-20 D o/h/l/c 158.518 158.592 157.877 158.523 | H(UTC day) o/h/l/c 158.524 158.604 157.821 158.282 | last hourly bar 23:00 first 00:00
+2026-10-21 D o/h/l/c 158.292 158.380 157.838 158.268 | H(UTC day) o/h/l/c 158.282 158.392 157.832 158.144 | last hourly bar 23:00 first 00:00
+2026-10-22 D o/h/l/c 158.150 158.241 156.694 158.132 | H(UTC day) o/h/l/c 158.143 158.254 156.389 156.536 | last hourly bar 23:00 first 00:00
+2026-10-23 D o/h/l/c 156.774 157.160 156.072 156.814 | H(UTC day) o/h/l/c 156.535 157.160 156.072 156.814 | last hourly bar 20:00 first 00:00
+EURUSD=X daily index tz None hourly tz Europe/London first hourly 2026-09-24 00:00:00+01:00
+2026-10-14 D o/h/l/c 1.120 1.121 1.111 1.120 | H(UTC day) o/h/l/c 1.120 1.121 1.112 1.120 | last hourly bar 23:00 first 00:00
+2026-10-15 D o/h/l/c 1.120 1.124 1.119 1.120 | H(UTC day) o/h/l/c 1.120 1.124 1.119 1.122 | last hourly bar 23:00 first 00:00
+2026-10-16 D o/h/l/c 1.121 1.127 1.121 1.121 | H(UTC day) o/h/l/c 1.121 1.127 1.121 1.124 | last hourly bar 21:00 first 00:00
+2026-10-19 D o/h/l/c 1.123 1.124 1.119 1.123 | H(UTC day) o/h/l/c 1.123 1.124 1.119 1.122 | last hourly bar 23:00 first 00:00
+2026-10-20 D o/h/l/c 1.121 1.126 1.121 1.122 | H(UTC day) o/h/l/c 1.122 1.126 1.121 1.123 | last hourly bar 23:00 first 00:00
+2026-10-21 D o/h/l/c 1.123 1.124 1.121 1.123 | H(UTC day) o/h/l/c 1.123 1.124 1.122 1.124 | last hourly bar 23:00 first 00:00
+2026-10-22 D o/h/l/c 1.123 1.126 1.119 1.123 | H(UTC day) o/h/l/c 1.124 1.126 1.119 1.122 | last hourly bar 23:00 first 00:00
+2026-10-23 D o/h/l/c 1.122 1.123 1.119 1.120 | H(UTC day) o/h/l/c 1.122 1.123 1.119 1.120 | last hourly bar 21:00 first 00:00
