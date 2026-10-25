@@ -73,6 +73,56 @@ try:
 except Exception:
     log("news fail", traceback.format_exc()[-500:])
 
+
+# ---- StockTwits: daily samples back as far as the public API serves (it stops after ~7 months) ----
+try:
+    import time, httpx
+    from datetime import datetime, timedelta, timezone
+    from app import sentiment as S
+    c = httpx.Client(timeout=30, headers=S.UA, follow_redirects=True)
+    def pg(sym, mx=None):
+        for k in range(3):
+            try:
+                time.sleep(0.8)
+                return S.stocktwits_page(sym, mx, c)
+            except Exception as e:
+                log("st retry", sym, mx, repr(e)[:80]); time.sleep(20)
+        return []
+    ts = lambda m: datetime.fromisoformat(m["t"].replace("Z", "+00:00")).timestamp()
+    top = pg("SPY"); id0, t0 = top[0]["id"], ts(top[0])
+    old = pg("SPY", id0 - 15_000_000); rate = 15_000_000 / (t0 - ts(old[0])) if old else 1.0  # ids per second
+    log("st rate ids/day", round(rate * 86400))
+    days, d = [], datetime.now(timezone.utc).date() - timedelta(days=1)
+    rows, empty = [], 0
+    while empty < 3:
+        if d.weekday() < 5:
+            tgt = datetime(d.year, d.month, d.day, 20, tzinfo=timezone.utc).timestamp()
+            guess = int(id0 - (t0 - tgt) * rate)
+            p = pg("SPY", guess)
+            if p:
+                err = ts(p[0]) - tgt
+                if abs(err) > 3 * 3600:
+                    guess = int(guess - err * rate); p = pg("SPY", guess) or p
+            if not p:
+                empty += 1
+            else:
+                empty = 0
+                row = {"d": d.isoformat(), "id": guess, "t": p[0]["t"]}
+                for sym, ms in (("SPY", p), ("QQQ", pg("QQQ", guess))):
+                    row[sym] = [sum(m["s"] == 1 for m in ms), sum(m["s"] == -1 for m in ms), len(ms)]
+                rows.append(row)
+        d -= timedelta(days=1)
+        if d < datetime(2024, 1, 1).date():
+            break
+    rows.reverse()
+    out["st_hist"] = rows
+    log("st days", len(rows), rows[0] if rows else "-", rows[-1] if rows else "-")
+    now = S.stocktwits(S.ST_SYMBOLS, 2)
+    out["st_now"] = {k: v[:60] for k, v in now.items()}
+    log("st now", {k: (len(v), sum(m["s"] == 1 for m in v), sum(m["s"] == -1 for m in v)) for k, v in now.items()})
+except Exception:
+    log("stocktwits fail", traceback.format_exc()[-600:])
+
 out["generated"] = dt.datetime.utcnow().strftime("%Y-%m-%dT%H:%MZ")
 out["log"] = LOG
 json.dump(out, open("data/mood.json", "w"), separators=(",", ":"), ensure_ascii=False)
