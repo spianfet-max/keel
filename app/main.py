@@ -947,3 +947,25 @@ def news_headlines(
         seen.add(it["title"])
         out.append(it)
     return _safe({"q": q, "lang": lang, "asof": datetime_now_jst(), "items": out[:limit]})
+
+
+@app.get("/api/social", operation_id="social_sentiment", dependencies=[Depends(check_token)])
+def social_sentiment(
+    symbols: str = Query("SPY,QQQ,IWM,NIKKEI,EWJ,USDJPY", description="StockTwits symbols, e.g. " + ",".join(S.ST_SYMBOLS)),
+    pages: int = Query(2, ge=1, le=5, description="Pages of 30 messages per symbol"),
+):
+    """StockTwits: the latest messages per symbol and how many their authors tagged Bullish or Bearish.
+    `bull_share` = bullish / (bullish + bearish). Busy symbols (SPY, QQQ) cover a few hours, quiet ones
+    (EWJ, NIKKEI) weeks, so compare a symbol with itself."""
+    syms = [s.strip().upper() for s in symbols.split(",") if s.strip()][:10]
+    try:
+        got = S.stocktwits(tuple(syms), pages)
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(503, f"StockTwits unavailable: {e}") from e
+    out = {}
+    for s, ms in got.items():
+        b, r = sum(m["s"] == 1 for m in ms), sum(m["s"] == -1 for m in ms)
+        out[s] = {"n": len(ms), "bull": b, "bear": r, "bull_share": round(b / (b + r), 3) if b + r else None,
+                  "from": ms[-1]["t"] if ms else None, "to": ms[0]["t"] if ms else None, "items": ms[:40]}
+    return _safe({"series": out, "missing": [s for s in syms if not got.get(s)], "asof": datetime_now_jst(),
+                  "source": "StockTwits public API; tags are chosen by each message's author"})

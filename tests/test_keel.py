@@ -571,3 +571,14 @@ def test_sentiment_routes(client, monkeypatch):
                                                       {"d": "2026-10-21", "title": "b", "source": "t", "link": "3"}])
     j = client.get("/api/headlines", params={"q": "stocks"}).json()
     assert [i["title"] for i in j["items"]] == ["a", "b"] and j["items"][0]["d"] == "2026-10-21"
+
+
+def test_stocktwits_parse_and_route(client, monkeypatch):
+    j = {"messages": [{"id": 3, "created_at": "2026-10-25T08:00:00Z", "body": "to the  moon\n$SPY", "entities": {"sentiment": {"basic": "Bullish"}}, "likes": {"total": 4}},
+                      {"id": 2, "created_at": "2026-10-25T07:00:00Z", "body": "x", "entities": {"sentiment": None}},
+                      {"id": 1, "created_at": "2026-10-25T06:00:00Z", "body": "y", "entities": {"sentiment": {"basic": "Bearish"}}}]}
+    p = S.parse_stocktwits(j)
+    assert [m["s"] for m in p] == [1, 0, -1] and p[0]["body"] == "to the moon $SPY" and p[0]["likes"] == 4 and p[1]["likes"] == 0
+    monkeypatch.setattr(S, "stocktwits", lambda syms, pages: {"SPY": p, "NOPE": []})
+    r = client.get("/api/social", params={"symbols": "SPY,NOPE"}).json()
+    assert r["series"]["SPY"]["bull_share"] == 0.5 and r["series"]["SPY"]["to"] == "2026-10-25T08:00:00Z" and r["missing"] == ["NOPE"]
