@@ -1,0 +1,24 @@
+name: history-snapshot
+on:
+  push:
+    branches: [rineichen-data]
+    paths: [scripts/history_snapshot.py, .github/workflows/history-snapshot.yml]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  snap:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - run: pip install requests yfinance pandas
+      - run: python scripts/history_snapshot.py || true
+      - run: |
+          git config user.name "history-bot"; git config user.email "actions@github.com"
+          git pull --rebase origin rineichen-data || true
+          git add data/ || true
+          git commit -m "History data snapshot" || exit 0
+          git push
