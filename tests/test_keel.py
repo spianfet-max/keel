@@ -362,13 +362,22 @@ def test_parse_cli_csv():
     assert len(df) == 2
 
 
+def test_parse_confidence_csv():
+    text = CLI_CSV.replace(",LI,", ",BCICP,")
+    df = D.parse_cli_csv(text, "BCICP")
+    assert df.loc["2026-08-31", "USA"] == pytest.approx(100.6)
+
+
 def test_macro(client, monkeypatch):
     idx = pd.date_range("2000-01-31", "2026-08-31", freq="ME")
     cli = pd.DataFrame({"USA": 100 + np.sin(np.arange(len(idx)) / 6), "EA19": 100.0}, index=idx)
     cpi = pd.DataFrame({"USA": 2.5, "JPN": 1.0, "EA20": 2.0}, index=idx)
     monkeypatch.setattr(D, "oecd_cli", lambda areas, start="2000-01": cli)
     monkeypatch.setattr(D, "cpi_yoy", lambda areas, start="2000-01": cpi)
+    conf = {"BCICP": pd.DataFrame({"USA": 99.5, "JPN": 100.2}, index=idx), "CCICP": pd.DataFrame()}
+    monkeypatch.setattr(D, "oecd_confidence", lambda areas, measure, start="2000-01": conf[measure])
     j = client.get("/api/macro", params={"areas": "US,JP,EA"}).json()
+    assert j["series"]["US"]["bci"][-1]["v"] == 99.5 and j["series"]["JP"]["bci"] and j["series"]["US"]["cci"] == []
     assert len(j["series"]["US"]["cli"]) == len(idx) and j["series"]["US"]["cpi_yoy"][-1]["v"] == 2.5
     assert j["series"]["JP"]["cli"] == [] and j["series"]["JP"]["cpi_yoy"]
     assert j["series"]["EA"]["cli"][0]["v"] == 100.0  # EA19 fallback
