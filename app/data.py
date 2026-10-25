@@ -150,9 +150,10 @@ def ohlc(symbol: str, years: float = 3) -> pd.DataFrame:
     df = _df(obb().yfinance.equity.price.historical(symbol=symbol, start_date=start))
     if df.empty or "close" not in df:
         raise ValueError(f"no prices for {symbol}")
-    out = pd.DataFrame({k: pd.to_numeric(df[k], errors="coerce") for k in ("open", "high", "low", "close")
-                        if k in df}, index=pd.to_datetime(df["date"]))
-    out["volume"] = pd.to_numeric(df["volume"], errors="coerce") if "volume" in df else np.nan
+    # .values: the frame has a plain row index, so assigning Series would align on it and give all-NaN
+    out = pd.DataFrame({k: pd.to_numeric(df[k], errors="coerce").values for k in ("open", "high", "low", "close")
+                        if k in df}, index=pd.to_datetime(df["date"]).values)
+    out["volume"] = pd.to_numeric(df["volume"], errors="coerce").values if "volume" in df else np.nan
     for k in ("open", "high", "low"):
         if k not in out:
             out[k] = out["close"]
