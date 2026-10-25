@@ -874,3 +874,76 @@ def datetime_now_jst() -> str:
     from datetime import datetime  # noqa: PLC0415
 
     return datetime.now(N.JST).isoformat(timespec="minutes")
+
+
+from . import sentiment as S  # noqa: E402
+
+
+@app.get("/api/cot", operation_id="cot_positioning", dependencies=[Depends(check_token)])
+def cot_positioning(
+    markets: str = Query("JPY,EUR,AUD,SPX,TY,GC", description="Comma-separated keys: " + ",".join(S.COT_MARKETS)),
+    start: str = Query("2006-01-01", description="YYYY-MM-DD"),
+):
+    """CFTC Commitments of Traders (legacy, futures only), weekly as of Tuesday, released Friday.
+    Per market: open interest, large-speculator (non-commercial) longs, shorts, net, and net as %
+    of open interest (`pct`), plus commercials' net (`cnet`). Positive = speculators net long the
+    contract (for JPY: long yen, i.e. short USD/JPY)."""
+    keys = [k.strip().upper() for k in markets.split(",") if k.strip().upper() in S.COT_MARKETS][:20]
+    if not keys:
+        raise HTTPException(400, "No known markets. Choose from " + ",".join(S.COT_MARKETS))
+    try:
+        got = S.cot(tuple(keys), start[:10])
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(503, f"CFTC unavailable: {e}") from e
+    return _safe({
+        "series": got,
+        "names": {k: {"en": S.COT_MARKETS[k][1], "ja": S.COT_MARKETS[k][2]} for k in keys},
+        "missing": [k for k in keys if k not in got],
+        "asof": max((v[-1]["d"] for v in got.values() if v), default=None),
+        "source": "CFTC Commitments of Traders, legacy futures-only report (publicreporting.cftc.gov)",
+    })
+
+
+@app.get("/api/jpflows", operation_id="japan_flows", dependencies=[Depends(check_token)])
+def japan_flows(start: str = Query("2005-01-01", description="YYYY-MM-DD")):
+    """Japan equity flows and positioning, weekly.
+    `mof`: non-residents' net purchases of Japanese equities (fe) and long-term bonds (fb), and
+    residents' net purchases of foreign equities (re), 100 million yen (MOF, since 2005).
+    `margin`: margin shorts and longs, Tokyo + Nagoya (shares in thousands, value in million yen);
+    longs / shorts in shares is the 信用倍率 (JPX, since 2002).
+    `investors`: last few weeks of TSE Prime net buying by foreigners, individuals, trust banks
+    and investment trusts, 100 million yen (JPX)."""
+    errors, out = [], {}
+    for k, fn in (("mof", S.mof_week), ("margin", S.jpx_margin), ("investors", S.jpx_investors)):
+        try:
+            out[k] = [r for r in fn() if r["d"] >= start[:10]]
+        except Exception as e:  # noqa: BLE001
+            errors.append(f"{k}: {e}")
+            out[k] = []
+    if not any(out.values()):
+        raise HTTPException(503, "MOF and JPX did not answer: " + "; ".join(errors))
+    return _safe({**out, "errors": errors,
+                  "asof": {k: (v[-1]["d"] if v else None) for k, v in out.items()},
+                  "source": "Ministry of Finance (対外及び対内証券売買契約等の状況, weekly); JPX (信用取引現在高; 投資部門別売買状況)"})
+
+
+@app.get("/api/headlines", operation_id="news_headlines", dependencies=[Depends(check_token)])
+def news_headlines(
+    q: str = Query(..., description="Google News search, e.g. 'stock market' or '日経平均'"),
+    lang: str = Query("en", pattern="^(en|ja)$"),
+    days: int = Query(3, ge=1, le=14),
+    limit: int = Query(40, ge=5, le=100),
+):
+    """Recent Google News headlines for a query (title, source, JST date, link), newest first.
+    For scoring tone yourself; Keel does not score them."""
+    try:
+        items = N._gnews(f"{q} when:{days}d", lang)
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(503, str(e)) from e
+    seen, out = set(), []
+    for it in sorted(items, key=lambda x: x["d"], reverse=True):
+        if it["title"] in seen:
+            continue
+        seen.add(it["title"])
+        out.append(it)
+    return _safe({"q": q, "lang": lang, "asof": datetime_now_jst(), "items": out[:limit]})
