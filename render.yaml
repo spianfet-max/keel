@@ -13,6 +13,10 @@ services:
         value: "3.13.5"
       - key: KEEL_TOKEN
         sync: false   # optional shared secret; leave empty for open access
+      - key: REDDIT_CLIENT_ID
+        sync: false   # optional: a free "script" app at reddit.com/prefs/apps, for /api/reddit
+      - key: REDDIT_CLIENT_SECRET
+        sync: false
 
   - type: web
     name: keel-mcp
@@ -24,3 +28,7 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: "3.13.5"
+      - key: REDDIT_CLIENT_ID
+        sync: false   # optional: a free "script" app at reddit.com/prefs/apps, for /api/reddit
+      - key: REDDIT_CLIENT_SECRET
+        sync: false

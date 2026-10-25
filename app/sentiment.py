@@ -13,6 +13,7 @@
 
 from __future__ import annotations
 
+import html
 import io
 import logging
 import re
@@ -251,3 +252,108 @@ def jpx_investors() -> list[dict]:
             if w:
                 out.append(w)
     return sorted(out, key=lambda x: x["d"])
+
+
+# --------------------------------------------------------------------------- #
+# StockTwits (public API, no key; users tag their own posts Bullish or Bearish)
+# --------------------------------------------------------------------------- #
+
+ST_URL = "https://api.stocktwits.com/api/2/streams/symbol/{}.json"
+ST_SYMBOLS = ("SPY", "QQQ", "IWM", "SPX", "NIKKEI", "EWJ", "DXJ", "USDJPY")
+
+
+def parse_stocktwits(j: dict) -> list[dict]:
+    """StockTwits stream JSON -> [{id, t (UTC ISO), s (1 bullish, -1 bearish, 0 untagged), body, likes}]."""
+    out = []
+    for m in j.get("messages") or []:
+        tag = ((m.get("entities") or {}).get("sentiment") or {}).get("basic")
+        out.append({"id": int(m["id"]), "t": str(m.get("created_at", "")), "s": 1 if tag == "Bullish" else -1 if tag == "Bearish" else 0,
+                    "body": re.sub(r"\s+", " ", html.unescape(str(m.get("body") or ""))).strip()[:280],
+                    "likes": int(((m.get("likes") or {}).get("total")) or 0)})
+    return out
+
+
+def stocktwits_page(sym: str, max_id: int | None = None, client: httpx.Client | None = None) -> list[dict]:
+    c = client or httpx.Client(timeout=30, headers=UA, follow_redirects=True)
+    try:
+        r = c.get(ST_URL.format(sym), params={"max": max_id} if max_id else None)
+        if r.status_code == 404:
+            return []
+        r.raise_for_status()
+        return parse_stocktwits(r.json())
+    finally:
+        if client is None:
+            c.close()
+
+
+@cached(ttl=900)
+def stocktwits(symbols: tuple[str, ...], pages: int) -> dict[str, list[dict]]:
+    """The latest `pages` x 30 messages per symbol, newest first."""
+    out = {}
+    with httpx.Client(timeout=30, headers=UA, follow_redirects=True) as c:
+        for s in symbols:
+            msgs, mx = [], None
+            for _ in range(pages):
+                p = stocktwits_page(s, mx, c)
+                if not p:
+                    break
+                msgs += p
+                mx = p[-1]["id"] - 1
+            out[s] = msgs
+    return out
+
+
+# --------------------------------------------------------------------------- #
+# Reddit (official Data API, application-only OAuth; needs a free "script" app)
+# --------------------------------------------------------------------------- #
+
+REDDIT_SUBS = ("wallstreetbets", "stocks", "investing", "StockMarket")
+REDDIT_UA = "python:keel-mood:0.1 (market sentiment research)"
+
+
+def reddit_configured() -> bool:
+    import os  # noqa: PLC0415
+
+    return bool(os.environ.get("REDDIT_CLIENT_ID") and os.environ.get("REDDIT_CLIENT_SECRET"))
+
+
+@cached(ttl=3000)
+def _reddit_token() -> str:
+    import os  # noqa: PLC0415
+
+    with httpx.Client(timeout=20, headers={"User-Agent": REDDIT_UA}) as c:
+        r = c.post("https://www.reddit.com/api/v1/access_token", data={"grant_type": "client_credentials"},
+                   auth=(os.environ["REDDIT_CLIENT_ID"], os.environ["REDDIT_CLIENT_SECRET"]))
+        r.raise_for_status()
+        return r.json()["access_token"]
+
+
+def parse_reddit(j: dict) -> list[dict]:
+    """Listing JSON -> [{t (UTC ISO), title, score, comments, flair, link}] (stickied posts dropped)."""
+    from datetime import datetime, timezone  # noqa: PLC0415
+
+    out = []
+    for ch in (j.get("data") or {}).get("children") or []:
+        p = ch.get("data") or {}
+        if p.get("stickied"):
+            continue
+        out.append({"t": datetime.fromtimestamp(float(p.get("created_utc", 0)), timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
+                    "title": re.sub(r"\s+", " ", html.unescape(str(p.get("title") or ""))).strip()[:300],
+                    "score": int(p.get("score") or 0), "comments": int(p.get("num_comments") or 0),
+                    "flair": p.get("link_flair_text") or "", "link": "https://www.reddit.com" + str(p.get("permalink") or "")})
+    return out
+
+
+@cached(ttl=900)
+def reddit(subs: tuple[str, ...], sort: str, limit: int) -> dict[str, list[dict]]:
+    tok = _reddit_token()
+    out = {}
+    with httpx.Client(timeout=20, headers={"User-Agent": REDDIT_UA, "Authorization": f"bearer {tok}"}) as c:
+        for s in subs:
+            r = c.get(f"https://oauth.reddit.com/r/{s}/{sort}", params={"limit": limit, "raw_json": 1})
+            if r.status_code in (403, 404):
+                out[s] = []
+                continue
+            r.raise_for_status()
+            out[s] = parse_reddit(r.json())
+    return out
