@@ -279,6 +279,31 @@ def test_history_total_return(client):
     assert t["series"]["TLT"][-1]["v"] > p["series"]["TLT"][-1]["v"]
 
 
+def test_ohlc_from_provider_frame(monkeypatch):
+    """D.ohlc on the frame shape OpenBB returns (plain row index, a 'date' column)."""
+    idx = pd.bdate_range("2026-09-01", periods=30)
+    frame = pd.DataFrame({"date": idx, "open": np.linspace(150, 152, 30), "high": np.linspace(151, 153, 30),
+                          "low": np.linspace(149, 151, 30), "close": np.linspace(150.5, 152.5, 30), "volume": 0.0})
+
+    class Res:
+        def to_dataframe(self):
+            return frame.copy()
+
+    class O:
+        class yfinance:
+            class equity:
+                class price:
+                    @staticmethod
+                    def historical(**kw):
+                        return Res()
+
+    monkeypatch.setattr(D, "obb", lambda: O)
+    D.ohlc.cache_clear()
+    out = D.ohlc("USDJPY=X", 1)
+    assert len(out) == 30 and out["close"].notna().all() and out.index[0] == idx[0]
+    assert out["close"].iloc[-1] == pytest.approx(152.5)
+
+
 def test_history_yields(client):
     j = client.get("/api/history", params={"symbols": "USDJPY=X,UST2Y,JGB10Y", "start": "2025-01-01", "interval": "D"}).json()
     assert j["units"] == {"USDJPY=X": "price", "UST2Y": "pct", "JGB10Y": "pct"}
