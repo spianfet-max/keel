@@ -1,87 +1,14 @@
-FILE tvdivq0000001rq1-att/tvdivq0000015969.xlsx ['信用取引現在高']
-shape (15, 26)
-R 0 0:信用取引現在高 | 25:2026-10-06 00:00:0
-R 1 0:Current outstandin | 25:東京証券取引所株式部
-R 2 25:申込日基準　Base：applica
-R 3 0:月日 | 1:制度信用取引 Standardize | 9:一般信用取引 Negotiable  | 13:合計 Total | 17:社内対当 | 18:貸借取引残高  　 | 22:自己貸株 | 24:自己融資
-R 4 1:自己 Proprietary Acc | 5:委託 Customer Accoun | 9:委託 Customer Accoun | 13:売残高 | 15:買残高 | 17:Amount 
-Matched
-Wi | 18:Outstanding Loans  | 22:Shares Lent
-by Mem | 24:Funds Lent
-by Memb
-R 5 0:Month
-or
-Day | 1:売残高  Shares Sold S | 3:買残高  Shares Bought | 5:売残高  Shares Sold S | 7:買残高  Shares Bought | 9:売残高  Shares Sold S | 11:買残高  Shares Bought | 13:Shares Sold Short | 15:Shares Bought on M | 18:貸株　　Shares | 20:融資　Funds
-R 6 1:株数 | 2:金額 | 3:株数 | 4:金額 | 5:株数 | 6:金額 | 7:株数 | 8:金額 | 9:株数 | 10:金額 | 11:株数 | 12:金額 | 13:株数(A) | 14:金額 | 15:株数(B) | 16:金額 | 18:株数 | 19:金額 | 20:株数 | 21:金額 | 22:株数 | 23:金額 | 24:株数 | 25:金額
-R 7 1:Shares | 2:Value | 3:Shares | 4:Value | 5:Shares | 6:Value | 7:Shares | 8:Value | 9:Shares | 10:Value | 11:Shares | 12:Value | 13:Shares | 14:Value | 15:Shares | 16:Value | 18:Shares | 19:Value | 20:Shares | 21:Value | 22:Shares | 23:Value | 24:Shares | 25:Value
-R 8 1:千株 thous.shs. | 2:百万円 \mil. | 3:千株 thous.shs. | 4:百万円 \mil. | 5:千株 thous.shs. | 6:百万円 \mil. | 7:千株 thous.shs. | 8:百万円 \mil. | 9:千株 thous.shs. | 10:百万円 \mil. | 11:千株 thous.shs. | 12:百万円 \mil. | 13:千株 thous.shs. | 14:百万円 \mil. | 15:千株 thous.shs. | 16:百万円 \mil. | 17:千株 thous.shs. | 18:千株 thous.shs. | 19:百万円 \mil. | 20:千株 thous.shs. | 21:百万円 \mil. | 22:千株 thous.shs. | 23:百万円 \mil. | 24:千株 thous.shs. | 25:百万円 \mil.
-R 9 0:[東京・名古屋 Tokyo & Na
-R 10 0:2026-09-25 00:00:0 | 1:79560 | 2:108176 | 3:1788 | 4:2136 | 5:228944 | 6:462841 | 7:1644350 | 8:3556056 | 9:236636 | 10:476220 | 11:1857331 | 12:2905644 | 13:545141 | 14:1047238 | 15:3503470 | 16:6463837 | 17:170683 | 18:162882 | 19:217547 | 20:256514 | 21:466788 | 22:211575 | 23:393582 | 24:3076271 | 25:5345429
-R 11 0:2026-10-02 00:00:0 | 1:79917 | 2:106528 | 3:1095 | 4:1752 | 5:197080 | 6:451229 | 7:1782940 | 8:3555327 | 9:77387 | 10:192967 | 11:1981537 | 12:2966471 | 13:354386 | 14:750725 | 15:3765572 | 16:6523552 | 17:155866 | 18:136197 | 19:174928 | 20:255303 | 21:399150 | 22:62322 | 23:143589 | 24:3354403 | 25:5506369
-R 12 
-R 13 
-R 14 0:注: | 1:(1)信用取引現在高は、東京・名古屋 | 9:Notes: | 10:(1)Current outstan
-FILE tvdivq0000001rq1-att/20260925_mtgk.xls ['信用取引現在高（一般信用取引・制度信用取引別）']
-shape (1240, 13)
-R 0 0:信用取引現在高（一般信用取引・制度信 | 12:2026-09-25 00:00:0
-R 1 0:Outstanding Margin | 12:東京証券取引所 株式部
-R 2 12:申込日基準　Base：applica
-R 3 0:月日 | 1:合計   　　　Total | 5:売残高  　　　Shares Sol | 9:買残高  　　　Shares Bou
-R 4 1:売残高 | 3:買残高 | 5:一般信用取引 | 7:制度信用取引 | 9:一般信用取引 | 11:制度信用取引
-R 5 0:Month
-or
-Day | 1:Shares Sold Short | 3:Shares Bought on M | 5:Negotiable Margin  | 7:Standardized Margi | 9:Negotiable Margin  | 11:Standardized Margi
-R 6 1:株数 | 2:金額 | 3:株数 | 4:金額 | 5:株数 | 6:金額 | 7:株数 | 8:金額 | 9:株数 | 10:金額 | 11:株数 | 12:金額
-R 7 1:Shares | 2:Value | 3:Shares | 4:Value | 5:Shares | 6:Value | 7:Shares | 8:Value | 9:Shares | 10:Value | 11:Shares | 12:Value
-R 8 1:千株 thous.shs. | 2:百万円 \mil. | 3:千株 thous.shs. | 4:百万円 \mil. | 5:千株 thous.shs. | 6:百万円 \mil. | 7:千株 thous.shs. | 8:百万円 \mil. | 9:千株 thous.shs. | 10:百万円 \mil. | 11:千株 thous.shs. | 12:百万円 \mil.
-R 9 0:[東京・名古屋 Tokyo & Na
-R 10 0:2002-08-02 00:00:0 | 1:1254269 | 2:1004839 | 3:2615658 | 4:1570284 | 5:115172 | 6:91766 | 7:1139097 | 8:913073 | 9:362 | 10:133 | 11:2615296 | 12:1570151
-R 11 0:2002-08-09 00:00:0 | 1:1302241 | 2:1056797 | 3:2560404 | 4:1514270 | 5:118738 | 6:93890 | 7:1183503 | 8:962907 | 9:342 | 10:126 | 11:2560062 | 12:1514144
-R 12 0:2002-08-16 00:00:0 | 1:1243304 | 2:999681 | 3:2576943 | 4:1523350 | 5:123194 | 6:97455 | 7:1120110 | 8:902226 | 9:364 | 10:125 | 11:2576579 | 12:1523225
-R 13 0:2002-08-23 00:00:0 | 1:1224501 | 2:1005860 | 3:2557772 | 4:1507357 | 5:129021 | 6:100564 | 7:1095480 | 8:905296 | 9:339 | 10:106 | 11:2557433 | 12:1507251
-R 1236 0:2026-09-18 00:00:0 | 1:481794 | 2:884462 | 3:3497919 | 4:6455988 | 5:191432 | 6:376741 | 7:290362 | 8:507721 | 9:1860397 | 10:2884981 | 11:1637522 | 12:3571007
-R 1237 
-R 1238 
-R 1239 0:注:
-
-
-
-Note: | 1:2013年7月12日申し込み分までの
-FILE tvdivq0000001rk9-att/20261016_mtcurrent.xlsx ['レイアウト']
-shape (36, 12)
-R 0 1:2026-10-16 00:00:0
-R 1 1:2026-10-16 00:00:0 | 2:2026-10-16 00:00:0
-R 2 1:2026-10-20 00:00:0 | 2:2026-10-20 00:00:0
-R 3 11:東京証券取引所株式部 Tokyo S
-R 4 11:(単位：千株、百万円）(Unit: 
-R 5 4:二市場 Tokyo&Nagoya | 8:東京 Tokyo
-R 6 4:売残高・
-貸株残高
-Sales | 5:前週比
-Weekly change | 6:買残高・
-融資残高
-Purchase | 7:前週比
-Weekly change | 8:売残高・
-貸株残高
-Sales | 9:前週比
-Weekly change | 10:買残高・
-融資残高
-Purchase | 11:前週比
-Weekly change
-R 7 1:制度信用取引残高
-Outstandi | 2:自己
-Proprietary Acc | 3:株数Shs. | 4:77013 | 5:796 | 6:1506 | 7:-84 | 8:77013 | 9:796 | 10:1506 | 11:-84
-R 8 3:金額Val. | 4:105013 | 5:3200 | 6:2284 | 7:120 | 8:105012 | 9:3199 | 10:2284 | 11:120
-R 9 2:委託
-Customer Accoun | 3:株数Shs. | 4:202556 | 5:-4939 | 6:1759670 | 7:-60262 | 8:202553 | 9:-4935 | 10:1759009 | 11:-60268
-R 10 3:金額Val. | 4:355508 | 5:-91630 | 6:3654541 | 7:-17085 | 8:355505 | 9:-91627 | 10:3653520 | 11:-17102
-R 11 1:一般信用取引残高
-Outstandi | 2:委託
-Customer Accoun | 3:株数Shs. | 4:86693 | 5:3499 | 6:1973268 | 7:-35831 | 8:86692 | 9:3500 | 10:1971383 | 11:-35721
-R 12 3:金額Val. | 4:206532 | 5:-6570 | 6:3007181 | 7:-27087 | 8:206532 | 9:-6570 | 10:3004973 | 11:-27118
-R 13 1:信用取引残高合計
-Total Out | 3:株数Shs. | 4:366263 | 5:-642 | 6:3734445 | 7:-96177 | 8:366259 | 9:-637 | 10:3731899 | 11:-96072
-R 32 1:           3."Non-
-R 33 1:           4.Value
-R 34 1:           5.Value
-R 35 1:           6.▲ ind
+200 browser https://api.stocktwits.com/api/2/streams/symbol/SPY.json 143131 msgs=30 bull=3 bear=4 first=2026-10-25T07:58:26Z last=2026-10-25T05:24:22Z cursor={'more': True, 'since': 667304840, 'max': 667304017} | $QQQ $SPCX $SPY $TSLA
+200 bot https://api.stocktwits.com/api/2/streams/symbol/SPY.json 143131 msgs=30 bull=3 bear=4 first=2026-10-25T07:58:26Z last=2026-10-25T05:24:22Z cursor={'more': True, 'since': 667304840, 'max': 667304017} | $QQQ $SPCX $SPY $TSLA
+200 browser https://api.stocktwits.com/api/2/streams/symbol/EWJ.json 104585 msgs=27 bull=16 bear=0 first=2026-10-23T20:34:36Z last=2026-09-20T15:15:50Z cursor={'more': True, 'since': 667267362, 'max': 664662051} | $EWJ $NIKKEI Joe Weisenthal on LLM voting advice in Japan:
+200 bot https://api.stocktwits.com/api/2/streams/symbol/EWJ.json 104585 msgs=27 bull=16 bear=0 first=2026-10-23T20:34:36Z last=2026-09-20T15:15:50Z cursor={'more': True, 'since': 667267362, 'max': 664662051} | $EWJ $NIKKEI Joe Weisenthal on LLM voting advice in Japan:
+200 browser https://api.stocktwits.com/api/2/trending/symbols.json 79191 trending LLY,CAT,BNTX,JNJ,FICO,GLXY,AXSM,COIN,KTOS,STX
+200 bot https://api.stocktwits.com/api/2/trending/symbols.json 79191 trending LLY,CAT,BNTX,JNJ,FICO,GLXY,AXSM,COIN,KTOS,STX
+403 browser https://www.reddit.com/r/wallstreetbets/hot.json?limit=25 190240 <body class=theme-beta><div><style>.theme-light,:root{--rem360:22.5rem;--rem320:20rem;--rem192:12rem;--rem144:9rem;--rem128:8rem;--rem96:6rem;--rem90:
+403 bot https://www.reddit.com/r/wallstreetbets/hot.json?limit=25 190240 <body class=theme-beta><div><style>.theme-light,:root{--rem360:22.5rem;--rem320:20rem;--rem192:12rem;--rem144:9rem;--rem128:8rem;--rem96:6rem;--rem90:
+403 browser https://old.reddit.com/r/stocks/new.json?limit=25 1522 <!doctype html>      <html>   <head>     <title>Blocked</title>     <style>       body {           font: small verdana, arial, helvetica, sans-serif; 
+403 bot https://old.reddit.com/r/stocks/new.json?limit=25 1522 <!doctype html>      <html>   <head>     <title>Blocked</title>     <style>       body {           font: small verdana, arial, helvetica, sans-serif; 
+200 browser https://www.reddit.com/r/wallstreetbets/new/.rss 51646 <?xml version="1.0" encoding="UTF-8"?><feed xmlns="http://www.w3.org/2005/Atom" xmlns:media="http://search.yahoo.com/mrss/"><category term="wallstreet
+429 bot https://www.reddit.com/r/wallstreetbets/new/.rss 0 
+403 browser https://api.reddit.com/r/investing/new?limit=25 190240 <body class=theme-beta><div><style>.theme-light,:root{--rem360:22.5rem;--rem320:20rem;--rem192:12rem;--rem144:9rem;--rem128:8rem;--rem96:6rem;--rem90:
+403 bot https://api.reddit.com/r/investing/new?limit=25 190240 <body class=theme-beta><div><style>.theme-light,:root{--rem360:22.5rem;--rem320:20rem;--rem192:12rem;--rem144:9rem;--rem128:8rem;--rem96:6rem;--rem90:
