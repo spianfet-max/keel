@@ -1,39 +1,47 @@
-"""Probe which Mood data sources answer from a GitHub runner. Writes data/mood_probe.txt."""
-import requests, os, traceback
+"""Probe 2: JPX file links and layouts. Writes data/mood_probe.txt."""
+import requests, os, re, io, traceback
 os.makedirs("data", exist_ok=True)
 out = []
 def log(*a):
     s = " ".join(str(x) for x in a); print(s, flush=True); out.append(s)
 H = {"User-Agent": "Mozilla/5.0 (keel research)"}
-def get(name, url, **kw):
-    try:
-        r = requests.get(url, headers=H, timeout=60, **kw)
-        log(name, r.status_code, r.headers.get("content-type", "")[:40], len(r.content), repr(r.text[:300]).replace("\\n", " ")[:300])
-        return r
-    except Exception as e:
-        log(name, "ERR", repr(e)[:200])
-# CFTC legacy futures-only (Socrata)
-get("cftc_legacy", "https://publicreporting.cftc.gov/resource/6dca-aqww.json", params={"$where": "cftc_contract_market_code='097741'", "$order": "report_date_as_yyyy_mm_dd DESC", "$limit": 2})
-get("cftc_tff", "https://publicreporting.cftc.gov/resource/gpe5-46if.json", params={"$where": "cftc_contract_market_code='13874A'", "$order": "report_date_as_yyyy_mm_dd DESC", "$limit": 1})
-# JPX
-get("jpx_investor_type", "https://www.jpx.co.jp/markets/statistics-equities/investor-type/index.html")
-get("jpx_margin", "https://www.jpx.co.jp/markets/statistics-equities/margin/index.html")
-get("jpx_investor_type_en", "https://www.jpx.co.jp/english/markets/statistics-equities/investor-type/index.html")
-# AAII
-get("aaii_xls", "https://www.aaii.com/files/surveys/sentiment.xls")
-# Google News RSS
-get("gnews", "https://news.google.com/rss/search", params={"q": "USD/JPY when:7d", "hl": "en-US", "gl": "US", "ceid": "US:en"})
-# Yahoo symbols
+B = "https://www.jpx.co.jp"
+def links(url, pat=r'href="([^"]+\.(?:xls|xlsx|csv|pdf|html))"'):
+    r = requests.get(url, headers=H, timeout=60); r.encoding = "utf-8"
+    ls = re.findall(pat, r.text)
+    return r.text, ls
 try:
-    import yfinance as yf
-    for s in "^VIX9D ^VIX ^VIX3M ^VIX6M ^SKEW ^JNIV ^VXJ SPLV SPHB XLY XLP AUDCHF=X ^NKVI.OS".split():
+    for url in [B + "/markets/statistics-equities/investor-type/index.html", B + "/markets/statistics-equities/margin/index.html"]:
+        t, ls = links(url)
+        log("PAGE", url, len(ls)); [log("  ", l) for l in ls[:40]]
+        tl = re.findall(r'<title>(.*?)</title>', t); log("  title", tl[:1])
+    # archives
+    for url in [B + "/markets/statistics-equities/investor-type/00-00-archives-00.html", B + "/markets/statistics-equities/margin/00-archives-01.html", B + "/markets/statistics-equities/margin/04.html", B + "/markets/statistics-equities/margin/05.html"]:
         try:
-            d = yf.download(s, start="2005-01-01", progress=False, auto_adjust=True, threads=False)
-            log("yahoo", s, len(d), str(d.index[0].date()) if len(d) else "-", str(d.index[-1].date()) if len(d) else "-")
+            t, ls = links(url); log("ARCH", url, len(ls)); [log("  ", l) for l in ls[:15]]
         except Exception as e:
-            log("yahoo", s, "ERR", repr(e)[:120])
+            log("ARCH", url, "ERR", repr(e)[:100])
 except Exception:
-    log(traceback.format_exc()[-300:])
-# FRED graph CSV (no key) for Michigan sentiment
-get("fred_umcsent", "https://fred.stlouisfed.org/graph/fredgraph.csv", params={"id": "UMCSENT"})
+    log(traceback.format_exc()[-500:])
+# open one investor-type weekly file and one margin file
+try:
+    import pandas as pd
+    t, ls = links(B + "/markets/statistics-equities/investor-type/index.html")
+    x = [l for l in ls if re.search(r'stock_val_1_\d+\.xls', l)] or [l for l in ls if l.endswith(('.xls', '.xlsx'))]
+    if x:
+        u = x[0] if x[0].startswith("http") else B + x[0]; log("OPEN", u)
+        df = pd.read_excel(io.BytesIO(requests.get(u, headers=H, timeout=60).content), header=None)
+        for i in range(min(60, len(df))):
+            row = [str(v)[:14] for v in df.iloc[i].tolist()[:12] if str(v) != "nan"]
+            if row: log("  r%02d" % i, " | ".join(row))
+    t, ls = links(B + "/markets/statistics-equities/margin/index.html")
+    x = [l for l in ls if l.endswith(('.xls', '.xlsx'))]
+    if x:
+        u = x[0] if x[0].startswith("http") else B + x[0]; log("OPEN", u)
+        df = pd.read_excel(io.BytesIO(requests.get(u, headers=H, timeout=60).content), header=None)
+        for i in range(min(45, len(df))):
+            row = [str(v)[:14] for v in df.iloc[i].tolist()[:12] if str(v) != "nan"]
+            if row: log("  m%02d" % i, " | ".join(row))
+except Exception:
+    log(traceback.format_exc()[-800:])
 open("data/mood_probe.txt", "w").write("\n".join(out))
