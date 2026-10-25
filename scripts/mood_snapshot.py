@@ -79,14 +79,17 @@ try:
     import time, httpx
     from datetime import datetime, timedelta, timezone
     from app import sentiment as S
-    c = httpx.Client(timeout=30, headers=S.UA, follow_redirects=True)
+    c = httpx.Client(timeout=15, headers=S.UA, follow_redirects=True)
+    deadline, calls = time.time() + 14 * 60, [0]
     def pg(sym, mx=None):
-        for k in range(3):
+        for k in range(2):
+            if time.time() > deadline:
+                return []
             try:
-                time.sleep(0.8)
+                time.sleep(0.8); calls[0] += 1
                 return S.stocktwits_page(sym, mx, c)
             except Exception as e:
-                log("st retry", sym, mx, repr(e)[:80]); time.sleep(20)
+                log("st retry", sym, mx, repr(e)[:120]); time.sleep(10)
         return []
     ts = lambda m: datetime.fromisoformat(m["t"].replace("Z", "+00:00")).timestamp()
     top = pg("SPY"); id0, t0 = top[0]["id"], ts(top[0])
@@ -94,7 +97,7 @@ try:
     log("st rate ids/day", round(rate * 86400))
     days, d = [], datetime.now(timezone.utc).date() - timedelta(days=1)
     rows, empty = [], 0
-    while empty < 3:
+    while empty < 3 and time.time() < deadline:
         if d.weekday() < 5:
             tgt = datetime(d.year, d.month, d.day, 20, tzinfo=timezone.utc).timestamp()
             guess = int(id0 - (t0 - tgt) * rate)
@@ -116,6 +119,7 @@ try:
             break
     rows.reverse()
     out["st_hist"] = rows
+    log("st calls", calls[0], "stopped by deadline" if time.time() > deadline else "")
     log("st days", len(rows), rows[0] if rows else "-", rows[-1] if rows else "-")
     now = S.stocktwits(S.ST_SYMBOLS, 2)
     out["st_now"] = {k: v[:60] for k, v in now.items()}
