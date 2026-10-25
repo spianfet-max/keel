@@ -27,7 +27,7 @@ import httpx
 import numpy as np
 import pandas as pd
 
-from .analytics import fix_splits, to_percent
+from .analytics import fix_splits, fx_close_fix, to_percent
 
 log = logging.getLogger("keel.data")
 
@@ -135,7 +135,14 @@ def closes(symbol: str, years: float = 3, dividends: bool = False) -> pd.Series:
     df = _df(res)
     if df.empty or "close" not in df:
         raise ValueError(f"no prices for {symbol}")
-    s = pd.Series(pd.to_numeric(df["close"], errors="coerce").values, index=pd.to_datetime(df["date"]))
+    if symbol.endswith("=X") and {"open", "high", "low"} <= set(df.columns):
+        # Yahoo's daily FX close is stale (see analytics.fx_close_fix): rebuild it from the next open
+        f = pd.DataFrame({k: pd.to_numeric(df[k], errors="coerce").values for k in ("open", "high", "low", "close")},
+                         index=pd.to_datetime(df["date"]).values)
+        f = fx_close_fix(f[~f.index.duplicated(keep="last")].sort_index().dropna())
+        s = f["close"].copy()
+    else:
+        s = pd.Series(pd.to_numeric(df["close"], errors="coerce").values, index=pd.to_datetime(df["date"]))
     s = s[~s.index.duplicated(keep="last")].sort_index().dropna()
     s.name = symbol
     if "=" not in symbol and not symbol.startswith("^"):
@@ -161,6 +168,8 @@ def ohlc(symbol: str, years: float = 3) -> pd.DataFrame:
     # bad prints: a high below the close or a low above it
     out["high"] = out[["high", "close", "open"]].max(axis=1)
     out["low"] = out[["low", "close", "open"]].min(axis=1)
+    if symbol.endswith("=X"):
+        out = fx_close_fix(out)
     return out[["open", "high", "low", "close", "volume"]]
 
 
