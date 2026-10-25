@@ -15,6 +15,7 @@ YAHOO = {  # key: yahoo symbol
     "HSI": "^HSI", "KOSPI": "^KS11", "EEM": "EEM", "VIX": "^VIX", "GOLD": "GC=F", "OIL": "CL=F", "COPPER": "HG=F",
     "BTC": "BTC-USD", "DXY": "DX-Y.NYB", "UST10": "^TNX", "TLT": "TLT", "HYG": "HYG",
     "USDJPY": "USDJPY=X", "EURUSD": "EURUSD=X", "GBPUSD": "GBPUSD=X", "AUDJPY": "AUDJPY=X", "USDCNY": "CNY=X", "USDCHF": "CHF=X", "USDTRY": "TRY=X",
+    "USDMXN": "MXN=X", "USDBRL": "BRL=X", "USDINR": "INR=X", "USDKRW": "KRW=X", "USDTHB": "THB=X", "USDRUB": "RUB=X", "USDARS": "ARS=X",
 }
 FRED = {"USDJPY": "DEXJPUS", "EURUSD": "DEXUSEU", "GBPUSD": "DEXUSUK", "USDCHF": "DEXSZUS", "USDCNY": "DEXCHUS", "OIL": "DCOILWTICO", "UST10": "DGS10"}
 out = {"s": {}, "src": {}}
@@ -49,10 +50,11 @@ try:
 except Exception:
     log(traceback.format_exc()[-500:])
 
+fred_ok = True
 for k, sid in FRED.items():
-    for attempt in range(3):
+    for attempt in range(2 if fred_ok else 0):
         try:
-            r = requests.get("https://fred.stlouisfed.org/graph/fredgraph.csv", params={"id": sid, "cosd": START}, timeout=90,
+            r = requests.get("https://fred.stlouisfed.org/graph/fredgraph.csv", params={"id": sid, "cosd": START}, timeout=25,
                              headers={"User-Agent": "Mozilla/5.0 (keel research)"})
             r.raise_for_status()
             f = pd.read_csv(io.StringIO(r.text)); f.columns = ["d", "v"]
@@ -60,7 +62,9 @@ for k, sid in FRED.items():
             out["s"].setdefault(k, {})["f"] = [[d, float(v)] for d, v in zip(f.d, f.v)]
             log(k, "FRED", sid, len(f), f.d.iloc[0], "->", f.d.iloc[-1]); break
         except Exception as e:
-            log(k, "FRED", sid, "attempt", attempt, repr(e)[:120]); time.sleep(10)
+            log(k, "FRED", sid, "attempt", attempt, repr(e)[:120]); time.sleep(3)
+    else:
+        if fred_ok and "f" not in out["s"].get(k, {}): fred_ok = False; log("FRED unreachable, skipping the rest")
 
 for attempt in range(6):
     try:
