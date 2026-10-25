@@ -126,10 +126,12 @@ def _pool(fn, items, workers: int = 6) -> dict:
 
 
 @cached(ttl=900)
-def closes(symbol: str, years: float = 3) -> pd.Series:
-    """Daily closes for any Yahoo symbol (stocks 7974.T, FX USDJPY=X, indices ^N225)."""
+def closes(symbol: str, years: float = 3, dividends: bool = False) -> pd.Series:
+    """Daily closes for any Yahoo symbol (stocks 7974.T, FX USDJPY=X, indices ^N225).
+    `dividends=True` also adjusts for distributions: a total-return series for funds and stocks."""
     start = (date.today() - timedelta(days=int(365.25 * years) + 7)).isoformat()
-    res = obb().yfinance.equity.price.historical(symbol=symbol, start_date=start)
+    kw = {"adjustment": "splits_and_dividends"} if dividends else {}
+    res = obb().yfinance.equity.price.historical(symbol=symbol, start_date=start, **kw)
     df = _df(res)
     if df.empty or "close" not in df:
         raise ValueError(f"no prices for {symbol}")
@@ -141,8 +143,8 @@ def closes(symbol: str, years: float = 3) -> pd.Series:
     return s
 
 
-def many_closes(symbols: list[str], years: float = 3) -> dict[str, pd.Series]:
-    got = _pool(lambda s: closes(s, years), symbols, workers=3)
+def many_closes(symbols: list[str], years: float = 3, dividends: bool = False) -> dict[str, pd.Series]:
+    got = _pool(lambda s: closes(s, years, dividends), symbols, workers=3)
     return {k: v for k, v in got.items() if v is not None and len(v) > 0}
 
 
