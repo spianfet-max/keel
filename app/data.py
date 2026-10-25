@@ -141,6 +141,35 @@ def closes(symbol: str, years: float = 3) -> pd.Series:
     return s
 
 
+@cached(ttl=900)
+def ohlc(symbol: str, years: float = 3) -> pd.DataFrame:
+    """Daily open/high/low/close/volume for any Yahoo symbol (split-adjusted, not dividend-adjusted)."""
+    start = (date.today() - timedelta(days=int(365.25 * years) + 7)).isoformat()
+    df = _df(obb().yfinance.equity.price.historical(symbol=symbol, start_date=start))
+    if df.empty or "close" not in df:
+        raise ValueError(f"no prices for {symbol}")
+    out = pd.DataFrame({k: pd.to_numeric(df[k], errors="coerce") for k in ("open", "high", "low", "close")
+                        if k in df}, index=pd.to_datetime(df["date"]))
+    out["volume"] = pd.to_numeric(df["volume"], errors="coerce") if "volume" in df else np.nan
+    for k in ("open", "high", "low"):
+        if k not in out:
+            out[k] = out["close"]
+    out = out[~out.index.duplicated(keep="last")].sort_index().dropna(subset=["close"])
+    # bad prints: a high below the close or a low above it
+    out["high"] = out[["high", "close", "open"]].max(axis=1)
+    out["low"] = out[["low", "close", "open"]].min(axis=1)
+    return out[["open", "high", "low", "close", "volume"]]
+
+
+def resample_ohlc(df: pd.DataFrame, interval: str) -> pd.DataFrame:
+    """Daily bars -> week (Friday) or month-end bars."""
+    if interval == "D":
+        return df
+    rule = "W-FRI" if interval == "W" else "ME"
+    agg = df.resample(rule).agg({"open": "first", "high": "max", "low": "min", "close": "last", "volume": "sum"})
+    return agg.dropna(subset=["close"])
+
+
 def many_closes(symbols: list[str], years: float = 3) -> dict[str, pd.Series]:
     got = _pool(lambda s: closes(s, years), symbols, workers=3)
     return {k: v for k, v in got.items() if v is not None and len(v) > 0}
