@@ -2,7 +2,7 @@ name: mood-snapshot
 on:
   push:
     branches: [rineichen-data]
-    paths: [scripts/mood_snapshot.py, .github/workflows/mood-snapshot.yml]
+    paths: [scripts/mood_snapshot.py]
   workflow_dispatch:
 permissions:
   contents: write
@@ -13,7 +13,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/checkout@v4
-        with: {ref: mood-routes, path: keel-src}
+        with: {ref: main, path: keel-src}
       - uses: actions/setup-python@v5
         with: {python-version: "3.12"}
       - run: pip install requests yfinance pandas numpy httpx openpyxl xlrd
