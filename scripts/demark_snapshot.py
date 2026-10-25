@@ -10,7 +10,7 @@ LOG = []
 def log(*a):
     line = " ".join(str(x) for x in a); print(line, flush=True); LOG.append(line)
 
-SYMS = ("USDJPY=X EURJPY=X GBPJPY=X AUDJPY=X CHFJPY=X EURUSD=X GBPUSD=X AUDUSD=X CNH=X "
+SYMS = ("USDJPY=X EURJPY=X GBPJPY=X AUDJPY=X CHFJPY=X EURUSD=X GBPUSD=X AUDUSD=X CNY=X "
         "^N225 1306.T ^GSPC ^NDX ^STOXX50E ^GDAXI ^HSI ^KS11 "
         "GC=F SI=F CL=F HG=F BTC-USD "
         "7974.T 6758.T 9697.T 7832.T 9766.T 6460.T 9684.T 3635.T").split()
