@@ -1,0 +1,23 @@
+name: mood-probe
+on:
+  push:
+    branches: [rineichen-data]
+    paths: [scripts/mood_probe.py, .github/workflows/mood-probe.yml]
+permissions:
+  contents: write
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - run: pip install requests yfinance
+      - run: python scripts/mood_probe.py || true
+      - run: |
+          git config user.name "mood-bot"; git config user.email "actions@github.com"
+          git pull --rebase origin rineichen-data || true
+          git add data/ || true
+          git commit -m "Mood probe results" || exit 0
+          git push
