@@ -13,6 +13,7 @@
 
 from __future__ import annotations
 
+import html
 import io
 import logging
 import re
@@ -267,7 +268,7 @@ def parse_stocktwits(j: dict) -> list[dict]:
     for m in j.get("messages") or []:
         tag = ((m.get("entities") or {}).get("sentiment") or {}).get("basic")
         out.append({"id": int(m["id"]), "t": str(m.get("created_at", "")), "s": 1 if tag == "Bullish" else -1 if tag == "Bearish" else 0,
-                    "body": re.sub(r"\s+", " ", str(m.get("body") or "")).strip()[:280],
+                    "body": re.sub(r"\s+", " ", html.unescape(str(m.get("body") or ""))).strip()[:280],
                     "likes": int(((m.get("likes") or {}).get("total")) or 0)})
     return out
 
@@ -337,7 +338,7 @@ def parse_reddit(j: dict) -> list[dict]:
         if p.get("stickied"):
             continue
         out.append({"t": datetime.fromtimestamp(float(p.get("created_utc", 0)), timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
-                    "title": re.sub(r"\s+", " ", str(p.get("title") or "")).strip()[:300],
+                    "title": re.sub(r"\s+", " ", html.unescape(str(p.get("title") or ""))).strip()[:300],
                     "score": int(p.get("score") or 0), "comments": int(p.get("num_comments") or 0),
                     "flair": p.get("link_flair_text") or "", "link": "https://www.reddit.com" + str(p.get("permalink") or "")})
     return out
