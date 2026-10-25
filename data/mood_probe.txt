@@ -1,21 +1,217 @@
-cftc_legacy 200 application/json;charset=utf-8 9369 '[{"id":"261020097741F","market_and_exchange_names":"JAPANESE YEN - CHICAGO MERCANTILE EXCHANGE","report_date_as_yyyy_mm_dd":"2026-10-20T00:00:00.000","yyyy_report_week_ww":"2026 Report Week 42","contract_market_name":"JAPANESE YEN","cftc_contract_market_code":"097741","cftc_market_code":"CME ","cft
-cftc_tff 200 application/json;charset=utf-8 3085 '[{"id":"26102013874AF","market_and_exchange_names":"E-MINI S&P 500 - CHICAGO MERCANTILE EXCHANGE","report_date_as_yyyy_mm_dd":"2026-10-20T00:00:00.000","yyyy_report_week_ww":"2026 Report Week 42","contract_market_name":"E-MINI S&P 500","cftc_contract_market_code":"13874A","cftc_market_code":"CME ",
-jpx_investor_type 200 text/html 37865 '<!DOCTYPE html>\r <html lang="ja">\r <head prefix="og: http://ogp.me/ns# fb: http://ogp.me/ns/fb# article: http://ogp.me/ns/article#">\r \r <meta charset="UTF-8">\r <meta name="viewport" content="width=device-width,initial-scale=1.0">\r <meta name="copyright" content="(C) Japan Exchange Group, Inc.
-jpx_margin 200 text/html 29356 '<!DOCTYPE html>\r <html lang="ja">\r <head prefix="og: http://ogp.me/ns# fb: http://ogp.me/ns/fb# article: http://ogp.me/ns/article#">\r \r <meta charset="UTF-8">\r <meta name="viewport" content="width=device-width,initial-scale=1.0">\r <meta name="copyright" content="(C) Japan Exchange Group, Inc.
-jpx_investor_type_en 200 text/html 34039 '<!DOCTYPE html>\r <html lang="en">\r <head prefix="og: http://ogp.me/ns# fb: http://ogp.me/ns/fb# article: http://ogp.me/ns/article#">\r \r <meta charset="UTF-8">\r <meta name="viewport" content="width=device-width,initial-scale=1.0">\r <meta name="copyright" content="(C) Japan Exchange Group, Inc.
-aaii_xls 403 text/html 965 '<html style="height:100%"><head><META NAME="ROBOTS" CONTENT="NOINDEX, NOFOLLOW"><meta name="format-detection" content="telephone=no"><meta name="viewport" content="initial-scale=1.0"><meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1"><script type="text/javascript" src="/_Incapsula_Resour
-gnews 200 application/xml; charset=utf-8 139442 '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><rss version="2.0" xmlns:media="http://search.yahoo.com/mrss/"><channel><generator>NFE/5.0</generator><title>"USD/JPY when:7d" - Google News</title><link>https://news.google.com/search?q=USD/JPY+when:7d&amp;hl=en-US&amp;gl=US&amp;ceid=US:en</li
-yahoo ^VIX9D 3975 2011-01-04 2026-10-23
-yahoo ^VIX 5489 2005-01-03 2026-10-23
-yahoo ^VIX3M 5101 2006-07-17 2026-10-23
-yahoo ^VIX6M 4733 2008-01-02 2026-10-23
-yahoo ^SKEW 5424 2005-01-03 2026-10-23
-yahoo ^JNIV 0 - -
-yahoo ^VXJ 0 - -
-yahoo SPLV 3891 2011-05-05 2026-10-23
-yahoo SPHB 3891 2011-05-05 2026-10-23
-yahoo XLY 5487 2005-01-03 2026-10-23
-yahoo XLP 5487 2005-01-03 2026-10-23
-yahoo AUDCHF=X 5655 2005-01-03 2026-10-25
-yahoo ^NKVI.OS 2129 2018-01-22 2026-10-23
-fred_umcsent ERR ReadTimeout(ReadTimeoutError("HTTPSConnectionPool(host='fred.stlouisfed.org', port=443): Read timed out. (read timeout=60)"))
+PAGE https://www.jpx.co.jp/markets/statistics-equities/investor-type/index.html 89
+   /corporate/index.html
+   /index.html
+   /news/index.html
+   /markets/index.html
+   /listing/index.html
+   /equities/index.html
+   /derivatives/index.html
+   /rules-participants/index.html
+   /systems/index.html
+   /regulation/index.html
+   /individuals/index.html
+   /listed-companies/index.html
+   /pre-listed-companies/index.html
+   /participants/index.html
+   /institutional/index.html
+   /media/index.html
+   /markets/index.html
+   /markets/statistics-equities/index.html
+   /markets/statistics-equities/daily/index.html
+   /markets/statistics-equities/monthly/index.html
+   /markets/statistics-equities/price/index.html
+   /markets/statistics-equities/margin/index.html
+   /markets/statistics-equities/short-selling/index.html
+   /markets/statistics-equities/investor-type/index.html
+   /markets/statistics-equities/program/index.html
+   /markets/statistics-equities/misc/index.html
+   /markets/statistics-equities/examination/index.html
+   /contact/index.html
+   /corporate/learning/education/index.html
+   /corporate/sustainability/index.html
+   /english/markets/statistics-equities/investor-type/index.html
+   /corporate/index.html
+   /index.html
+   /markets/index.html
+   /markets/statistics-equities/index.html
+   /markets/statistics-equities/investor-type/index.html
+   /markets/statistics-equities/investor-type/index.html
+   /markets/statistics-equities/investor-type/index.html
+   /markets/statistics-equities/investor-type/index.html
+   /markets/statistics-equities/investor-type/02.html
+  title ['週間 | 株式 | 投資部門別売買状況 | 日本取引所グループ']
+PAGE https://www.jpx.co.jp/markets/statistics-equities/margin/index.html 76
+   /corporate/index.html
+   /index.html
+   /news/index.html
+   /markets/index.html
+   /listing/index.html
+   /equities/index.html
+   /derivatives/index.html
+   /rules-participants/index.html
+   /systems/index.html
+   /regulation/index.html
+   /individuals/index.html
+   /listed-companies/index.html
+   /pre-listed-companies/index.html
+   /participants/index.html
+   /institutional/index.html
+   /media/index.html
+   /markets/index.html
+   /markets/statistics-equities/index.html
+   /markets/statistics-equities/daily/index.html
+   /markets/statistics-equities/monthly/index.html
+   /markets/statistics-equities/price/index.html
+   /markets/statistics-equities/margin/index.html
+   /markets/statistics-equities/short-selling/index.html
+   /markets/statistics-equities/investor-type/index.html
+   /markets/statistics-equities/program/index.html
+   /markets/statistics-equities/misc/index.html
+   /markets/statistics-equities/examination/index.html
+   /contact/index.html
+   /corporate/learning/education/index.html
+   /corporate/sustainability/index.html
+   /english/markets/statistics-equities/margin/index.html
+   /corporate/index.html
+   /index.html
+   /markets/index.html
+   /markets/statistics-equities/index.html
+   /markets/statistics-equities/margin/index.html
+   /markets/statistics-equities/margin/index.html
+   /markets/statistics-equities/margin/index.html
+   /markets/statistics-equities/margin/01.html
+   /markets/statistics-equities/margin/02.html
+  title ['日々公表銘柄等信用取引残高 | 信用取引残高等 | 日本取引所グループ']
+ARCH https://www.jpx.co.jp/markets/statistics-equities/investor-type/00-00-archives-00.html 228
+   /corporate/index.html
+   /index.html
+   /news/index.html
+   /markets/index.html
+   /listing/index.html
+   /equities/index.html
+   /derivatives/index.html
+   /rules-participants/index.html
+   /systems/index.html
+   /regulation/index.html
+   /individuals/index.html
+   /listed-companies/index.html
+   /pre-listed-companies/index.html
+   /participants/index.html
+   /institutional/index.html
+ARCH https://www.jpx.co.jp/markets/statistics-equities/margin/00-archives-01.html 41
+   /corporate/index.html
+   /index.html
+   /news/index.html
+   /markets/index.html
+   /listing/index.html
+   /equities/index.html
+   /derivatives/index.html
+   /rules-participants/index.html
+   /systems/index.html
+   /regulation/index.html
+   /individuals/index.html
+   /listed-companies/index.html
+   /pre-listed-companies/index.html
+   /participants/index.html
+   /institutional/index.html
+ARCH https://www.jpx.co.jp/markets/statistics-equities/margin/04.html 82
+   /corporate/index.html
+   /index.html
+   /news/index.html
+   /markets/index.html
+   /listing/index.html
+   /equities/index.html
+   /derivatives/index.html
+   /rules-participants/index.html
+   /systems/index.html
+   /regulation/index.html
+   /individuals/index.html
+   /listed-companies/index.html
+   /pre-listed-companies/index.html
+   /participants/index.html
+   /institutional/index.html
+ARCH https://www.jpx.co.jp/markets/statistics-equities/margin/05.html 76
+   /corporate/index.html
+   /index.html
+   /news/index.html
+   /markets/index.html
+   /listing/index.html
+   /equities/index.html
+   /derivatives/index.html
+   /rules-participants/index.html
+   /systems/index.html
+   /regulation/index.html
+   /individuals/index.html
+   /listed-companies/index.html
+   /pre-listed-companies/index.html
+   /participants/index.html
+   /institutional/index.html
+OPEN https://www.jpx.co.jp/markets/statistics-equities/investor-type/t13vrt000002havh-att/stock_1_w_20261013_20261016.xlsx
+  r00 投資部門別 株式売買状況 S
+  r02 自己 Proprietary | 委託 Brokerage
+  r03 自己 Proprietary | 個人 Individuals
+  r04 現金取引 Cash | 信用取引 Margin | 現金取引 Cash
+  r05 現金取引 Cash | 信用取引 Margin | 現金取引 Cash
+  r06 年月週 Year, Mont | 市場／Market | 株数／金額 Shares／V | 売 Sales | 買 Purchases | 差引 Balance | 合計 Total | 売 Sales | 買 Purchases | 差引 Balance | 合計 Total | 売 Sales
+  r07 2026102 | 東証プライム
+TSE Pri | 株数 Shares | 1493974 | 1567153 | 73179 | 3061127 | 52335 | 245 | -52090 | 52580 | 765137
+  r08 金額 Value | 3969725772 | 4077667285 | 107941513 | 8047393057 | 118467947 | 952149 | -117515798 | 119420096 | 1644711949
+  r09 東証スタンダード
+TSE S | 株数 Shares | 87707 | 91503 | 3796 | 179210 | 3068 | 16 | -3052 | 3084 | 1258096
+  r10 金額 Value | 97955224 | 103563607 | 5608383 | 201518831 | 3005939 | 27972 | -2977967 | 3033911 | 130569563
+  r11 東証グロース
+TSE Gro | 株数 Shares | 84301 | 81472 | -2829 | 165773 | 2678 | 11 | -2667 | 2689 | 377525
+  r12 金額 Value | 126483319 | 124806147 | -1677172 | 251289466 | 1676218 | 25704 | -1650514 | 1701922 | 160717862
+  r13 二市場
+Tokyo & Na | 株数 Shares | 1666021 | 1740171 | 74150 | 3406192 | 58083 | 272 | -57811 | 58355 | 2410941
+  r14 金額 Value | 4194200306 | 4306084429 | 111884123 | 8500284735 | 123150289 | 1005825 | -122144464 | 124156114 | 1938033474
+OPEN https://www.jpx.co.jp/markets/statistics-equities/margin/tvdivq0000001r92-att/20261022_mtdaily.xlsx
+  m00 1 銘柄欄:
+  m01 「規」は規制銘柄。「日」は日
+  m02 「A」は1株、「J」は10株
+  m03 2 銘柄種別:
+  m04 ｢制」は制度信用銘柄、「貸」
+  m05 3 表示単位:
+  m06 全ての銘柄を１株単位で表示。
+  m07 4 前日比欄：
+  m08 前日比欄の「▲」は減少、無印
+  m09 5 上場比欄：
+  m10 ETF及びETNについては「
+  m11 1 Issue:
+  m12 "規": indicates
+  m13 "喚": JSF has p
+  m14 A indicates 1 
+  m15 2 Loan/Margin:
+  m16 "制" indicates 
+  m17 3 Units:
+  m18 Displayed in u
+  m19 4 Daily change
+  m20  ▲ indicates f
+  m21 5 Ratio to lis
+  m22 For ETFs and E
+  m23 日々公表銘柄等信用取引残高
+  m24 Outstanding Ma
+  m25 2026/10/22 | 申込み現在
+  m26 as of 2026/10/
+  m27 合　　計 Total
+  m28 銘　　柄 Issue
+  m29 市場 | 銘柄種別 | コード | 新証券コード | 売残高 Outstandin | 買残高 Outstandin
+  m30 Section | Loan/
+Margin | Code | New Sec.Code | 前日比
+Daily 
+cha | 上場比
+Ratio to l
+  m31 B | 規 | クラスターテクノロジー　普通 | スタンダード | 制 | 42400 | JP3268810003 | 6100 | -30000 | 0.1 | 491800
+  m32 B | 規 | 株 | カウリス　普通株式 | グロース | 貸 | 153A0 | JP3205750007 | 54000 | 3900 | 0.8 | 249600
+  m33 B | 日 | ＫＬａｂ　普通株式 | プライム | 貸 | 36560 | JP3268870007 | 4660600 | -244000 | 5.6 | 16770200
+  m34 B | 日 | Ｓｈｉｎｗａ　Ｗｉｓｅ　Ｈｏ | スタンダード | 制 | 24370 | JP3384900001 | 0 | 0 | 0.0 | 3333300
+  m35 B | 日 | 株 | セキュアヴェイル　普通株式 | スタンダード | 貸 | 30420 | JP3420960001 | 566400 | 0 | 7.4 | 635900
+  m36 B | 日 | スターシーズ　普通株式 | スタンダード | 制 | 30830 | JP3347030003 | 0 | 0 | 0.0 | 3311200
+  m37 B | 日 | ＡＤＲバイオメディカルホール | スタンダード | 制 | 37500 | JP3426500009 | 0 | 0 | 0.0 | 1526300
+  m38 B | 日 | ショーケース　普通株式 | スタンダード | 制 | 39090 | JP3360120004 | 78500 | 23500 | 0.8 | 367000
+  m39 B | 日 | 株 | アズジェント　普通株式 | スタンダード | 貸 | 42880 | JP3119910002 | 283200 | 7200 | 7.4 | 451700
+  m40 B | 日 | ブロードバンドセキュリティ　 | スタンダード | 制 | 43980 | JP3831470004 | 6400 | 4900 | 0.1 | 138700
+  m41 B | 日 | ＥＲＴＨ　Ｇｒｏｕｐ　普通株 | スタンダード | 貸 | 60720 | JP3387880002 | 770800 | -6300 | 3.3 | 5252400
+  m42 B | 日 | ａｋｉｐｐａ　普通株式 | スタンダード | 制 | 627A0 | JP3107640009 | 0 | -2500 | 0.0 | 1031200
+  m43 B | 日 | オリエンタルチエン工業　普通 | スタンダード | 制 | 63800 | JP3198800009 | 0 | 0 | 0.0 | 444200
+  m44 B | 日 | 東京コスモス電機　普通株式 | スタンダード | 制 | 67720 | JP3576200004 | 0 | 0 | 0.0 | 1749500
