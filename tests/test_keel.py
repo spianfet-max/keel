@@ -256,6 +256,22 @@ def test_history(client):
     assert len(j["series"]["USDJPY=X"]) >= 12
 
 
+def test_ohlc(client, monkeypatch):
+    def fake_ohlc(sym, years=3):
+        c = gbm(seed=3, s0=150, start="2017-01-02")
+        return pd.DataFrame({"open": c * 0.999, "high": c * 1.004, "low": c * 0.995, "close": c, "volume": 1000.0})
+    monkeypatch.setattr(D, "ohlc", fake_ohlc)
+    j = client.get("/api/ohlc", params={"symbols": "USDJPY=X,UST10Y", "start": "2025-01-01", "interval": "W"}).json()
+    b = j["series"]["USDJPY=X"]
+    assert all(x["l"] <= min(x["o"], x["c"]) and x["h"] >= max(x["o"], x["c"]) for x in b)
+    assert pd.Timestamp(b[0]["d"]).dayofweek == 4 and b[0]["v"] > 1000
+    assert j["close_only"] == ["UST10Y"] and j["series"]["UST10Y"][-1]["h"] == j["series"]["UST10Y"][-1]["c"]
+    d = client.get("/api/ohlc", params={"symbols": "USDJPY=X", "start": "2026-09-01"}).json()["series"]["USDJPY=X"]
+    m = client.get("/api/ohlc", params={"symbols": "USDJPY=X", "start": "2026-09-01", "interval": "M"}).json()["series"]["USDJPY=X"]
+    sep = [x for x in d if x["d"].startswith("2026-09")]
+    assert m[0]["h"] == max(x["h"] for x in sep) and m[0]["c"] == sep[-1]["c"] and m[0]["o"] == sep[0]["o"]
+
+
 def test_history_total_return(client):
     p = client.get("/api/history", params={"symbols": "TLT", "start": "2025-01-01", "interval": "W"}).json()
     t = client.get("/api/history", params={"symbols": "TLT", "start": "2025-01-01", "interval": "W", "total": "true"}).json()

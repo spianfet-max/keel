@@ -14,6 +14,7 @@ import math
 import os
 from datetime import date, timedelta
 
+import numpy as np
 import pandas as pd
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -350,6 +351,41 @@ def history(
     units = {s: ("pct" if s in ysyms else "price") for s in out}
     return _safe({"series": out, "units": units, "missing": [s for s in syms if s not in out],
                   "total_return": bool(total)})
+
+
+@app.get("/api/ohlc", operation_id="price_bars", dependencies=[Depends(check_token)])
+def ohlc_bars(
+    symbols: str = Query(..., description="Comma-separated Yahoo symbols, or UST2Y..UST30Y / JGB2Y..JGB30Y "
+                         "(yields: close only, so open = high = low = close)"),
+    start: str | None = Query(None, description="YYYY-MM-DD; default 2 years ago"),
+    interval: str = Query("D", pattern="^(D|W|M)$", description="D, W (Friday) or M (month-end) bars"),
+):
+    """Open, high, low, close and volume bars per symbol, for bar-pattern studies (e.g. DeMark).
+    Prices are split-adjusted but not dividend-adjusted. `close_only` lists symbols whose
+    high/low are not available (government yields)."""
+    syms = _syms(symbols, 12)
+    st = pd.Timestamp(start) if start else pd.Timestamp(date.today() - timedelta(days=730))
+    years = max(1.0, (pd.Timestamp(date.today()) - st).days / 365.25 + 0.1)
+    ysyms = [s for s in syms if s.upper() in YIELD_SYMS]
+    psyms = [s for s in syms if s not in ysyms]
+    got = D._pool(lambda s: D.ohlc(s, years), psyms, workers=3) if psyms else {}
+    got = {k: v for k, v in got.items() if v is not None and len(v)}
+    for s in ysyms:
+        try:
+            ys = _yield_series(s.upper(), years)
+        except Exception as e:  # noqa: BLE001
+            log.warning("yield %s failed: %s", s, e)
+            ys = None
+        if ys is not None:
+            got[s] = pd.DataFrame({"open": ys, "high": ys, "low": ys, "close": ys, "volume": np.nan})
+    out = {}
+    for s, df in got.items():
+        df = D.resample_ohlc(df[df.index >= st], interval)
+        out[s] = [{"d": str(i.date()), "o": float(r.open), "h": float(r.high), "l": float(r.low), "c": float(r.close),
+                   **({"v": float(r.volume)} if pd.notna(r.volume) and r.volume > 0 else {})}
+                  for i, r in df.iterrows()]
+    return _safe({"series": out, "close_only": [s for s in ysyms if s in out],
+                  "missing": [s for s in syms if s not in out], "interval": interval})
 
 
 @app.get("/api/sp/screen", operation_id="structured_product_screen", dependencies=[Depends(check_token)])
