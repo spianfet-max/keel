@@ -669,3 +669,22 @@ def test_trend_filter_sign():
     up = pd.Series(np.linspace(3, 5, 400), index=pd.bdate_range("2024-01-01", periods=400))
     f = M._trend_filter(up)
     assert (f["gap"] > 0).all()
+
+
+def test_fxfactors(client, monkeypatch):
+    idx = pd.date_range("2004-01-31", "2026-10-31", freq="ME")
+    n = len(idx)
+    fxs = {f"{c}=X": pd.Series(np.linspace(1, 1.2, n) * (i + 1), index=idx) for i, c in enumerate(M.FXF) if c != "USD"}
+    fxs["CNY=X"] = pd.Series(np.linspace(6, 7, n), index=idx)
+    eqs = {v[3]: pd.Series(np.linspace(100, 200, n), index=idx) for v in M.FXF.values() if v[3]}
+    monkeypatch.setattr(D, "monthly_closes", lambda syms, years=22, dividends=False: {s: (fxs.get(s) if s in fxs else eqs.get(s)) for s in syms if s in fxs or s in eqs})
+    areas = [v[0] for v in M.FXF.values() if v[0]]
+    df = pd.DataFrame({a: np.linspace(2, 4, n) for a in areas}, index=idx)
+    for name in ("oecd_3m_rates", "oecd_lt_rates", "cpi_index", "oecd_cli"):
+        monkeypatch.setattr(D, name, lambda a, start="2000-01", _df=df: _df)
+    monkeypatch.setattr(D, "oecd_confidence", lambda a, m, start="2000-01": df)
+    monkeypatch.setattr(D, "bis_policy_rates", lambda a, start="2000-01": pd.DataFrame())
+    j = client.get("/api/fxfactors", params={"years": 20}).json()
+    assert "JPY" in j["spot"] and "USD" not in j["spot"] and len(j["spot"]["JPY"]) == len(j["months"])
+    assert j["rate"]["USD"][-1] is not None and "USD" in j["equity"]
+    assert j["cost_bp"]["THB"] == 9

@@ -863,6 +863,134 @@ def rates_carry(years: int = Query(25, ge=5, le=35)):
 
 
 # --------------------------------------------------------------------------- #
+# FX factors: carry, value, momentum, reversals, quality across G10 and EM
+# --------------------------------------------------------------------------- #
+
+# ccy -> (OECD area for 3M rate / CPI / CLI / confidence, OECD area for 10Y, BIS area, local equity index)
+FXF = {
+    "USD": ("USA", "USA", "US", "^GSPC"), "EUR": ("EA20", "DEU", "XM", "^STOXX50E"), "JPY": ("JPN", "JPN", "JP", "^N225"),
+    "GBP": ("GBR", "GBR", "GB", "^FTSE"), "CHF": ("CHE", "CHE", "CH", "^SSMI"), "CAD": ("CAN", "CAN", "CA", "^GSPTSE"),
+    "AUD": ("AUS", "AUS", "AU", "^AXJO"), "NZD": ("NZL", "NZL", "NZ", "^NZ50"), "SEK": ("SWE", "SWE", "SE", "^OMX"),
+    "NOK": ("NOR", "NOR", "NO", "OBX.OL"), "BRL": ("BRA", None, "BR", "^BVSP"), "CNH": ("CHN", None, "CN", "000001.SS"),
+    "CZK": ("CZE", "CZE", "CZ", None), "HUF": ("HUN", "HUN", "HU", "^BUX.BD"), "IDR": ("IDN", None, "ID", "^JKSE"),
+    "ILS": ("ISR", "ISR", "IL", "^TA125.TA"), "INR": ("IND", None, "IN", "^BSESN"), "KRW": ("KOR", "KOR", "KR", "^KS11"),
+    "MXN": ("MEX", "MEX", "MX", "^MXX"), "PLN": ("POL", "POL", "PL", "WIG20.WA"), "SGD": (None, None, "SG", "^STI"),
+    "THB": (None, None, "TH", "^SET.BK"), "TRY": ("TUR", "TUR", "TR", "XU100.IS"), "ZAR": ("ZAF", "ZAF", "ZA", None),
+}
+FXF_G10 = ["USD", "EUR", "JPY", "GBP", "CHF", "CAD", "AUD", "NZD", "SEK", "NOK"]
+# One-way transaction cost per trade, bp of notional (G10 1bp; EM 1.5 to 9bp)
+FXF_COST = {"EUR": 1, "JPY": 1, "GBP": 1, "CHF": 1, "CAD": 1, "AUD": 1, "NZD": 1, "SEK": 1, "NOK": 1, "BRL": 3.5,
+            "CNH": 2, "CZK": 1.5, "HUF": 2, "IDR": 7, "ILS": 2, "INR": 3.5, "KRW": 2.5, "MXN": 1.5, "PLN": 1.5,
+            "SGD": 2, "THB": 9, "TRY": 4, "ZAR": 2.5, "USD": 0}
+
+
+@app.get("/api/fxfactors", operation_id="fx_factor_data", dependencies=[Depends(check_token)])
+def fx_factors(years: int = Query(24, ge=8, le=26)):
+    """Month-end panel for currency factor investing across G10 and EM (24 currencies against the dollar):
+    spot (units per USD; the last row is the latest close), 3-month rates and 10-year yields (% p.a.),
+    CPI index (for PPP value), local equity index, OECD leading indicator and consumer confidence.
+    Plus one-way trading costs in bp. Front ends compute carry, value, momentum, reversal and quality signals.
+
+    Sources: Yahoo month-end closes; OECD 3-month and long-term rates (BIS policy rate where missing or
+    stale), OECD CPI, CLI and consumer confidence (published with a one to two month lag; `asof` per series)."""
+    start = f"{date.today().year - years}-01"
+    errors: list[str] = []
+
+    def safe(name, fn, *a):
+        try:
+            return fn(*a)
+        except Exception as e:  # noqa: BLE001
+            errors.append(f"{name}: {e}")
+            return pd.DataFrame() if name != "yahoo" else {}
+
+    fx_syms = tuple(sorted({f"{c}=X" for c in FXF if c not in ("USD", "CNH")} | {"CNH=X", "CNY=X"}))
+    eq_syms = tuple(sorted({v[3] for v in FXF.values() if v[3]}))
+    fx = safe("yahoo", D.monthly_closes, fx_syms, years + 1)
+    if not fx:
+        raise HTTPException(503, "Yahoo returned no FX history; try again in a minute")
+    eq = safe("yahoo", D.monthly_closes, eq_syms, years + 1)
+    areas = tuple(sorted({v[0] for v in FXF.values() if v[0]} | {FX_EURO_ALT[0]}))
+    lt_areas = tuple(sorted({v[1] for v in FXF.values() if v[1]}))
+    bis_areas = tuple(sorted({v[2] for v in FXF.values() if v[2]}))
+    st3 = safe("OECD 3M", D.oecd_3m_rates, areas, start)
+    lt = safe("OECD 10Y", D.oecd_lt_rates, lt_areas, start)
+    bis = safe("BIS policy", D.bis_policy_rates, bis_areas, start)
+    cpi = safe("OECD CPI", D.cpi_index, areas, start)
+    cli = safe("OECD CLI", D.oecd_cli, areas, start)
+    cci = safe("OECD consumer confidence", D.oecd_confidence, areas, "CCICP", start)
+
+    spot = {}
+    for c in FXF:
+        if c == "USD":
+            continue
+        s = fx.get(f"{c}=X")
+        if c == "CNH":
+            cny = fx.get("CNY=X")
+            s = cny if s is None or s.empty else (pd.concat([cny[cny.index < s.index[0]], s]).sort_index()
+                                                   if cny is not None and not cny.empty else s)
+        if s is None or s.empty:
+            errors.append(f"{c} spot")
+            continue
+        spot[c] = D.despike(s.resample("ME").last())
+    end = max(s.index[-1] for s in spot.values())
+    grid = pd.date_range(pd.Timestamp(start + "-01") + pd.offsets.MonthEnd(0), end, freq="ME")
+    stale = pd.Timestamp(date.today()) - pd.DateOffset(months=4)
+
+    def col(df, a):
+        if df is None or df.empty or a is None:
+            return None
+        if a in df and df[a].notna().any():
+            return df[a].dropna()
+        if a == "EA20" and FX_EURO_ALT[0] in df and df[FX_EURO_ALT[0]].notna().any():
+            return df[FX_EURO_ALT[0]].dropna()
+        return None
+
+    def aligned(s, ffill):
+        if s is None or s.empty:
+            return None
+        s = s.copy()
+        s.index = s.index + pd.offsets.MonthEnd(0)
+        s = s[~s.index.duplicated(keep="last")]
+        x = s.reindex(s.index.union(grid)).sort_index()
+        x = x.ffill(limit=ffill) if ffill else x
+        v = x.reindex(grid)
+        return None if v.isna().all() else [None if pd.isna(z) else round(float(z), 6) for z in v.values]
+
+    out = {k: {} for k in ("spot", "rate", "y10", "cpi", "equity", "cli", "cci")}
+    src, asof = {}, {}
+    for c, (a, la, ba, ei) in FXF.items():
+        if c != "USD":
+            out["spot"][c] = aligned(spot.get(c), 0)
+        o, b = col(st3, a), col(bis, ba)
+        if o is not None and b is not None and o.index[-1] < stale:
+            r, how = pd.concat([o, b[b.index > o.index[-1]]]).sort_index(), "oecd+bis"
+        elif o is not None:
+            r, how = o, "oecd"
+        elif b is not None:
+            r, how = b, "bis"
+        else:
+            r, how = None, None
+        out["rate"][c], src[c] = aligned(r, 3), how
+        out["y10"][c] = aligned(col(lt, la), 1)
+        out["cpi"][c] = aligned(col(cpi, a), 3)
+        out["equity"][c] = aligned(eq.get(ei).resample("ME").last() if ei and eq.get(ei) is not None else None, 0)
+        out["cli"][c] = aligned(col(cli, a), 0)
+        out["cci"][c] = aligned(col(cci, a), 0)
+        asof[c] = {k: (str(col(df, a).index[-1].date()) if col(df, a) is not None else None)
+                   for k, df in (("cpi", cpi), ("cli", cli), ("cci", cci))}
+    for k in out:
+        out[k] = {c: v for c, v in out[k].items() if v is not None}
+    return _safe({
+        "asof": str(grid[-1].date()), "spot_asof": str(end.date()), "months": [str(d.date()) for d in grid],
+        "ccys": list(FXF), "g10": FXF_G10, "cost_bp": FXF_COST, **out, "rate_src": src, "macro_asof": asof,
+        "errors": errors,
+        "note": "Month-end values; the last month is the latest close so far. Spot in units per USD. Rates % p.a.: "
+                "3M = OECD interbank (bis = BIS policy rate), 10Y = OECD long-term government yield (EUR = Germany). "
+                "CPI index, CLI (100 = trend) and consumer confidence (100 = average) from the OECD, with a 1-2 month lag.",
+    })
+
+
+# --------------------------------------------------------------------------- #
 # Macro regimes (growth x inflation)
 # --------------------------------------------------------------------------- #
 
