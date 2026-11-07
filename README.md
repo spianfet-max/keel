@@ -15,8 +15,9 @@ A small market-data service on top of the [OpenBB Open Data Platform](https://gi
 | **Cadence** | "Themes against the market": meeting themes vs USD/JPY, US 10Y, Nikkei | `api_history` |
 | **Seasonality** (artifact) | Month, weekday, turn-of-month and calendar-path seasonality for FX, indices, commodities and UST/JGB yields | `api_history` |
 | **Intervention** (artifact) | USD/JPY intervention risk meter: speed, level against past MOF interventions, stretch, vol, move against the US–Japan 2Y gap | `api_history` |
-| **Web** (artifact) | Cross-asset correlation regimes: classic pairs, full matrix, sign flips, what diversifies now | `api_history` |
+| **Web** (artifact) | Cross-asset correlation regimes: classic pairs, full matrix, sign flips, what diversifies now, absorption ratio, UST/JGB curve factors | `api_history` |
 | **Catalyst** (artifact) | Event-move board since 2010 for FOMC, ECB, BoJ, BoE, US CPI, payrolls, retail sales, PCE and GDP; event vs ordinary-day moves and an implied-vs-history check | `api_history` |
+| **Trend** (artifact) | CTA trend replicator: positions across 29 markets, one-week and one-month flip levels, scenario flows, track record vs DBMF/KMLM | `api_history` |
 
 Only public market data passes through Keel. Pages send ticker symbols and parameters; no client data.
 

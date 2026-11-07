@@ -78,6 +78,28 @@ tbody tr.click:hover td{background:var(--sel)}
   </section>
 
   <section class="sec">
+    <div class="sh"><h2 data-ja="吸収率（市場の脆弱性）">Absorption ratio</h2><p id="arSub"></p></div>
+    <div class="kpis" id="arK"></div>
+    <div class="two" style="margin-top:14px">
+      <div style="min-width:0"><span class="lbl" data-ja="吸収率と変化のシグナル">Absorption ratio and its shift</span><svg class="ch" id="arC" height="250"></svg><div class="leg" id="arLeg"></div><svg class="ch" id="arZ" height="150"></svg></div>
+      <div style="min-width:0"><span class="lbl" id="pcL"></span><div class="seg" id="pcSel" style="margin:6px 0 10px"><button data-v="0">PC1</button><button data-v="1">PC2</button><button data-v="2">PC3</button></div><div class="dv" id="pcB"></div></div>
+    </div>
+    <div style="margin-top:18px"><span class="lbl" data-ja="シグナル別のS&amp;P500のその後">What the S&amp;P 500 did next, by signal</span><div class="tw"><table id="arF"></table></div><p class="minor" id="arFn"></p></div>
+    <p class="say" id="arSay"></p>
+  </section>
+
+  <section class="sec">
+    <div class="sh"><h2 data-ja="金利カーブのファクター">Yield-curve factors</h2><p id="cvSub"></p></div>
+    <div class="bar" style="border:0;padding-top:0"><div class="seg" id="cvSel"><button data-v="UST" data-ja="米国債">US Treasuries</button><button data-v="JGB" data-ja="日本国債">JGBs</button></div></div>
+    <div class="kpis" id="cvK"></div>
+    <div class="two" style="margin-top:14px">
+      <div style="min-width:0"><span class="lbl" data-ja="ファクターの形（年限別の感応度）">Factor shapes (loading by maturity)</span><svg class="ch" id="cvL" height="230"></svg><div class="leg" id="cvLLeg"></div></div>
+      <div style="min-width:0"><span class="lbl" data-ja="過去1年の累積ファクター変動（bp）">Cumulative factor moves over the past year (bp)</span><svg class="ch" id="cvS" height="230"></svg><div class="leg" id="cvSLeg"></div></div>
+    </div>
+    <p class="say" id="cvSay"></p>
+  </section>
+
+  <section class="sec">
     <div class="sh"><h2 id="pT"></h2><p id="pSub"></p></div>
     <div class="sel2"><select id="pa" aria-label="First asset"></select><span class="lbl">×</span><select id="pb" aria-label="Second asset"></select></div>
     <div style="margin-top:12px"><svg class="ch" id="pc" height="280"></svg><div class="leg" id="pLeg"></div></div>
@@ -202,7 +224,7 @@ function buildGrid(){
       if(last!=null)prev=last;
     }
     R.push(r)});
-  GRID={dates,R};CACHE={};
+  GRID={dates,R};CACHE={};AR=null;
 }
 /* rolling correlation of assets i,j over window n periods; needs 70% valid pairs */
 function rolling(i,j,n){
@@ -273,7 +295,7 @@ function render(){
       <td>${spark(sp,120,28,'var(--ink)')}</td></tr>`}).join('')+'</tbody>';
   $$('#classic tr.click').forEach(r=>r.onclick=()=>{S.pa=r.dataset.a;S.pb=r.dataset.b;save();pair();$('#pT').scrollIntoView({behavior:'smooth',block:'start'})});
 
-  heat(P);pair();diversify(P);shifts(okP);method();
+  heat(P);pair();diversify(P);shifts(okP);if(!AR)absorption();absorptionView();curveView();method();
 }
 function heat(P){
   const svg=$('#hm'),n=U.length,M={};P.forEach(p=>{M[p.a+'|'+p.b]=p;M[p.b+'|'+p.a]=p});
@@ -343,9 +365,133 @@ function shifts(okP){
     top.map(p=>`<tr class="click" data-a="${p.a}" data-b="${p.b}"><td>${esc(KEY(p.a))} × ${esc(KEY(p.b))}${p.flip?`<span class="flag flip">${T('flip','反転')}</span>`:''}</td><td>${cf(p.base)}</td><td><span class="cell" style="background:${corrColor(p.cur)}">${cf(p.cur)}</span></td><td class="${p.d>0?'':''}">${cf(p.d)}</td></tr>`).join('')+'</tbody>';
   $$('#shifts tr.click').forEach(r=>r.onclick=()=>{S.pa=r.dataset.a;S.pb=r.dataset.b;save();render();$('#pT').scrollIntoView({behavior:'smooth',block:'start'})});
 }
+
+/* ---------- principal components ---------- */
+/* cyclic Jacobi eigen-decomposition of a symmetric matrix; returns values (descending) and column vectors */
+function eigSym(A0){
+  const n=A0.length,A=A0.map(r=>r.slice()),V=A.map((r,i)=>r.map((_,j)=>i===j?1:0));
+  for(let sweep=0;sweep<60;sweep++){
+    let off=0;for(let i=0;i<n;i++)for(let j=i+1;j<n;j++)off+=A[i][j]*A[i][j];if(off<1e-12)break;
+    for(let p=0;p<n;p++)for(let q=p+1;q<n;q++){if(Math.abs(A[p][q])<1e-15)continue;
+      const th=(A[q][q]-A[p][p])/(2*A[p][q]),t=Math.sign(th||1)/(Math.abs(th)+Math.sqrt(th*th+1)),c=1/Math.sqrt(t*t+1),s=t*c;
+      for(let k=0;k<n;k++){const akp=A[k][p],akq=A[k][q];A[k][p]=c*akp-s*akq;A[k][q]=s*akp+c*akq}
+      for(let k=0;k<n;k++){const apk=A[p][k],aqk=A[q][k];A[p][k]=c*apk-s*aqk;A[q][k]=s*apk+c*aqk}
+      for(let k=0;k<n;k++){const vkp=V[k][p],vkq=V[k][q];V[k][p]=c*vkp-s*vkq;V[k][q]=s*vkp+c*vkq}}
+  }
+  const ord=A.map((r,i)=>i).sort((a,b)=>A[b][b]-A[a][a]);
+  return{val:ord.map(i=>A[i][i]),vec:ord.map(i=>V.map(r=>r[i]))};
+}
+let AR=null;
+const AR_K=3;
+function arWin(){return S.freq==='W'?104:252}
+/* rolling absorption ratio: share of variance in the top three components of the correlation matrix */
+function absorption(){
+  const W=arWin(),step=S.freq==='W'?1:5,T=GRID.dates.length,ids=U.map((u,i)=>i).filter(i=>GRID.R[i]);
+  const pts=[];let last=null,yearAgo=null;
+  for(let t=W;t<T;t+=step){
+    const use=ids.filter(i=>{let c=0;for(let q=t-W+1;q<=t;q++)if(isFinite(GRID.R[i][q]))c++;return c>=W*.7});
+    if(use.length<6)continue;
+    const Z=use.map(i=>{const v=[];for(let q=t-W+1;q<=t;q++)v.push(isFinite(GRID.R[i][q])?GRID.R[i][q]:0);const m=v.reduce((a,b)=>a+b,0)/W,sd=Math.sqrt(v.reduce((a,b)=>a+(b-m)**2,0)/W)||1;return v.map(x=>(x-m)/sd)});
+    const n=use.length,C=Array.from({length:n},()=>new Array(n).fill(0));
+    for(let a=0;a<n;a++)for(let b=a;b<n;b++){let s=0;for(let q=0;q<W;q++)s+=Z[a][q]*Z[b][q];C[a][b]=C[b][a]=s/W}
+    const e=eigSym(C),tot=e.val.reduce((a,b)=>a+b,0),ar=e.val.slice(0,AR_K).reduce((a,b)=>a+b,0)/tot;
+    pts.push({t,x:GRID.dates[t],y:ar,sh:e.val.slice(0,3).map(v=>v/tot)});
+    if(t>=T-step)last={use,e,tot};
+  }
+  if(!pts.length){AR=null;return}
+  /* standardised shift: short average minus one-year average, over the one-year spread */
+  const sh=3,lg=S.freq==='W'?52:50;
+  pts.forEach((p,k)=>{if(k<lg)return;const a=pts.slice(k-sh+1,k+1).reduce((s,q)=>s+q.y,0)/sh,b=pts.slice(k-lg+1,k+1),mb=b.reduce((s,q)=>s+q.y,0)/lg,sd=Math.sqrt(b.reduce((s,q)=>s+(q.y-mb)**2,0)/lg);p.z=sd>0?(a-mb)/sd:NaN});
+  const ya=pts[Math.max(0,pts.length-1-lg)];
+  AR={pts,last,ya};
+}
+let PCN=0;
+function absorptionView(){
+  if(!AR){$('#arK').innerHTML='';return}
+  const{pts,last,ya}=AR,L=pts[pts.length-1],W=arWin();
+  $('#arSub').textContent=T(`Kritzman’s absorption ratio: the share of all ${last.use.length} markets’ variance explained by the top ${AR_K} principal components of their correlation matrix, over a rolling ${S.freq==='W'?'two-year window of weekly':'one-year window of daily'} returns. When it rises, markets are tied to fewer drivers and shocks spread further.`,
+    `Kritzmanの吸収率：${last.use.length}市場の相関行列の上位${AR_K}主成分で説明される分散の割合（${S.freq==='W'?'週次リターン・2年':'日次リターン・1年'}のローリング窓）。上昇すると市場を動かす要因が少数に集中し、ショックが広がりやすくなります。`);
+  const z=L.z;
+  $('#arK').innerHTML=[
+    [T('Absorption ratio','吸収率'),num(L.y*100,0)+'%',T(`${num(ya.y*100,0)}% a year ago`,`1年前は${num(ya.y*100,0)}%`)],
+    [T('Shift signal','変化のシグナル'),`<span class="${z>1?'dn':z<-1?'up':''}">${isFinite(z)?(z>0?'+':'')+num(z,2):'—'}</span>`,z>1?T('rising fast: markets more fragile','急上昇：市場の脆弱性が高まる'):z<-1?T('falling fast: drivers spreading out','急低下：要因が分散'):T('within one standard deviation','1標準偏差以内')],
+    [T('First component','第1主成分'),num(L.sh[0]*100,0)+'%',T('of variance, the common driver','の分散を説明する共通要因')],
+    [T('Second and third','第2・第3主成分'),num(L.sh[1]*100,0)+'% · '+num(L.sh[2]*100,0)+'%',T('next independent drivers','次に独立した要因')]
+  ].map(k=>`<div class="kpi"><span class="lbl">${k[0]}</span><span class="v">${k[1]}</span><span class="s">${k[2]}</span></div>`).join('');
+  const s1=[{name:T('Absorption ratio','吸収率'),color:'var(--a2)',width:1.8,area:1,pts:pts.map(p=>({x:p.x,y:p.y*100}))}];
+  lineChart($('#arC'),s1,{h:250,xType:'date',yFmt:v=>num(v,0)+'%',tipFmt:v=>num(v,1)+'%'});legend($('#arLeg'),s1);
+  const s2=[{name:T('Shift signal (σ)','変化のシグナル（σ）'),color:'var(--ink)',width:1.3,pts:pts.map(p=>({x:p.x,y:isFinite(p.z)?p.z:null}))},
+    {name:'+1σ',color:'var(--warn)',dash:1,width:1,pts:[{x:pts[0].x,y:1},{x:L.x,y:1}]},{name:'−1σ',color:'var(--a1)',dash:1,width:1,pts:[{x:pts[0].x,y:-1},{x:L.x,y:-1}]}];
+  lineChart($('#arZ'),s2,{h:150,xType:'date',zero:true,yt:4,yFmt:v=>num(v,1),tipFmt:v=>num(v,2)});
+  /* loadings, sign set so the S&P 500 loads positively (or the largest loading, if absent) */
+  $$('#pcSel button').forEach(b=>b.classList.toggle('on',+b.dataset.v===PCN));
+  const vec=last.e.vec[PCN],ix=last.use.indexOf(IDX['^GSPC']);let sgn=1;
+  if(ix>=0&&Math.abs(vec[ix])>.05)sgn=Math.sign(vec[ix]);else{const m=vec.reduce((a,v,i)=>Math.abs(v)>Math.abs(vec[a])?i:a,0);sgn=Math.sign(vec[m])}
+  const rows=last.use.map((i,k)=>({s:U[i].s,v:vec[k]*sgn})).sort((a,b)=>b.v-a.v),mx=Math.max(...rows.map(r=>Math.abs(r.v)));
+  $('#pcL').textContent=T(`Loadings of component ${PCN+1} (${num(L.sh[PCN]*100,0)}% of variance), latest window`,`第${PCN+1}主成分の負荷量（分散の${num(L.sh[PCN]*100,0)}%）、最新の窓`);
+  const X=v=>(v/mx+1)/2*100;
+  $('#pcB').innerHTML=rows.map(r=>{const a=X(Math.min(0,r.v)),b=X(Math.max(0,r.v));return `<div class="dvrow"><span>${esc(NAME(r.s))}</span><span class="t"><b style="left:${a}%;width:${b-a}%;background:${r.v>=0?'var(--a2)':'var(--a1)'}"></b></span><span class="n">${(r.v<0?'−':'+')+Math.abs(r.v).toFixed(2)}</span></div>`}).join('');
+  /* forward S&P 500 by signal */
+  const spx=SERIES['^GSPC']||[],idxOf=t=>{let lo=0,hi=spx.length-1;while(lo<hi){const m=(lo+hi+1)>>1;if(ms(spx[m].d)<=t)lo=m;else hi=m-1}return lo};
+  const fw=(t,days)=>{const i=idxOf(t),j=idxOf(t+days*864e5);return j>i&&ms(spx[j].d)>=t+(days-4)*864e5?spx[j].v/spx[i].v-1:NaN};
+  const dd=(t,days)=>{const i=idxOf(t),j=idxOf(t+days*864e5);if(j<=i)return NaN;let m=0;for(let k=i+1;k<=j;k++)m=Math.min(m,spx[k].v/spx[i].v-1);return m};
+  const grp={hi:[],mid:[],lo:[]};pts.forEach(p=>{if(!isFinite(p.z))return;const g=p.z>1?'hi':p.z<-1?'lo':'mid';const a=fw(p.x,30),b=fw(p.x,91),c=dd(p.x,91);if(isFinite(b))grp[g].push({a,b,c})});
+  const av=(arr,f)=>arr.length?arr.reduce((s,o)=>s+f(o),0)/arr.length:NaN,pcf=v=>!isFinite(v)?'—':(v>0?'+':v<0?'−':'')+Math.abs(v*100).toFixed(1)+'%';
+  const lab={hi:T('Rising fast (above +1σ)','急上昇（+1σ超）'),mid:T('In between','中間'),lo:T('Falling fast (below −1σ)','急低下（−1σ未満）')};
+  $('#arF').innerHTML=`<thead><tr><th>${T('Shift signal','変化のシグナル')}</th><th>${T('Readings','観測数')}</th><th>${T('S&P next month','S&P 翌1か月')}</th><th>${T('S&P next 3 months','S&P 翌3か月')}</th><th>${T('3-month fall below −10%','3か月で−10%超の下落')}</th><th>${T('Avg worst point in 3 months','3か月内の最大下落（平均）')}</th></tr></thead><tbody>`+
+    ['hi','mid','lo'].map(g=>{const a=grp[g];return `<tr><td>${lab[g]}</td><td>${a.length}</td><td>${pcf(av(a,o=>o.a))}</td><td>${pcf(av(a,o=>o.b))}</td><td>${a.length?num(a.filter(o=>o.c<-.1).length/a.length*100,0)+'%':'—'}</td><td>${pcf(av(a,o=>o.c))}</td></tr>`}).join('')+'</tbody>';
+  $('#arFn').textContent=T(`Readings overlap (each ${S.freq==='W'?'week':'fifth day'} is one reading), so treat the counts as smaller than they look. ${LIVE?'':'Sample data: these numbers mean nothing.'}`,`観測は重複しているため、実質的なサンプル数は見た目より少なくなります。${LIVE?'':'サンプルデータのため数値に意味はありません。'}`);
+  const top=rows.slice(0,3).map(r=>NAME(r.s)).join(', '),bot=rows.slice(-2).map(r=>NAME(r.s)).join(', ');
+  $('#arSay').innerHTML=T(`The top ${AR_K} components now explain <b>${num(L.y*100,0)}%</b> of cross-asset variance, against ${num(ya.y*100,0)}% a year ago. ${z>1?'The shift signal is above +1σ: in Kritzman’s work, readings like this came before most large equity drawdowns, though many were false alarms.':z<-1?'The shift signal is below −1σ: risk is spreading across more independent drivers, which has historically been a calmer backdrop.':'The shift signal is inside ±1σ, so there is no strong warning either way.'} Component ${PCN+1} loads most on ${top}, and against ${bot}.`,
+    `上位${AR_K}主成分が説明するクロスアセットの分散は現在<b>${num(L.y*100,0)}%</b>（1年前は${num(ya.y*100,0)}%）。${z>1?'変化のシグナルは+1σ超。Kritzmanの研究では、この水準は大きな株価下落の多くに先行しましたが、空振りも多くあります。':z<-1?'変化のシグナルは−1σ未満。リスクがより多くの独立した要因に分散しており、歴史的には落ち着いた局面です。':'変化のシグナルは±1σ以内で、どちらの方向にも強い警告はありません。'}第${PCN+1}主成分の負荷が大きいのは${top}、逆向きは${bot}。`);
+}
+
+/* ---------- yield-curve PCA ---------- */
+const CVT=[2,5,10,30];let CURVE=null,CVS='UST';
+function curveSample(){
+  let seed=8112026;const rnd=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296};
+  const gauss=()=>{let u=0,v=0;while(!u)u=rnd();while(!v)v=rnd();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v)};
+  const out={};const lv={UST:[.9,1.3,1.8,2.5],JGB:[-.1,-.05,.1,.6]};
+  const days=[];for(let t=Date.UTC(2016,10,7);t<=Date.UTC(2026,10,6);t+=864e5){const w=new Date(t).getUTCDay();if(w&&w<6)days.push(new Date(t).toISOString().slice(0,10))}
+  ['UST','JGB'].forEach(c=>{const y=lv[c].slice(),sc=c==='UST'?1:.35;CVT.forEach(m=>out[c+m+'Y']=[]);
+    days.forEach(d=>{const L=gauss()*5*sc,Sl=gauss()*2.5*sc,Cu=gauss()*1.2*sc;CVT.forEach((m,i)=>{const x=i/3;y[i]+=(L+Sl*(x-.5)*2+Cu*(1-4*(x-.5)**2-.5)+gauss()*.6*sc)/100;out[c+m+'Y'].push({d,v:+y[i].toFixed(3)})})})});
+  return out;
+}
+function curvePCA(c){
+  if(!CURVE)return null;const ser=CVT.map(m=>CURVE[c+m+'Y']);if(ser.some(a=>!a||a.length<300))return null;
+  const maps=ser.map(a=>new Map(a.map(p=>[p.d,p.v])));const dates=[...maps[0].keys()].filter(d=>maps.every(m=>m.has(d))).sort();
+  const dy=[];for(let i=1;i<dates.length;i++)dy.push({d:dates[i],v:maps.map(m=>(m.get(dates[i])-m.get(dates[i-1]))*100)});
+  const fit=(end,W)=>{const rows=dy.slice(Math.max(0,end-W),end);const n=4,mu=[0,1,2,3].map(j=>rows.reduce((s,r)=>s+r.v[j],0)/rows.length);
+    const C=[0,1,2,3].map(a=>[0,1,2,3].map(b=>rows.reduce((s,r)=>s+(r.v[a]-mu[a])*(r.v[b]-mu[b]),0)/rows.length));
+    const e=eigSym(C),tot=e.val.reduce((a,b)=>a+b,0);
+    /* signs: level up, slope steepening (30y above 2y), curvature belly up */
+    const v=e.vec.slice(0,3).map((x,k)=>{const sg=k===0?Math.sign(x.reduce((a,b)=>a+b,0)):k===1?Math.sign(x[3]-x[0]):Math.sign(x[1]+x[2]-x[0]-x[3]);return x.map(y=>y*(sg||1))});
+    return{v,sh:e.val.slice(0,3).map(x=>x/tot),rows}};
+  const W=252,now=fit(dy.length,W),ago=fit(dy.length-W,W);
+  return{now,ago,dy,last:dates[dates.length-1]};
+}
+function curveView(){
+  $$('#cvSel button').forEach(b=>b.classList.toggle('on',b.dataset.v===CVS));
+  const r=curvePCA(CVS);if(!r){$('#cvK').innerHTML=`<p class="empty">${T('Curve data not loaded.','カーブのデータがありません。')}</p>`;$('#cvL').innerHTML='';$('#cvS').innerHTML='';$('#cvSay').innerHTML='';return}
+  const nm=[T('Level','水準'),T('Slope','傾き'),T('Curvature','曲率')];
+  $('#cvSub').textContent=T(`Principal components of daily changes in the ${CVS==='UST'?'US Treasury':'JGB'} 2, 5, 10 and 30-year yields over the past year (${r.now.rows.length} days to ${fdate(r.last)}). Level moves all maturities together, slope steepens or flattens, curvature moves the belly against the wings.`,
+    `${CVS==='UST'?'米国債':'日本国債'}2・5・10・30年利回りの日次変化の主成分（過去1年、${fdate(r.last)}まで${r.now.rows.length}日）。水準は全年限の同方向の動き、傾きはスティープ化・フラット化、曲率は中期ゾーンと両端の逆方向の動き。`);
+  $('#cvK').innerHTML=[0,1,2].map(k=>`<div class="kpi"><span class="lbl">${nm[k]}</span><span class="v">${num(r.now.sh[k]*100,0)}%</span><span class="s">${T(`of daily variance; ${num(r.ago.sh[k]*100,0)}% the year before`,`の日次分散。前年は${num(r.ago.sh[k]*100,0)}%`)}</span></div>`).join('');
+  const cols=['var(--ink)','var(--a2)','var(--a1)'];
+  const ls=[0,1,2].map(k=>({name:nm[k],color:cols[k],dots:1,width:1.6,pts:CVT.map((m,i)=>({x:m,y:r.now.v[k][i]}))}));
+  lineChart($('#cvL'),ls,{h:230,zero:true,xTicks:CVT,xFmt:v=>v+(JA()?'年':'y'),yFmt:v=>num(v,1),tipX:v=>v+(JA()?'年':'y'),tipFmt:v=>num(v,2)});legend($('#cvLLeg'),ls);
+  const cum=[0,0,0],nm2=[T('Level: average yield change','水準：平均利回り変化'),T('Slope: 2s30s change','傾き：2年30年スプレッド変化'),T('Curvature: 5s10s vs wings','曲率：5・10年と両端の差')],ss=[0,1,2].map(k=>({name:nm2[k],color:cols[k],width:1.5,pts:[]}));
+  /* express each factor in yield terms: level as the average change across maturities, slope as the 2s30s change, curvature as belly minus wings */
+  const v=r.now.v,unit=[v[0].reduce((a,b)=>a+b,0)/4,v[1][3]-v[1][0],(v[2][1]+v[2][2])/2-(v[2][0]+v[2][3])/2];
+  r.now.rows.forEach(row=>{[0,1,2].forEach(k=>{cum[k]+=v[k].reduce((s,l,i)=>s+l*row.v[i],0)*unit[k];ss[k].pts.push({x:ms(row.d),y:cum[k]})})});
+  lineChart($('#cvS'),ss,{h:230,xType:'date',zero:true,yFmt:v=>num(v,0),tipFmt:v=>num(v,1)+'bp'});legend($('#cvSLeg'),ss);
+  const lv=cum[0],sl=cum[1];
+  $('#cvSay').innerHTML=T(`Over the past year, <b>${num(r.now.sh[0]*100,0)}%</b> of the daily variance in ${CVS==='UST'?'Treasuries':'JGBs'} came from parallel moves, against ${num(r.ago.sh[0]*100,0)}% the year before. Moves explained by the level factor add up to ${num(lv,0)}bp on the average yield, and by the slope factor to ${num(sl,0)}bp on the 2s30s spread${sl>0?' (steeper)':' (flatter)'}. ${r.now.sh[1]>r.ago.sh[1]+.03?'Slope is explaining more than it used to: curve trades matter more than duration right now.':r.now.sh[0]>r.ago.sh[0]+.03?'Parallel moves dominate more than before: duration is the main risk.':'The split between level and slope is close to last year’s.'}`,
+    `過去1年、${CVS==='UST'?'米国債':'日本国債'}の日次分散の<b>${num(r.now.sh[0]*100,0)}%</b>は平行移動によるもの（前年は${num(r.ago.sh[0]*100,0)}%）。水準ファクターによる平均利回りの変化は累計${num(lv,0)}bp、傾きファクターによる2年30年スプレッドの変化は${num(sl,0)}bp${sl>0?'（スティープ化）':'（フラット化）'}。${r.now.sh[1]>r.ago.sh[1]+.03?'傾きの説明力が高まっており、今はデュレーションよりカーブの取引が重要です。':r.now.sh[0]>r.ago.sh[0]+.03?'平行移動の比重が高まっており、デュレーションが主なリスクです。':'水準と傾きの配分は前年とほぼ同じです。'}`);
+}
 function method(){
-  $('#method').innerHTML=T(`<b>Method.</b> Log returns of closing prices; UST and JGB yields as changes in basis points (Fed H.15 and Japan MOF). Weekly returns run Friday to Friday and avoid most of the time-zone mismatch between Tokyo, London and New York closes; daily returns understate correlation between a Tokyo asset and a New York one, because news after the Nikkei close shows up there a day later. A period counts only when the asset printed in it; a window needs 70% of its periods. Correlation is linear and backward-looking: it says how assets moved, not how they will. ${LIVE?'Data: Keel (Yahoo Finance, Fed, MOF through OpenBB); free sources can be delayed.':'<b>Synthetic sample, not market data.</b> Connect Keel for live figures.'}`,
-    `<b>手法。</b>終値の対数リターン。米国債・日本国債の利回りはbp変化（FRB H.15、財務省）。週次は金曜〜金曜で、東京・ロンドン・ニューヨークの終値時刻のずれをほぼ回避します。日次では、日経平均の引け後のニュースが翌日に反映されるため、東京とニューヨークの資産間の相関が低めに出ます。各期間は価格が付いた場合のみ計上し、窓の70%以上の期間が必要です。相関は線形で過去の値であり、将来の動きを示すものではありません。${LIVE?'データ：Keel（OpenBB経由のYahoo Finance、FRB、財務省）。無料ソースのため遅延の可能性があります。':'<b>合成サンプルであり、市場データではありません。</b>Keelに接続すると実データを表示します。'}`);
+  $('#method').innerHTML=T(`<b>Method.</b> Log returns of closing prices; UST and JGB yields as changes in basis points (Fed H.15 and Japan MOF). Weekly returns run Friday to Friday and avoid most of the time-zone mismatch between Tokyo, London and New York closes; daily returns understate correlation between a Tokyo asset and a New York one, because news after the Nikkei close shows up there a day later. A period counts only when the asset printed in it; a window needs 70% of its periods. Correlation is linear and backward-looking: it says how assets moved, not how they will. The absorption ratio follows Kritzman, Li, Page and Rigobon (2011): eigenvalues of the correlation matrix of returns, with missing returns set to zero; the shift signal compares its recent average with its one-year average. Curve factors are principal components of the covariance of daily yield changes in basis points. ${LIVE?'Data: Keel (Yahoo Finance, Fed, MOF through OpenBB); free sources can be delayed.':'<b>Synthetic sample, not market data.</b> Connect Keel for live figures.'}`,
+    `<b>手法。</b>終値の対数リターン。米国債・日本国債の利回りはbp変化（FRB H.15、財務省）。週次は金曜〜金曜で、東京・ロンドン・ニューヨークの終値時刻のずれをほぼ回避します。日次では、日経平均の引け後のニュースが翌日に反映されるため、東京とニューヨークの資産間の相関が低めに出ます。各期間は価格が付いた場合のみ計上し、窓の70%以上の期間が必要です。相関は線形で過去の値であり、将来の動きを示すものではありません。吸収率はKritzman, Li, Page, Rigobon（2011）に準拠：リターンの相関行列の固有値（欠損リターンはゼロ）。変化のシグナルは直近平均と1年平均の比較。カーブ・ファクターは利回りの日次bp変化の共分散の主成分。${LIVE?'データ：Keel（OpenBB経由のYahoo Finance、FRB、財務省）。無料ソースのため遅延の可能性があります。':'<b>合成サンプルであり、市場データではありません。</b>Keelに接続すると実データを表示します。'}`);
 }
 window.redraw=render;
 
@@ -354,7 +500,9 @@ async function load(fresh){
   setStatus('busy');
   const start=new Date(Date.now()-10*365.25*864e5).toISOString().slice(0,10);
   const syms=U.map(u=>u.s),half=[syms.slice(0,7),syms.slice(7)];
-  const rs=await Promise.all(half.map(h=>keel('api_history',{symbols:h.join(','),interval:'D',start},{fresh})));
+  const rs=[];for(const h of half)rs.push(await keel('api_history',{symbols:h.join(','),interval:'D',start},{fresh}));
+  const cv=await keel('api_history',{symbols:['UST','JGB'].flatMap(c=>CVT.map(m=>c+m+'Y')).join(','),interval:'D',start},{fresh});
+  CURVE=cv.ok&&cv.data&&cv.data.series?cv.data.series:(rs.some(r=>r.ok)?null:curveSample());
   const good=rs.filter(r=>r.ok&&r.data&&r.data.series);
   if(good.length){
     SERIES={};UNITS={};good.forEach(r=>{Object.assign(SERIES,r.data.series);Object.assign(UNITS,r.data.units||{})});
@@ -372,10 +520,12 @@ $('#pa').onchange=e=>{S.pa=e.target.value;save();render()};
 $('#pb').onchange=e=>{S.pb=e.target.value;save();render()};
 $('#anchor').onchange=e=>{S.anchor=e.target.value;save();render()};
 $('#refresh').onclick=()=>load(true);
+$$('#pcSel button').forEach(b=>b.onclick=()=>{PCN=+b.dataset.v;absorptionView()});
+$$('#cvSel button').forEach(b=>b.onclick=()=>{CVS=b.dataset.v;curveView()});
 $('#how').innerHTML=howHtml();
 $$('#langSeg button').forEach(b=>b.onclick=()=>{setLang(b.dataset.l);$('#how').innerHTML=howHtml();restatus();render()});
 setLang(LANG);
 /* first paint from the sample so the page is never empty, then try Keel */
-{const sm=sample();SERIES=sm.series;UNITS=sm.units;buildGrid();render()}
+{const sm=sample();SERIES=sm.series;UNITS=sm.units;CURVE=curveSample();buildGrid();render()}
 load(false);
 </script>

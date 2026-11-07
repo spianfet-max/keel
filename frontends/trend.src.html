@@ -1,0 +1,408 @@
+<title>Trend</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@300;400;500;600&family=Noto+Sans+JP:wght@300;400&display=swap">
+<style>
+/*CORE_CSS*/
+/* Trend: where systematic trend followers are probably positioned, where they turn, and what they buy or sell on the next move.
+   Order: summary → board (position, speeds, flip levels) → flows under price scenarios → one market in depth → model track record.
+   Long in red, short in steel, as in the other Keel apps; strength by length and opacity. */
+.app{padding-left:max(20px,env(safe-area-inset-left,0px));padding-right:max(20px,env(safe-area-inset-right,0px))}
+@media (max-width:480px){.app{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}}
+.sbar{display:inline-block;position:relative;width:120px;height:14px;vertical-align:middle;background:linear-gradient(to right,transparent calc(50% - .5px),var(--rule) calc(50% - .5px),var(--rule) calc(50% + .5px),transparent calc(50% + .5px))}
+.sbar b{position:absolute;top:2px;height:10px}
+.spd{display:inline-flex;gap:3px;vertical-align:middle}
+.spd i{display:inline-block;width:10px;height:10px;border:1px solid var(--line)}
+td.grp{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--mute);padding-top:16px}
+tbody tr.click{cursor:pointer}
+tbody tr.click:hover td{background:var(--sel)}
+tbody tr.on td{background:var(--sel)}
+.near{display:inline-block;font-size:11px;padding:0 6px;border:1px solid var(--warn);color:var(--warn);margin-left:6px;vertical-align:1px}
+table.flow td.f{text-align:center;min-width:58px;font-variant-numeric:tabular-nums}
+table.flow th{text-align:center}
+table.flow th:first-child,table.flow td:first-child{text-align:left}
+.sel2{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.say{font-size:15px;line-height:1.55;max-width:78ch;margin:14px 0 0}
+.say b{font-weight:500}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));border-top:1px solid var(--line);margin-top:14px}
+.stats .kpi .v{font-size:22px}
+.minor{font-size:12px;color:var(--mute)}
+.pos{color:var(--a2)}.neg{color:var(--a1)}
+</style>
+
+<div class="app">
+  <header class="top">
+    <div class="brand"><h1 data-ja="トレンド">Trend</h1><span data-ja="トレンドフォロー（CTA）の推定ポジション、反転水準、次の値動きでの売買フロー">Where trend followers are probably positioned, where they turn, and what they trade on the next move</span></div>
+    <div class="tright">
+      <span class="pill busy" id="status"><i></i></span>
+      <button class="btn q" id="refresh" data-ja="更新">Refresh</button>
+      <button class="btn q" id="themeBtn">Dark</button>
+      <div class="seg" id="langSeg"><button data-l="en">EN</button><button data-l="ja">日本語</button></div>
+    </div>
+  </header>
+  <div class="banner" id="banner" hidden></div>
+  <div class="help" id="how" hidden></div>
+
+  <div class="kpis" id="kpis"></div>
+
+  <section class="sec">
+    <div class="sh"><h2 data-ja="ポジション・ボード">Positioning board</h2><p id="bSub"></p></div>
+    <div class="tw"><table id="board"></table></div>
+  </section>
+
+  <section class="sec two">
+    <div style="min-width:0">
+      <div class="sh"><h2 data-ja="反転が近い市場">Closest to a turn</h2><p data-ja="今後5営業日でその価格に達すると合成シグナルが反転する水準。必要な値動きは1週間の標準偏差の何倍か。近い順。">The price that, reached over the next five trading days, would turn the blended signal; the move needed is in one-week standard deviations. Nearest first.</p></div>
+      <div class="tw"><table id="near"></table></div>
+    </div>
+    <div style="min-width:0">
+      <div class="sh"><h2 data-ja="資産クラス別のエクスポージャー">Exposure by asset class</h2><p id="rSub"></p></div>
+      <svg class="ch" id="reg" height="240"></svg><div class="leg" id="regLeg"></div>
+    </div>
+  </section>
+
+  <section class="sec">
+    <div class="sh"><h2 data-ja="値動き別の売買フロー">Flows under price scenarios</h2><p id="fSub"></p></div>
+    <div class="tw"><table class="flow" id="flow"></table></div>
+    <p class="say" id="fSay"></p>
+  </section>
+
+  <section class="sec">
+    <div class="sh"><h2 id="aT"></h2><p id="aSub"></p></div>
+    <div class="sel2"><select id="asset" aria-label="Market"></select></div>
+    <div class="two" style="margin-top:14px">
+      <div style="min-width:0"><span class="lbl" data-ja="価格（1年）と反転水準">Price, last year, with flip levels</span><svg class="ch" id="pc" height="280"></svg><div class="leg" id="pLeg"></div></div>
+      <div style="min-width:0"><span class="lbl" data-ja="シグナル（3年）">Signal, last 3 years</span><svg class="ch" id="sc" height="280"></svg><div class="leg" id="sLeg"></div></div>
+    </div>
+    <div class="two" style="margin-top:18px">
+      <div style="min-width:0"><span class="lbl" data-ja="スピード別">By speed</span><div class="tw"><table id="speeds"></table></div></div>
+      <div style="min-width:0"><span class="lbl" data-ja="1週間の値動きシナリオ">One-week price scenarios</span><div class="tw"><table id="scen"></table></div></div>
+    </div>
+    <div class="stats kpis" id="aStats"></div>
+    <p class="say" id="aSay"></p>
+  </section>
+
+  <section class="sec">
+    <div class="sh"><h2 data-ja="モデルの実績">Model track record</h2><p id="tSub"></p></div>
+    <div class="bar" style="border:0;padding-top:0">
+      <div class="grp"><span class="lbl" data-ja="暗号資産">Bitcoin</span><div class="seg" id="btc"><button data-v="0" data-ja="除く">Exclude</button><button data-v="1" data-ja="含める">Include</button></div></div>
+      <div class="grp"><span class="lbl" data-ja="期間">Period</span><div class="seg" id="per"><button data-v="all" data-ja="全期間">Full</button><button data-v="etf" data-ja="CTA ETF上場以降">Since CTA ETFs</button></div></div>
+    </div>
+    <svg class="ch" id="bt" height="300"></svg><div class="leg" id="btLeg"></div>
+    <div class="stats kpis" id="btStats"></div>
+    <div class="two" style="margin-top:18px">
+      <div style="min-width:0"><span class="lbl" data-ja="年別・資産クラス別の損益（%）">Return by year and asset class (%)</span><div class="tw"><table id="years"></table></div></div>
+      <div style="min-width:0"><span class="lbl" data-ja="株式の月次リターン別のモデルの成績">Model returns by S&amp;P 500 month</span><div class="tw"><table id="crisis"></table></div><p class="minor" id="crisisNote"></p></div>
+    </div>
+  </section>
+  <p class="note" id="method"></p>
+</div>
+
+<script>
+/*CORE_JS*/
+/* ---------- universe ---------- */
+const U=[
+ {s:'USDJPY=X',g:'fx',en:'USD/JPY',ja:'ドル円'},{s:'EURUSD=X',g:'fx',en:'EUR/USD',ja:'ユーロドル'},{s:'GBPUSD=X',g:'fx',en:'GBP/USD',ja:'ポンドドル'},
+ {s:'AUDUSD=X',g:'fx',en:'AUD/USD',ja:'豪ドル'},{s:'NZDUSD=X',g:'fx',en:'NZD/USD',ja:'NZドル'},{s:'USDCAD=X',g:'fx',en:'USD/CAD',ja:'ドルカナダ'},
+ {s:'USDCHF=X',g:'fx',en:'USD/CHF',ja:'ドルスイス'},{s:'USDMXN=X',g:'fx',en:'USD/MXN',ja:'ドルペソ'},
+ {s:'^GSPC',g:'eq',en:'S&P 500',ja:'S&P500'},{s:'^NDX',g:'eq',en:'Nasdaq 100',ja:'ナスダック100'},{s:'^N225',g:'eq',en:'Nikkei 225',ja:'日経平均'},
+ {s:'^STOXX50E',g:'eq',en:'Euro Stoxx 50',ja:'ユーロ・ストックス50'},{s:'^GDAXI',g:'eq',en:'DAX',ja:'DAX'},{s:'^FTSE',g:'eq',en:'FTSE 100',ja:'FTSE100'},{s:'^HSI',g:'eq',en:'Hang Seng',ja:'ハンセン'},
+ {s:'ZT=F',g:'rt',en:'US 2Y note',ja:'米2年債先物'},{s:'ZF=F',g:'rt',en:'US 5Y note',ja:'米5年債先物'},{s:'ZN=F',g:'rt',en:'US 10Y note',ja:'米10年債先物'},{s:'ZB=F',g:'rt',en:'US bond',ja:'米長期債先物'},
+ {s:'GC=F',g:'cm',en:'Gold',ja:'金'},{s:'SI=F',g:'cm',en:'Silver',ja:'銀'},{s:'HG=F',g:'cm',en:'Copper',ja:'銅'},{s:'CL=F',g:'cm',en:'WTI crude',ja:'WTI原油'},
+ {s:'BZ=F',g:'cm',en:'Brent crude',ja:'ブレント原油'},{s:'NG=F',g:'cm',en:'Natural gas',ja:'天然ガス'},{s:'ZC=F',g:'cm',en:'Corn',ja:'トウモロコシ'},
+ {s:'ZS=F',g:'cm',en:'Soybeans',ja:'大豆'},{s:'ZW=F',g:'cm',en:'Wheat',ja:'小麦'},
+ {s:'BTC-USD',g:'cr',en:'Bitcoin',ja:'ビットコイン'}];
+const BENCH=[{s:'DBMF',en:'DBMF (managed futures ETF)',ja:'DBMF（マネージド・フューチャーズETF）'},{s:'KMLM',en:'KMLM (trend ETF)',ja:'KMLM（トレンドETF）'}];
+const GN={fx:['FX','為替'],eq:['Equity indices','株価指数'],rt:['US Treasuries','米国債'],cm:['Commodities','商品'],cr:['Crypto','暗号資産']};
+const NAME=s=>{const u=U.find(x=>x.s===s)||BENCH.find(x=>x.s===s);return u?(JA()?u.ja:u.en):s};
+const BATCHES=[U.slice(0,11).map(u=>u.s),U.slice(11,21).map(u=>u.s).concat(['DBMF']),U.slice(21).map(u=>u.s).concat(['KMLM'])];
+
+/* ---------- model constants (Carver-style EWMA crossovers) ---------- */
+/* fast, slow, forecast scalar, blend weight; weights lean to the slower speeds, which tracked the managed-futures ETFs best */
+const SPEEDS=[[8,32,10.6,.05],[16,64,7.5,.15],[32,128,5.3,.35],[64,256,3.75,.45]];
+const FDM=1.1,CAP=20,VOLSPAN=36,TARGET=.10,WARM=260,ROLLZ=7;
+const al=n=>2/(n+1);
+
+/* ---------- state ---------- */
+let S={asset:'USDJPY=X',btc:0,per:'all'};
+try{Object.assign(S,JSON.parse(localStorage.getItem('trend-state')||'{}'))}catch(e){}
+if(!U.some(u=>u.s===S.asset))S.asset='USDJPY=X';
+const save=()=>{try{localStorage.setItem('trend-state',JSON.stringify(S))}catch(e){}};
+let SERIES=null,LIVE=false,M=null;
+
+/* ---------- synthetic sample ---------- */
+function sample(){
+  let seed=19012026;const rnd=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296};
+  const gauss=()=>{let u=0,v=0;while(!u)u=rnd();while(!v)v=rnd();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v)};
+  const vol={fx:.09,eq:.18,rt:.05,cm:.27,cr:.65},out={};
+  const days=[];for(let t=Date.UTC(2011,0,3);t<=Date.UTC(2026,10,6);t+=864e5){const w=new Date(t).getUTCDay();if(w&&w<6)days.push(new Date(t).toISOString().slice(0,10))}
+  const risk=[];let rk=0;days.forEach(()=>{rk=.995*rk+.1*gauss();risk.push(rk)});
+  [...U,...BENCH].forEach((u,k)=>{const g=u.g||'bm',sd=(vol[g]||.08)/Math.sqrt(252);let p=50+30*rnd(),drift=0;const a=[];
+    days.forEach((d,i)=>{if(i%60===0)drift=gauss()*.06*sd;
+      const z=g==='bm'?(.4*Math.tanh(risk[i])*.3+gauss()):gauss();p*=Math.exp(drift+(g==='eq'?.15*sd*risk[i]:0)+z*sd);if(u.s!=='BTC-USD'||i>500)a.push({d,v:+p.toFixed(4)})});
+    out[u.s]=a});
+  return out;
+}
+
+/* ---------- data prep ---------- */
+const ms=d=>Date.parse(d+'T00:00:00Z');
+function prep(){
+  const all=[...U,...BENCH].map(u=>u.s);
+  let hi=-Infinity,lo=Infinity;all.forEach(s=>{const a=SERIES[s];if(a&&a.length){hi=Math.max(hi,ms(a[a.length-1].d));lo=Math.min(lo,ms(a[0].d))}});
+  const dates=[];for(let t=lo;t<=hi;t+=864e5){const w=new Date(t).getUTCDay();if(w>0&&w<6)dates.push(t)}
+  const T=dates.length,P={},R={},F={};
+  all.forEach(s=>{const a=(SERIES[s]||[]).filter(x=>x.v!=null&&isFinite(x.v)&&x.v>0);const p=new Float64Array(T).fill(NaN),r=new Float64Array(T).fill(NaN),f=new Uint8Array(T);
+    let j=0,last=NaN;
+    for(let t=0;t<T;t++){let got=false;while(j<a.length&&ms(a[j].d)<=dates[t]){last=a[j].v;j++;got=true}p[t]=last;f[t]=got?1:0;
+      if(t&&isFinite(p[t])&&isFinite(p[t-1]))r[t]=got?p[t]/p[t-1]-1:0}
+    P[s]=p;R[s]=r;F[s]=f});
+  return{dates,T,P,R,F};
+}
+/* run the trend model on one market */
+function runAsset(D,s){
+  const p=D.P[s],r=D.R[s],T=D.T,sig=new Float64Array(T).fill(NaN),vol=new Float64Array(T).fill(NaN),fk=SPEEDS.map(()=>new Float64Array(T).fill(NaN));
+  const Ef=SPEEDS.map(()=>NaN),Es=SPEEDS.map(()=>NaN);let v2=NaN,n=0,acc=0,cnt=0;const av=al(VOLSPAN);
+  const ret=new Float64Array(T).fill(NaN);
+  for(let t=0;t<T;t++){
+    if(!isFinite(p[t]))continue;
+    /* roll gaps and bad prints in continuous futures: treat returns beyond ROLLZ sigma as zero for vol and P&L */
+    let x=r[t];if(isFinite(x)&&isFinite(v2)&&Math.abs(x)>ROLLZ*Math.sqrt(v2)&&s.endsWith('=F'))x=0;
+    ret[t]=x;
+    if(isFinite(x)){if(cnt<20){acc+=x*x;cnt++;if(cnt===20)v2=acc/20}else v2=v2+av*(x*x-v2)}
+    SPEEDS.forEach((k,i)=>{const af=al(k[0]),as=al(k[1]);Ef[i]=isFinite(Ef[i])?Ef[i]+af*(p[t]-Ef[i]):p[t];Es[i]=isFinite(Es[i])?Es[i]+as*(p[t]-Es[i]):p[t]});
+    n++;
+    if(isFinite(v2)&&v2>0&&n>WARM){
+      const sd=Math.sqrt(v2);vol[t]=sd;let sum=0;
+      SPEEDS.forEach((k,i)=>{const f=Math.max(-CAP,Math.min(CAP,(Ef[i]-Es[i])/(p[t]*sd)*k[2]));fk[i][t]=f;sum+=k[3]*f});
+      sig[t]=Math.max(-CAP,Math.min(CAP,FDM*sum));
+    }
+  }
+  return{s,sig,vol,fk,ret,state:{Ef:Ef.slice(),Es:Es.slice(),sd:Math.sqrt(v2),p:p[T-1]}};
+}
+/* blended forecast after a price path, from the end-of-data state; volatility held fixed */
+function forecastAfter(st,path){
+  const Ef=st.Ef.slice(),Es=st.Es.slice();
+  path.forEach(px=>SPEEDS.forEach((k,i)=>{Ef[i]+=al(k[0])*(px-Ef[i]);Es[i]+=al(k[1])*(px-Es[i])}));
+  const px=path.length?path[path.length-1]:st.p;let sum=0;const each=[];
+  SPEEDS.forEach((k,i)=>{const f=Math.max(-CAP,Math.min(CAP,(Ef[i]-Es[i])/(px*st.sd)*k[2]));each.push(f);sum+=k[3]*f});
+  return{c:Math.max(-CAP,Math.min(CAP,FDM*sum)),each};
+}
+const pathTo=(st,target,days)=>{const a=[];for(let j=1;j<=days;j++)a.push(st.p*Math.pow(target/st.p,j/days));return a};
+/* price at which speed i crosses over tomorrow */
+function speedFlip(st,i){const af=al(SPEEDS[i][0]),as=al(SPEEDS[i][1]);const p=((1-as)*st.Es[i]-(1-af)*st.Ef[i])/(af-as);return p>0?p:NaN}
+/* price at which the blended signal reaches zero, reached in a straight line over `days` */
+function compFlip(st,days){
+  /* nearest price whose straight-line path over `days` leaves the blended signal at zero */
+  const f=x=>forecastAfter(st,pathTo(st,x,days)).c,f0=f(st.p),step=st.sd*Math.sqrt(days)*.25;
+  if(f0===0)return st.p;
+  for(let k=1;k<=60;k++)for(const dir of[-1,1]){
+    const a=st.p*Math.exp(dir*(k-1)*step),b=st.p*Math.exp(dir*k*step);
+    if(Math.sign(f(b))!==Math.sign(f0)){let lo=a,hi=b;for(let it=0;it<40;it++){const m=(lo+hi)/2;if(Math.sign(f(m))===Math.sign(f0))lo=m;else hi=m}return(lo+hi)/2}}
+  return NaN;
+}
+function model(){
+  const D=prep(),A={};
+  U.forEach(u=>{if(D.P[u.s]&&D.P[u.s].some(isFinite))A[u.s]=runAsset(D,u.s)});
+  /* portfolio: equal risk to each class, equal within class, scaled to 10% annual volatility */
+  const T=D.T,cls=['fx','eq','rt','cm'].concat(S.btc?['cr']:[]),pnl=new Float64Array(T).fill(0),byC={};cls.forEach(c=>byC[c]=new Float64Array(T).fill(0));
+  let first=-1;
+  for(let t=1;t<T;t++){
+    const act={};cls.forEach(c=>act[c]=U.filter(u=>u.g===c&&A[u.s]&&isFinite(A[u.s].sig[t-1])&&isFinite(A[u.s].ret[t])));
+    const nc=cls.filter(c=>act[c].length).length;if(!nc)continue;if(first<0)first=t;
+    cls.forEach(c=>act[c].forEach(u=>{const a=A[u.s],w=(a.sig[t-1]/10)*(TARGET/(a.vol[t-1]*Math.sqrt(252)))/(nc*act[c].length);const x=w*a.ret[t];pnl[t]+=x;byC[c][t]+=x}));
+  }
+  const live=[...pnl].slice(first+1),sd=Math.sqrt(live.reduce((s,x)=>s+x*x,0)/live.length-Math.pow(live.reduce((s,x)=>s+x,0)/live.length,2))*Math.sqrt(252);
+  const K=sd>0?TARGET/sd:1;for(let t=0;t<T;t++){pnl[t]*=K;cls.forEach(c=>byC[c][t]*=K)}
+  return{D,A,pnl,byC,cls,first,K};
+}
+
+/* ---------- formatting ---------- */
+const pc=(v,d=0)=>!isFinite(v)?'—':Math.abs(v*100)<.5*Math.pow(10,-d)?(0).toFixed(d):(v>0?'+':v<0?'−':'')+Math.abs(v*100).toFixed(d);
+const prc=(s,v)=>{if(!isFinite(v))return'—';const d=v>=1000?0:v>=100?2:v>=10?3:4;return num(v,d)};
+const sCol=v=>`color-mix(in srgb, ${v>=0?'var(--a2)':'var(--a1)'} ${Math.round(Math.min(1,Math.abs(v))*85)}%, var(--card))`;
+const sbar=v=>{if(!isFinite(v))return'—';const a=50+Math.min(0,v)*50,b=50+Math.max(0,v)*50;return `<span class="sbar"><b style="left:${a}%;width:${b-a}%;background:${v>=0?'var(--a2)':'var(--a1)'}"></b></span>`};
+const fdS=t=>fdate(new Date(t).toISOString().slice(0,10));
+
+/* ---------- views ---------- */
+function snapshot(){
+  const{D,A}=M,T=D.T,rows=[];
+  U.forEach(u=>{const a=A[u.s];if(!a)return;let t=T-1;while(t>0&&!isFinite(a.sig[t]))t--;if(!isFinite(a.sig[t]))return;
+    const st=a.state,c=a.sig[T-1],w=D.dates.findIndex(x=>x>=D.dates[T-1]-7*864e5);
+    let since=0;for(let k=T-1;k>0&&Math.sign(a.sig[k])===Math.sign(c);k--)since++;
+    const fw=compFlip(st,5),fm=compFlip(st,21);
+    rows.push({u,a,s:c/CAP,w1:(c-a.sig[w])/CAP,since,st,each:SPEEDS.map((k,i)=>a.fk[i][T-1]),fw,fm,
+      dw:fw/st.p-1,dm:fm/st.p-1,zw:Math.log(fw/st.p)/(st.sd*Math.sqrt(5)),zm:Math.log(fm/st.p)/(st.sd*Math.sqrt(21))})});
+  return rows;
+}
+function render(){
+  if(!M)return;
+  const{D,A}=M,T=D.T,rows=snapshot(),last=fdS(D.dates[T-1]);
+  $$('#btc button').forEach(b=>b.classList.toggle('on',+b.dataset.v===S.btc));
+  $$('#per button').forEach(b=>b.classList.toggle('on',b.dataset.v===S.per));
+  /* KPIs */
+  const cl=g=>{const r=rows.filter(x=>x.u.g===g);return r.length?r.reduce((s,x)=>s+x.s,0)/r.length:NaN};
+  const strength=rows.reduce((s,x)=>s+Math.abs(x.s),0)/rows.length,near=rows.filter(x=>Math.abs(x.zw)<1.5).length;
+  const ytdStart=D.dates.findIndex(t=>new Date(t).getUTCFullYear()===new Date(D.dates[T-1]).getUTCFullYear());
+  const ytd=[...M.pnl].slice(ytdStart).reduce((s,x)=>s*(1+x),1)-1;
+  $('#kpis').innerHTML=[
+    [T_('Equity exposure','株式エクスポージャー'),`<span class="${cl('eq')>=0?'pos':'neg'}">${pc(cl('eq'))}%</span>`,T_('average signal across 7 indices, −100 to +100','7指数の平均シグナル（−100〜+100）')],
+    [T_('Bond exposure','債券エクスポージャー'),`<span class="${cl('rt')>=0?'pos':'neg'}">${pc(cl('rt'))}%</span>`,T_('Treasury futures; long = betting on lower yields','米国債先物。ロング＝金利低下に賭ける')],
+    [T_('Trend strength','トレンドの強さ'),num(strength*100,0),T_('average size of signals across all markets','全市場のシグナルの平均の大きさ')],
+    [T_('Near a turn','反転間近'),String(near),T_(`markets that flip on a move of under 1.5 weekly σ`,`1週間σの1.5倍未満の値動きで反転する市場数`)],
+    [T_('Model this year','モデルの年初来'),`<span class="${ytd>=0?'up':'dn'}">${pc(ytd,1)}%</span>`,T_('replicator at 10% volatility, no costs','10%ボラ換算、コスト控除前')]
+  ].map(k=>`<div class="kpi"><span class="lbl">${k[0]}</span><span class="v">${k[1]}</span><span class="s">${k[2]}</span></div>`).join('');
+  board(rows,last);nearTable(rows);regime();flows(rows);asset();track();method();
+}
+const T_=T; /* alias: T is shadowed inside functions that use D.T */
+function board(rows,last){
+  $('#bSub').innerHTML=T_(`Model position as of ${last}, from −100 (full short) to +100 (full long). The four squares are the speeds, fastest first (8/32, 16/64, 32/128, 64/256-day moving-average crossovers); the blend leans on the two slow ones. “Flips in a week at” is the price that turns the blended signal if the market gets there steadily over the next five trading days; “in a month” over 21. A level on the far side (above the price for a long) means the signal fades to zero even if the price holds, and the market has to reach that level to keep the position. Click a row for the full analysis.`,
+    `${last}時点のモデルのポジション。−100（フル・ショート）〜+100（フル・ロング）。4つの四角は速い順のスピード（8/32、16/64、32/128、64/256日の移動平均クロス）。合成は遅い2つに重点。「1週間での反転水準」は今後5営業日で一定のペースでその価格に達した場合に合成シグナルがゼロになる水準、「1か月」は21営業日の場合。ロングで水準が現値より上にある場合は、価格が横ばいでもシグナルがゼロに向かい、その水準まで上昇しないとポジションを維持できないことを意味します。行をクリックで詳細分析。`);
+  let h=`<thead><tr><th>${T_('Market','市場')}</th><th>${T_('Last','終値')}</th><th>${T_('Position','ポジション')}</th><th></th><th>${T_('Speeds','スピード')}</th><th>${T_('1 week','1週間')}</th><th>${T_('Days','日数')}</th><th>${T_('Flips in a week at','1週間での反転水準')}</th><th>${T_('Away','距離')}</th><th>${T_('Flips in a month at','1か月での反転水準')}</th><th>${T_('Away','距離')}</th></tr></thead><tbody>`;
+  Object.keys(GN).forEach(g=>{const r=rows.filter(x=>x.u.g===g);if(!r.length)return;
+    h+=`<tr><td class="grp" colspan="11">${GN[g][JA()?1:0]}</td></tr>`;
+    r.forEach(x=>{h+=`<tr class="click ${x.u.s===S.asset?'on':''}" data-s="${x.u.s}"><td>${esc(NAME(x.u.s))}${Math.abs(x.zw)<1.5?`<span class="near">${T_('near','間近')}</span>`:''}</td><td>${prc(x.u.s,x.st.p)}</td>
+      <td>${sbar(x.s)}</td><td class="${x.s>=0?'pos':'neg'}">${pc(x.s)}</td>
+      <td><span class="spd">${x.each.map(f=>`<i style="background:${sCol(f/CAP)}" title="${num(f,1)}"></i>`).join('')}</span></td>
+      <td>${pc(x.w1)}</td><td>${x.since}</td><td>${isFinite(x.fw)?prc(x.u.s,x.fw):`<span class="minor">${T_('far','遠い')}</span>`}</td><td>${isFinite(x.dw)?pc(x.dw,1)+'%':''} <span class="minor">${isFinite(x.zw)?num(Math.abs(x.zw),1)+'σ':''}</span></td><td>${isFinite(x.fm)?prc(x.u.s,x.fm):`<span class="minor">${T_('far','遠い')}</span>`}</td><td>${isFinite(x.dm)?pc(x.dm,1)+'%':''}</td></tr>`})});
+  $('#board').innerHTML=h+'</tbody>';
+  $$('#board tr.click').forEach(r=>r.onclick=()=>{S.asset=r.dataset.s;save();render();$('#aT').scrollIntoView({behavior:'smooth',block:'start'})});
+}
+function nearTable(rows){
+  const r=rows.filter(x=>isFinite(x.zw)).sort((a,b)=>Math.abs(a.zw)-Math.abs(b.zw)).slice(0,10);
+  $('#near').innerHTML=`<thead><tr><th>${T_('Market','市場')}</th><th>${T_('Position','ポジション')}</th><th>${T_('Flips at','反転水準')}</th><th>${T_('Move needed','必要な値動き')}</th><th>${T_('Weekly σ','1週間σ')}</th></tr></thead><tbody>`+
+    r.map(x=>`<tr class="click" data-s="${x.u.s}"><td>${esc(NAME(x.u.s))}</td><td class="${x.s>=0?'pos':'neg'}">${pc(x.s)}</td><td>${prc(x.u.s,x.fw)}</td><td>${pc(x.dw,1)}%</td><td>${num(Math.abs(x.zw),1)}</td></tr>`).join('')+'</tbody>';
+  $$('#near tr.click').forEach(r=>r.onclick=()=>{S.asset=r.dataset.s;save();render();$('#aT').scrollIntoView({behavior:'smooth',block:'start'})});
+}
+function regime(){
+  const{D,A}=M,T=D.T,from=Math.max(0,T-3*261);
+  $('#rSub').textContent=T_('Average model position in each asset class over the last three years, −100 to +100.','過去3年の資産クラス別の平均ポジション（−100〜+100）。');
+  const cols={fx:'var(--ink)',eq:'var(--a2)',rt:'var(--a1)',cm:'var(--warn)'};
+  const ser=['eq','rt','fx','cm'].map(g=>({name:GN[g][JA()?1:0],color:cols[g],pts:[]}));
+  for(let t=from;t<T;t+=2)ser.forEach((s,k)=>{const g=['eq','rt','fx','cm'][k];const v=U.filter(u=>u.g===g&&A[u.s]&&isFinite(A[u.s].sig[t])).map(u=>A[u.s].sig[t]/CAP);s.pts.push({x:D.dates[t],y:v.length?v.reduce((a,b)=>a+b,0)/v.length*100:null})});
+  lineChart($('#reg'),ser,{h:240,xType:'date',zero:true,yFmt:v=>num(v,0),tipFmt:v=>num(v,0)});legend($('#regLeg'),ser);
+}
+const SCN=[-3,-2,-1,0,1,2,3];
+function flows(rows){
+  $('#fSub').innerHTML=T_(`Change in model position, in points of a full position, if each market moves by the given number of one-week standard deviations over the next five trading days. Blue cells are selling, red cells buying. The flat column shows drift from the averages catching up even with no price change.`,
+    `各市場が今後5営業日で1週間の標準偏差のn倍動いた場合のポジション変化（フル・ポジションに対するポイント）。青は売り、赤は買い。「0」の列は価格が変わらなくても移動平均の追随で生じる変化。`);
+  let h=`<thead><tr><th>${T_('Market','市場')}</th>${SCN.map(m=>`<th>${m>0?'+':m<0?'−':''}${Math.abs(m)}σ</th>`).join('')}<th>${T_('1σ week','1週間の1σ')}</th></tr></thead><tbody>`;
+  const agg={};
+  Object.keys(GN).forEach(g=>{const r=rows.filter(x=>x.u.g===g);if(!r.length)return;h+=`<tr><td class="grp" colspan="${SCN.length+2}">${GN[g][JA()?1:0]}</td></tr>`;
+    r.forEach(x=>{const ch=SCN.map(m=>{const tgt=x.st.p*Math.exp(m*x.st.sd*Math.sqrt(5));return(forecastAfter(x.st,pathTo(x.st,tgt,5)).c/CAP)-x.s});
+      x.flow=ch;(agg[g]=agg[g]||[]).push(ch);
+      h+=`<tr class="click" data-s="${x.u.s}"><td>${esc(NAME(x.u.s))}</td>${ch.map(v=>`<td class="f" style="background:${sCol(v*2.5)}">${pc(v)}</td>`).join('')}<td class="minor">${num(x.st.sd*Math.sqrt(5)*100,1)}%</td></tr>`})});
+  $('#flow').innerHTML=h+'</tbody>';
+  $$('#flow tr.click').forEach(r=>r.onclick=()=>{S.asset=r.dataset.s;save();render();$('#aT').scrollIntoView({behavior:'smooth',block:'start'})});
+  const eq=rows.filter(x=>x.u.g==='eq');if(!eq.length){$('#fSay').innerHTML='';return}
+  const avg=k=>eq.reduce((s,x)=>s+x.flow[k],0)/eq.length*100;
+  $('#fSay').innerHTML=T_(`Across the seven equity indices, a 2σ fall over the week would change the average position by <b>${num(avg(1),0)}</b> points, a 2σ rise by <b>${num(avg(5),0)}</b>. With flat prices it drifts by ${num(avg(3),0)}. The more lopsided those two numbers, the more one-sided the trend-following flow.`,
+    `株価指数7市場の平均で、1週間で2σの下落ならポジションは<b>${num(avg(1),0)}</b>ポイント、2σの上昇なら<b>${num(avg(5),0)}</b>ポイント変化。価格横ばいでも${num(avg(3),0)}ポイント変化します。両者の差が大きいほど、トレンドフォローのフローは一方向に偏ります。`);
+}
+function asset(){
+  const{D,A}=M,T=D.T;
+  $('#asset').innerHTML=Object.keys(GN).map(g=>`<optgroup label="${GN[g][JA()?1:0]}">`+U.filter(u=>u.g===g&&A[u.s]).map(u=>`<option value="${u.s}" ${u.s===S.asset?'selected':''}>${esc(NAME(u.s))}</option>`).join('')+'</optgroup>').join('');
+  const a=A[S.asset];if(!a){$('#aT').textContent=NAME(S.asset);return}
+  const st=a.state,c=a.sig[T-1]/CAP;
+  $('#aT').textContent=NAME(S.asset);
+  $('#aSub').textContent=T_('The model on this market alone: prices against the moving averages, how each speed stands, what a week’s move would do, and how trend following has worked here.','この市場単体でのモデル：移動平均との位置、スピード別の状況、1週間の値動きの影響、そしてこの市場でトレンドフォローがどう機能してきたか。');
+  /* price chart, 1 year */
+  const from=Math.max(0,T-261),xs=D.dates.slice(from),e16=[],e64=[];
+  { let f=NaN,s=NaN;for(let t=0;t<T;t++){const p=D.P[S.asset][t];if(!isFinite(p))continue;f=isFinite(f)?f+al(16)*(p-f):p;s=isFinite(s)?s+al(64)*(p-s):p;if(t>=from){e16.push({x:D.dates[t],y:f});e64.push({x:D.dates[t],y:s})}}}
+  const flips=SPEEDS.map((k,i)=>speedFlip(st,i)),cf=compFlip(st,5);
+  const flat=(v,col,name,dash)=>({name,color:col,dash,width:1.2,pts:isFinite(v)&&Math.abs(Math.log(v/st.p))<.35?[{x:xs[0],y:v},{x:xs[xs.length-1],y:v}]:[]});
+  const ps=[{name:T_('Price','価格'),color:'var(--ink)',width:1.8,pts:xs.map((x,i)=>({x,y:D.P[S.asset][from+i]}))},
+    {name:T_('16-day average','16日平均'),color:'var(--a2)',width:1.2,pts:e16},{name:T_('64-day average','64日平均'),color:'var(--a1)',width:1.2,pts:e64},
+    flat(cf,'var(--warn)',T_('Blended flip (one week)','合成シグナルの反転水準（1週間）'),1)];
+  lineChart($('#pc'),ps,{h:280,xType:'date',yFmt:v=>prc(S.asset,v),tipFmt:v=>prc(S.asset,v)});legend($('#pLeg'),ps.filter(s=>s.pts.length));
+  /* signal chart, 3 years */
+  const f3=Math.max(0,T-3*261),ss=[{name:T_('Blended','合成'),color:'var(--ink)',width:2,area:1,pts:[]}].concat(SPEEDS.map((k,i)=>({name:`${k[0]}/${k[1]}`,color:['var(--a2)','var(--warn)','var(--a1)','var(--mute)'][i],width:1,pts:[]})));
+  for(let t=f3;t<T;t++){ss[0].pts.push({x:D.dates[t],y:isFinite(a.sig[t])?a.sig[t]/CAP*100:null});SPEEDS.forEach((k,i)=>ss[i+1].pts.push({x:D.dates[t],y:isFinite(a.fk[i][t])?a.fk[i][t]/CAP*100:null}))}
+  lineChart($('#sc'),ss,{h:280,xType:'date',zero:true,yFmt:v=>num(v,0),tipFmt:v=>num(v,0)});legend($('#sLeg'),ss);
+  /* speeds */
+  $('#speeds').innerHTML=`<thead><tr><th>${T_('Speed (days)','スピード（日）')}</th><th>${T_('Signal','シグナル')}</th><th>${T_('Flips at (tomorrow; blended: a week)','反転水準（明日。合成は1週間）')}</th><th>${T_('Away','距離')}</th><th>σ</th></tr></thead><tbody>`+
+    SPEEDS.map((k,i)=>{const f=a.fk[i][T-1],fl=flips[i];return `<tr><td>${k[0]}/${k[1]}</td><td class="${f>=0?'pos':'neg'}">${pc(f/CAP)}</td><td>${prc(S.asset,fl)}</td><td>${isFinite(fl)?pc(fl/st.p-1,1)+'%':'—'}</td><td>${isFinite(fl)?num(Math.abs(Math.log(fl/st.p))/st.sd,1):'—'}</td></tr>`}).join('')+
+    `<tr><td><b>${T_('Blended','合成')}</b></td><td class="${c>=0?'pos':'neg'}"><b>${pc(c)}</b></td><td><b>${prc(S.asset,cf)}</b></td><td>${isFinite(cf)?pc(cf/st.p-1,1)+'%':'—'}</td><td>${isFinite(cf)?num(Math.abs(Math.log(cf/st.p))/(st.sd*Math.sqrt(5)),1)+'w':'—'}</td></tr></tbody>`;
+  /* scenarios */
+  $('#scen').innerHTML=`<thead><tr><th>${T_('Week move','1週間の値動き')}</th><th>${T_('Price','価格')}</th><th>${T_('Position after','変化後')}</th><th>${T_('Trade','売買')}</th></tr></thead><tbody>`+
+    SCN.map(m=>{const tgt=st.p*Math.exp(m*st.sd*Math.sqrt(5)),after=forecastAfter(st,pathTo(st,tgt,5)).c/CAP,d=after-c;
+      return `<tr><td>${m>0?'+':m<0?'−':''}${Math.abs(m)}σ (${pc(tgt/st.p-1,1)}%)</td><td>${prc(S.asset,tgt)}</td><td class="${after>=0?'pos':'neg'}">${pc(after)}</td><td style="background:${sCol(d*2.5)}">${d>0.005?T_('buy ','買い ')+pc(d):d<-0.005?T_('sell ','売り ')+pc(-d).replace('+',''):T_('little','ほぼなし')}</td></tr>`}).join('')+'</tbody>';
+  /* single-market track record */
+  const ar=[];for(let t=1;t<T;t++){if(isFinite(a.sig[t-1])&&isFinite(a.ret[t])&&isFinite(a.vol[t-1]))ar.push({t,x:(a.sig[t-1]/10)*(TARGET/(a.vol[t-1]*Math.sqrt(252)))*a.ret[t]})}
+  const mean=ar.reduce((s,o)=>s+o.x,0)/ar.length,sd=Math.sqrt(ar.reduce((s,o)=>s+(o.x-mean)**2,0)/ar.length);
+  const mo={};ar.forEach(o=>{const k=new Date(D.dates[o.t]).toISOString().slice(0,7);mo[k]=(mo[k]||0)+o.x});const mv=Object.values(mo);
+  const mm=mv.reduce((s,x)=>s+x,0)/mv.length,msd=Math.sqrt(mv.reduce((s,x)=>s+(x-mm)**2,0)/mv.length),skew=mv.reduce((s,x)=>s+((x-mm)/msd)**3,0)/mv.length;
+  let flipsN=0,prev=0;for(let t=0;t<T;t++){const v=Math.sign(a.sig[t]||0);if(v&&prev&&v!==prev)flipsN++;if(v)prev=v}
+  const yrs=ar.length/261,hold=flipsN?ar.length/flipsN:NaN;
+  $('#aStats').innerHTML=[[T_('Sharpe ratio','シャープ・レシオ'),num(mean/sd*Math.sqrt(252),2)],[T_('Positive months','プラスの月'),num(mv.filter(x=>x>0).length/mv.length*100,0)+'%'],[T_('Monthly skew','月次の歪度'),num(skew,2)],[T_('Best month','最良月'),pc(Math.max(...mv),1)+'%'],[T_('Worst month','最悪月'),pc(Math.min(...mv),1)+'%'],[T_('Average trend','平均トレンド期間'),isFinite(hold)?num(hold,0)+T_(' days',' 日'):'—']]
+    .map(k=>`<div class="kpi"><span class="lbl">${k[0]}</span><span class="v">${k[1]}</span></div>`).join('');
+  const nearest=SPEEDS.map((k,i)=>({k,fl:flips[i],z:Math.abs(Math.log(flips[i]/st.p))/st.sd})).filter(o=>isFinite(o.z)).sort((p,q)=>p.z-q.z)[0];
+  let txt=T_(`The model is <b>${pc(c)}</b> on ${NAME(S.asset)}${c>=0?' (long)':' (short)'}. `,`${NAME(S.asset)}のモデル・ポジションは<b>${pc(c)}</b>（${c>=0?'ロング':'ショート'}）。`);
+  if(isFinite(cf))txt+=T_(`Reached over the next week, ${prc(S.asset,cf)} would turn the blended signal, ${pc(cf/st.p-1,1)}% from here (${num(Math.abs(Math.log(cf/st.p))/(st.sd*Math.sqrt(5)),1)} weekly σ). `,`今後1週間で${prc(S.asset,cf)}に達すると合成シグナルが反転します。現値から${pc(cf/st.p-1,1)}%（1週間σの${num(Math.abs(Math.log(cf/st.p))/(st.sd*Math.sqrt(5)),1)}倍）。`);
+  if(nearest)txt+=T_(`The first speed to turn is ${nearest.k[0]}/${nearest.k[1]} at ${prc(S.asset,nearest.fl)}. `,`最初に反転するのは${nearest.k[0]}/${nearest.k[1]}で、水準は${prc(S.asset,nearest.fl)}。`);
+  txt+=T_(`Over ${num(yrs,0)} years, trend following on this market alone had a Sharpe ratio of ${num(mean/sd*Math.sqrt(252),2)} before costs, with monthly skew of ${num(skew,2)}${skew>0?', the positive skew trend following is known for':''}.`,
+    `過去${num(yrs,0)}年、この市場単体のトレンドフォローのシャープ・レシオはコスト控除前で${num(mean/sd*Math.sqrt(252),2)}、月次の歪度は${num(skew,2)}${skew>0?'（トレンドフォローに特有の正の歪み）':''}。`);
+  $('#aSay').innerHTML=txt;
+}
+function track(){
+  const{D,pnl,byC,cls,first}=M,T=D.T;
+  /* benchmarks, rebased */
+  const bStart=Math.min(...BENCH.map(b=>{const p=D.P[b.s];if(!p)return T;for(let t=0;t<T;t++)if(isFinite(p[t]))return t;return T}));
+  const st=S.per==='etf'&&bStart<T?bStart:first+1;
+  const series=[{name:T_('Trend replicator (10% vol)','トレンド複製モデル（ボラ10%）'),color:'var(--ink)',width:2,pts:[]}];
+  let eq=1;for(let t=st;t<T;t++){eq*=1+pnl[t];if((t-st)%3===0||t===T-1)series[0].pts.push({x:D.dates[t],y:(eq-1)*100})}
+  BENCH.forEach((b,k)=>{const p=D.P[b.s];if(!p)return;let s0=NaN;const pts=[];for(let t=Math.max(st,0);t<T;t++){if(!isFinite(p[t]))continue;if(!isFinite(s0)){s0=p[t];if(S.per!=='etf'&&t>st){/* align to model value on the ETF's first day */s0=p[t]/(1+series[0].pts.reduce((v,q)=>q.x<=D.dates[t]?q.y/100:v,0))}}if((t-st)%3===0||t===T-1)pts.push({x:D.dates[t],y:(p[t]/s0-1)*100})}
+    series.push({name:NAME(b.s),color:k?'var(--a1)':'var(--a2)',width:1.3,pts})});
+  lineChart($('#bt'),series,{h:300,xType:'date',zero:true,yFmt:v=>num(v,0)+'%',tipFmt:v=>num(v,1)+'%'});legend($('#btLeg'),series);
+  $('#tSub').textContent=T_(`Cumulative return of a portfolio that holds every market at the model position, with equal risk in each asset class and scaled to 10% annual volatility, before costs and without interest on cash. Managed-futures ETFs are shown for comparison; a close match means the replicator is a fair guide to where the industry sits.`,
+    `全市場をモデルのポジションで保有し、資産クラスごとにリスクを均等配分、年率ボラ10%に調整したポートフォリオの累積リターン（コスト・現金金利を含まず）。比較としてマネージド・フューチャーズETFを表示。連動が高いほど、複製モデルが業界のポジションの目安として有効です。`);
+  /* stats */
+  const r=[...pnl].slice(st),n=r.length,mu=r.reduce((s,x)=>s+x,0)/n,sd=Math.sqrt(r.reduce((s,x)=>s+(x-mu)**2,0)/n);
+  let pk=1,v=1,mdd=0;r.forEach(x=>{v*=1+x;pk=Math.max(pk,v);mdd=Math.min(mdd,v/pk-1)});
+  const cagr=Math.pow(v,261/n)-1;
+  /* weekly correlation with DBMF */
+  const wk=(arr)=>{const out={};for(let t=st;t<T;t++){const d=new Date(D.dates[t]);const k=Math.floor((D.dates[t]/864e5+3)/7);out[k]=(out[k]||0)+arr(t)}return out};
+  const mW=wk(t=>pnl[t]);const corr=b=>{const p=D.P[b];if(!p)return NaN;const bw=wk(t=>isFinite(D.R[b][t])?D.R[b][t]:0);const ks=Object.keys(mW).filter(k=>bw[k]!==undefined&&bw[k]!==0);if(ks.length<30)return NaN;
+    const x=ks.map(k=>mW[k]),y=ks.map(k=>bw[k]),mx=x.reduce((s,a)=>s+a,0)/x.length,my=y.reduce((s,a)=>s+a,0)/y.length;let sxy=0,sxx=0,syy=0;x.forEach((a,i)=>{sxy+=(a-mx)*(y[i]-my);sxx+=(a-mx)**2;syy+=(y[i]-my)**2});return sxy/Math.sqrt(sxx*syy)};
+  $('#btStats').innerHTML=[[T_('Annual return','年率リターン'),pc(cagr,1)+'%'],[T_('Sharpe ratio','シャープ・レシオ'),num(mu/sd*Math.sqrt(261),2)],[T_('Worst drawdown','最大ドローダウン'),pc(mdd,1)+'%'],[T_('Weekly correlation with DBMF','DBMFとの週次相関'),num(corr('DBMF'),2)],[T_('… with KMLM','KMLMとの週次相関'),num(corr('KMLM'),2)]]
+    .map(k=>`<div class="kpi"><span class="lbl">${k[0]}</span><span class="v">${k[1]}</span></div>`).join('');
+  /* by year and class */
+  const yrs={};for(let t=st;t<T;t++){const y=new Date(D.dates[t]).getUTCFullYear();yrs[y]=yrs[y]||{all:0};yrs[y].all+=pnl[t];cls.forEach(c=>yrs[y][c]=(yrs[y][c]||0)+byC[c][t])}
+  $('#years').innerHTML=`<thead><tr><th>${T_('Year','年')}</th>${cls.map(c=>`<th>${GN[c][JA()?1:0]}</th>`).join('')}<th>${T_('Total','合計')}</th></tr></thead><tbody>`+
+    Object.keys(yrs).sort().reverse().map(y=>`<tr><td>${y}</td>${cls.map(c=>`<td class="${yrs[y][c]>=0?'up':'dn'}">${pc(yrs[y][c],1)}</td>`).join('')}<td class="${yrs[y].all>=0?'up':'dn'}"><b>${pc(yrs[y].all,1)}</b></td></tr>`).join('')+'</tbody>';
+  /* crisis alpha: model return by S&P 500 monthly quintile */
+  const spx=D.P['^GSPC'];const mo={};for(let t=st;t<T;t++){const k=new Date(D.dates[t]).toISOString().slice(0,7);mo[k]=mo[k]||{m:0,a:NaN,b:NaN};mo[k].m+=pnl[t];if(isFinite(spx[t])){if(!isFinite(mo[k].a))mo[k].a=spx[t-1]||spx[t];mo[k].b=spx[t]}}
+  const ms_=Object.values(mo).filter(o=>isFinite(o.a)&&isFinite(o.b)).map(o=>({m:o.m,s:o.b/o.a-1})).sort((p,q)=>p.s-q.s);
+  const q=5,rowsQ=[];for(let i=0;i<q;i++){const part=ms_.slice(Math.floor(i*ms_.length/q),Math.floor((i+1)*ms_.length/q));rowsQ.push({lo:part[0].s,hi:part[part.length-1].s,sp:part.reduce((s,o)=>s+o.s,0)/part.length,md:part.reduce((s,o)=>s+o.m,0)/part.length,hit:part.filter(o=>o.m>0).length/part.length})}
+  const lab=[T_('Worst fifth','下位20%'),T_('Second','2番目'),T_('Middle','中位'),T_('Fourth','4番目'),T_('Best fifth','上位20%')];
+  $('#crisis').innerHTML=`<thead><tr><th>${T_('S&P 500 months','S&P500の月')}</th><th>${T_('S&P avg','S&P平均')}</th><th>${T_('Model avg','モデル平均')}</th><th>${T_('Model up','モデルがプラス')}</th></tr></thead><tbody>`+
+    rowsQ.map((o,i)=>`<tr><td>${lab[i]}</td><td class="${o.sp>=0?'up':'dn'}">${pc(o.sp,1)}%</td><td class="${o.md>=0?'up':'dn'}">${pc(o.md,2)}%</td><td>${num(o.hit*100,0)}%</td></tr>`).join('')+'</tbody>';
+  $('#crisisNote').textContent=T_(`${ms_.length} months, sorted by the S&P 500’s return. Trend following tends to do best in the extremes, the “smile” that makes it a diversifier.`,`${ms_.length}か月をS&P500のリターン順に5分割。トレンドフォローは両端で好成績になりやすく、この「スマイル」が分散効果の源です。`);
+}
+function method(){
+  $('#method').innerHTML=T_(`<b>Method.</b> A public-domain replication of trend-following CTAs. For each market, four exponential moving-average crossovers (8/32, 16/64, 32/128 and 64/256 days) are divided by the market’s recent price volatility (36-day exponentially weighted), scaled so a typical reading is 10 and capped at ±20, then blended with weights of 5%, 15%, 35% and 45% (fastest to slowest) and multiplied by 1.1. That weighting tracked the DBMF and KMLM managed-futures ETFs more closely than an equal blend. The result, shown as −100 to +100, is the position as a share of a full position. Positions are sized by inverse volatility, with equal risk per asset class and the whole book scaled to 10% annual volatility over the period shown. Flip levels hold volatility fixed and step the moving averages forward along the price path. Prices are Yahoo continuous futures, FX spot and cash indices; continuous futures splice contracts at expiry, so daily moves beyond ${ROLLZ} standard deviations in futures are treated as roll gaps. No costs, no carry, no interest. Real CTAs differ in speeds, markets, weights and risk limits, so read positions as direction and relative size, not dollars. Not investment advice. ${LIVE?'Data: Keel (Yahoo Finance through OpenBB); free sources can be delayed.':'<b>Synthetic sample, not market data.</b> Connect Keel for live figures.'}`,
+    `<b>手法。</b>トレンドフォロー型CTAの公開された複製手法。各市場で4つの指数移動平均クロス（8/32、16/64、32/128、64/256日）を直近の価格ボラ（36日指数加重）で割り、典型値が10になるよう調整して±20で上限設定し、速い順に5%・15%・35%・45%で加重して1.1倍したもの。この加重は均等配分よりもマネージド・フューチャーズETF（DBMF、KMLM）との連動が高くなりました。−100〜+100で表示し、フル・ポジションに対する割合を示します。ポジションはボラの逆数で調整し、資産クラスごとにリスクを均等配分、全体を表示期間で年率ボラ10%に調整。反転水準はボラを固定し、価格経路に沿って移動平均を更新して算出。価格はYahooの連続先物、為替スポット、現物指数。連続先物は限月の切り替えで価格が接続されるため、先物で${ROLLZ}標準偏差を超える日次の動きはロールの段差として扱います。取引コスト、キャリー、金利は含みません。実際のCTAはスピード、市場、ウェイト、リスク制限が異なるため、ポジションは金額ではなく方向と相対的な大きさとして読んでください。投資助言ではありません。${LIVE?'データ：Keel（OpenBB経由のYahoo Finance）。無料ソースのため遅延の可能性があります。':'<b>合成サンプルであり、市場データではありません。</b>Keelに接続すると実データを表示します。'}`);
+}
+window.redraw=render;
+
+/* ---------- load: three batches in turn so a free server is not flooded ---------- */
+async function load(fresh){
+  setStatus('busy');
+  const series={};let ok=0,err=null;
+  for(const b of BATCHES){const r=await keel('api_history',{symbols:b.join(','),interval:'D',start:'2011-01-01'},{fresh});
+    if(r.ok&&r.data&&r.data.series){Object.assign(series,r.data.series);ok++}else err=r}
+  if(ok){SERIES=series;LIVE=true;setStatus('live');
+    if(err){const bn=$('#banner');bn.hidden=false;bn.innerHTML=`<span>${T('Some markets did not load: ','一部の市場を取得できません：')}${esc(keelMsg(err.code,err.message))}</span>`}}
+  else{SERIES=sample();LIVE=false;setStatus(err&&err.code==='no_mcp'?'sample':'err',err&&err.code,err&&err.message)}
+  M=model();render();
+}
+$('#asset').onchange=e=>{S.asset=e.target.value;save();render()};
+$$('#btc button').forEach(b=>b.onclick=()=>{S.btc=+b.dataset.v;save();M=model();render()});
+$$('#per button').forEach(b=>b.onclick=()=>{S.per=b.dataset.v;save();track()});
+$('#refresh').onclick=()=>load(true);
+$('#how').innerHTML=howHtml();
+$$('#langSeg button').forEach(b=>b.onclick=()=>{setLang(b.dataset.l);$('#how').innerHTML=howHtml();restatus();render()});
+setLang(LANG);
+SERIES=sample();M=model();render();
+load(false);
+</script>
