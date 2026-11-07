@@ -1,0 +1,381 @@
+<title>Web</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@300;400;500;600&family=Noto+Sans+JP:wght@300;400&display=swap">
+<style>
+/*CORE_CSS*/
+/* Web: cross-asset correlation regimes. Summary (stock–bond and the classic pairs) first, then the full matrix, then one pair in depth.
+   Correlation colour: positive in red, negative in steel, strength by opacity; the same scale everywhere. */
+.app{padding-left:max(20px,env(safe-area-inset-left,0px));padding-right:max(20px,env(safe-area-inset-right,0px))}
+@media (max-width:480px){.app{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}}
+.hm-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+svg.hm{display:block;user-select:none}
+svg.hm text{font-family:var(--font);font-size:11px;fill:var(--mute)}
+svg.hm text.v{fill:var(--ink);font-variant-numeric:tabular-nums}
+svg.hm text.g{fill:var(--ink);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase}
+svg.hm rect.c{cursor:pointer}
+svg.hm rect.sel{fill:none;stroke:var(--ink);stroke-width:2}
+.scale{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--mute);margin-top:10px;flex-wrap:wrap}
+.scale .bar{height:10px;width:180px;border:1px solid var(--line);padding:0}
+td.pair{white-space:normal;min-width:150px}
+td.pair b{font-weight:400}
+.cell{display:inline-block;min-width:52px;padding:2px 6px;text-align:right}
+.flag{display:inline-block;font-size:11px;padding:1px 6px;border:1px solid var(--line);color:var(--mute);margin-left:6px;vertical-align:1px}
+.flag.flip{border-color:var(--warn);color:var(--warn)}
+.flag.ext{border-color:var(--a2);color:var(--a2)}
+tbody tr.click{cursor:pointer}
+tbody tr.click:hover td{background:var(--sel)}
+.pctbar{display:inline-block;width:70px;height:6px;background:var(--track);position:relative;vertical-align:middle}
+.pctbar i{position:absolute;top:-3px;width:2px;height:12px;background:var(--ink)}
+.dv{display:grid;grid-template-columns:minmax(0,1fr);gap:4px}
+.dvrow{display:grid;grid-template-columns:110px minmax(0,1fr) 54px;align-items:center;gap:10px;font-size:13px;font-variant-numeric:tabular-nums}
+.dvrow .t{position:relative;height:16px;background:linear-gradient(to right,transparent calc(50% - .5px),var(--rule) calc(50% - .5px),var(--rule) calc(50% + .5px),transparent calc(50% + .5px))}
+.dvrow .t b{position:absolute;top:3px;height:10px}
+.dvrow .t i{position:absolute;top:0;width:2px;height:16px;background:var(--ink);opacity:.55}
+.dvrow .n{text-align:right}
+.dvax{display:grid;grid-template-columns:110px minmax(0,1fr) 54px;gap:10px;font-size:11px;color:var(--mute)}
+.dvax div{display:flex;justify-content:space-between}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:0;border-top:1px solid var(--line);margin-top:14px}
+.stats .kpi .v{font-size:22px}
+.sel2{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.say{font-size:15px;line-height:1.55;max-width:78ch;margin:14px 0 0}
+.say b{font-weight:500}
+</style>
+
+<div class="app">
+  <header class="top">
+    <div class="brand"><h1 data-ja="ウェブ">Web</h1><span data-ja="資産同士の相関がいまどう動いているか。符号の反転と、いま分散に効く資産">How assets are moving together now, which relationships have flipped, and what still diversifies</span></div>
+    <div class="tright">
+      <span class="pill busy" id="status"><i></i></span>
+      <button class="btn q" id="refresh" data-ja="更新">Refresh</button>
+      <button class="btn q" id="themeBtn">Dark</button>
+      <div class="seg" id="langSeg"><button data-l="en">EN</button><button data-l="ja">日本語</button></div>
+    </div>
+  </header>
+  <div class="banner" id="banner" hidden></div>
+  <div class="help" id="how" hidden></div>
+
+  <div class="bar">
+    <div class="grp"><span class="lbl" data-ja="リターン">Returns</span><div class="seg" id="freq"><button data-v="W" data-ja="週次">Weekly</button><button data-v="D" data-ja="日次">Daily</button></div></div>
+    <div class="grp"><span class="lbl" data-ja="直近の窓">Recent window</span><div class="seg" id="rwin"></div></div>
+    <div class="grp"><span class="lbl" data-ja="比較の窓">Baseline</span><div class="seg" id="bwin"></div></div>
+    <span class="lbl" id="asof"></span>
+  </div>
+
+  <div class="kpis" id="kpis"></div>
+
+  <section class="sec">
+    <div class="sh"><h2 data-ja="定番の関係">The classic relationships</h2><p id="clSub"></p></div>
+    <div class="tw"><table id="classic"></table></div>
+  </section>
+
+  <section class="sec">
+    <div class="sh"><h2 data-ja="相関マトリクス">Correlation matrix</h2><p data-ja="セルをクリックすると下に推移を表示。「変化」は直近の窓から比較の窓を引いた値。">Click a cell to see that pair over time below. “Change” is the recent window minus the baseline.</p></div>
+    <div class="bar" style="border:0;padding-top:0"><div class="seg" id="view"><button data-v="r" data-ja="直近">Recent</button><button data-v="b" data-ja="比較">Baseline</button><button data-v="d" data-ja="変化">Change</button></div></div>
+    <div class="hm-wrap"><svg class="hm" id="hm"></svg></div>
+    <div class="scale" id="scale"></div>
+  </section>
+
+  <section class="sec">
+    <div class="sh"><h2 id="pT"></h2><p id="pSub"></p></div>
+    <div class="sel2"><select id="pa" aria-label="First asset"></select><span class="lbl">×</span><select id="pb" aria-label="Second asset"></select></div>
+    <div style="margin-top:12px"><svg class="ch" id="pc" height="280"></svg><div class="leg" id="pLeg"></div></div>
+    <div class="stats kpis" id="pStats"></div>
+    <p class="say" id="pSay"></p>
+  </section>
+
+  <section class="sec two">
+    <div style="min-width:0">
+      <div class="sh"><h2 data-ja="いま分散に効くもの">What diversifies right now</h2><p id="dvSub"></p></div>
+      <div class="sel2" style="margin-bottom:12px"><span class="lbl" data-ja="保有資産">Against</span><select id="anchor" aria-label="Anchor asset"></select></div>
+      <div class="dv" id="dv"></div>
+    </div>
+    <div style="min-width:0">
+      <div class="sh"><h2 data-ja="大きく変わった組み合わせ">Biggest shifts</h2><p data-ja="直近と比較の窓の差が大きい順。符号が変わったものに印。行をクリックで推移へ。">Pairs whose correlation moved most between the baseline and the recent window. Sign flips are flagged. Click a row to chart it.</p></div>
+      <div class="tw"><table id="shifts"></table></div>
+    </div>
+  </section>
+  <p class="note" id="method"></p>
+</div>
+
+<script>
+/*CORE_JS*/
+/* ---------- universe ---------- */
+const U=[
+ {s:'USDJPY=X',g:'fx',en:'USD/JPY',ja:'ドル円',k:'USDJPY'},
+ {s:'EURUSD=X',g:'fx',en:'EUR/USD',ja:'ユーロドル',k:'EURUSD'},
+ {s:'AUDUSD=X',g:'fx',en:'AUD/USD',ja:'豪ドル',k:'AUDUSD'},
+ {s:'USDCAD=X',g:'fx',en:'USD/CAD',ja:'ドルカナダ',k:'USDCAD'},
+ {s:'^GSPC',g:'eq',en:'S&P 500',ja:'S&P500',k:'SPX'},
+ {s:'^N225',g:'eq',en:'Nikkei 225',ja:'日経平均',k:'NKY'},
+ {s:'^STOXX50E',g:'eq',en:'Euro Stoxx 50',ja:'ユーロ・ストックス50',k:'SX5E'},
+ {s:'UST2Y',g:'rt',en:'UST 2Y yield',ja:'米2年金利',k:'UST2'},
+ {s:'UST10Y',g:'rt',en:'UST 10Y yield',ja:'米10年金利',k:'UST10'},
+ {s:'JGB10Y',g:'rt',en:'JGB 10Y yield',ja:'日本10年金利',k:'JGB10'},
+ {s:'GC=F',g:'cm',en:'Gold',ja:'金',k:'Gold'},
+ {s:'CL=F',g:'cm',en:'WTI oil',ja:'WTI原油',k:'WTI'},
+ {s:'HG=F',g:'cm',en:'Copper',ja:'銅',k:'Copper'},
+ {s:'BTC-USD',g:'cr',en:'Bitcoin',ja:'ビットコイン',k:'BTC'}];
+const GN={fx:['FX','為替'],eq:['Equities','株式'],rt:['Yields','金利'],cm:['Commodities','商品'],cr:['Crypto','暗号資産']};
+const NAME=s=>{const u=U.find(x=>x.s===s);return u?(JA()?u.ja:u.en):s};
+const KEY=s=>(U.find(x=>x.s===s)||{}).k||s;
+const IDX=Object.fromEntries(U.map((u,i)=>[u.s,i]));
+/* Relationships people watch, with what the sign means */
+const CLASSIC=[
+ {a:'^GSPC',b:'UST10Y',en:'Stocks vs bond yields',ja:'株と債券利回り',why:['Positive: stocks and bonds fall together (inflation regime). Negative: bonds hedge equities.','正：株と債券が同時に下がる（インフレ局面）。負：債券が株のヘッジになる。']},
+ {a:'USDJPY=X',b:'^N225',en:'Weak yen, strong Nikkei',ja:'円安・株高',why:['Positive: a weaker yen lifts Japanese stocks.','正：円安が日本株を押し上げる。']},
+ {a:'USDJPY=X',b:'UST10Y',en:'Dollar-yen and US yields',ja:'ドル円と米金利',why:['Positive: USD/JPY trades the US rate story.','正：ドル円が米金利に連動。']},
+ {a:'GC=F',b:'UST10Y',en:'Gold vs US yields',ja:'金と米金利',why:['Negative: higher yields weigh on gold. A fading negative means other buyers dominate.','負：金利上昇が金の重し。負の弱まりは別の買い手の存在を示す。']},
+ {a:'CL=F',b:'USDCAD=X',en:'Oil vs USD/CAD',ja:'原油とドルカナダ',why:['Negative: oil up, Canadian dollar up.','負：原油高でカナダドル高。']},
+ {a:'^GSPC',b:'BTC-USD',en:'Stocks vs Bitcoin',ja:'株とビットコイン',why:['Positive: Bitcoin trades as a risk asset.','正：ビットコインがリスク資産として動く。']},
+ {a:'^GSPC',b:'USDJPY=X',en:'Stocks vs dollar-yen',ja:'株とドル円',why:['Positive: the yen still works as a risk-off hedge.','正：円がリスクオフのヘッジとして機能。']},
+ {a:'AUDUSD=X',b:'HG=F',en:'Aussie vs copper',ja:'豪ドルと銅',why:['Positive: AUD follows China-linked metals.','正：豪ドルが中国関連の金属に連動。']}];
+
+/* ---------- state ---------- */
+let S={freq:'W',r:26,b:156,view:'r',pa:'^GSPC',pb:'UST10Y',anchor:'^N225'};
+try{Object.assign(S,JSON.parse(localStorage.getItem('web-state')||'{}'))}catch(e){}
+const save=()=>{try{localStorage.setItem('web-state',JSON.stringify(S))}catch(e){}};
+if(!['W','D'].includes(S.freq))S.freq='W';
+const WINS={W:{r:[[13,'3M','3ヶ月'],[26,'6M','6ヶ月'],[52,'1Y','1年']],b:[[104,'2Y','2年'],[156,'3Y','3年'],[260,'5Y','5年']],dr:26,db:156},
+            D:{r:[[21,'1M','1ヶ月'],[63,'3M','3ヶ月'],[126,'6M','6ヶ月']],b:[[252,'1Y','1年'],[504,'2Y','2年'],[756,'3Y','3年']],dr:63,db:252}};
+if(!WINS[S.freq].r.some(w=>w[0]===S.r))S.r=WINS[S.freq].dr;if(!WINS[S.freq].b.some(w=>w[0]===S.b))S.b=WINS[S.freq].db;
+const winLab=(n)=>{for(const k of['r','b'])for(const w of WINS[S.freq][k])if(w[0]===n)return JA()?w[2]:w[1];return n};
+
+let SERIES=null,UNITS={},LIVE=false,STORED=null;
+let GRID=null; /* {dates:[ms], R:[Float64Array|null per asset], valid:[Uint8Array]} */
+let CACHE={}; /* rolling series per pair+window */
+
+/* ---------- sample data (synthetic, seeded) ---------- */
+function sample(){
+  let seed=20261107;const rnd=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296};
+  const gauss=()=>{let u=0,v=0;while(!u)u=rnd();while(!v)v=rnd();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v)};
+  const start=new Date('2016-11-07T00:00:00Z'),days=[];
+  for(let d=new Date(start);d<=new Date('2026-11-06T00:00:00Z');d=new Date(+d+864e5)){const w=d.getUTCDay();if(w&&w<6)days.push(d.toISOString().slice(0,10))}
+  /* factor loadings: [risk, usd, rates, yen-haven, commodity, crypto] ; stock-bond flips sign in 2021 */
+  const L={'USDJPY=X':[.25,.45,.45,-.5,0,0],'EURUSD=X':[.15,-.8,-.1,0,.1,0],'AUDUSD=X':[.45,-.55,0,0,.4,0],'USDCAD=X':[-.25,.55,0,0,-.45,0],
+    '^GSPC':[.9,0,0,0,0,0],'^N225':[.7,0,0,0,0,0],'^STOXX50E':[.8,-.1,0,0,.05,0],
+    'UST2Y':[.15,.2,.85,0,.1,0],'UST10Y':[.25,.1,.85,0,.15,0],'JGB10Y':[.1,0,.4,.2,0,0],
+    'GC=F':[.05,-.35,-.45,.2,.3,0],'CL=F':[.35,-.15,.1,0,.75,0],'HG=F':[.45,-.25,.05,0,.6,0],'BTC-USD':[.45,-.1,-.05,0,0,.85]};
+  const vol={'USDJPY=X':.09,'EURUSD=X':.07,'AUDUSD=X':.1,'USDCAD=X':.06,'^GSPC':.17,'^N225':.2,'^STOXX50E':.18,'UST2Y':90,'UST10Y':95,'JGB10Y':35,'GC=F':.15,'CL=F':.35,'HG=F':.24,'BTC-USD':.6};
+  const lvl={'USDJPY=X':105,'EURUSD=X':1.1,'AUDUSD=X':.74,'USDCAD=X':1.33,'^GSPC':2100,'^N225':17000,'^STOXX50E':3000,'UST2Y':.9,'UST10Y':1.8,'JGB10Y':-.05,'GC=F':1290,'CL=F':45,'HG=F':2.2,'BTC-USD':700};
+  const out={};U.forEach(u=>out[u.s]=[]);
+  days.forEach((d,i)=>{const yr=+d.slice(0,4)+(+d.slice(5,7))/12;
+    const f=[gauss(),gauss(),gauss(),gauss(),gauss(),gauss()];
+    const sb=yr<2021.3?-.55:yr<2025?.6:.15; /* stock-bond regime */
+    const shock=yr>2020.15&&yr<2020.35?2.4:yr>2022.1&&yr<2022.8?1.4:1;
+    U.forEach(u=>{let l=L[u.s].slice();
+      if(u.g==='rt'&&u.s!=='JGB10Y')l[0]=sb*.9;
+      if(u.s==='JGB10Y'&&yr>2023.5)l[2]=.6;
+      if(u.s==='USDJPY=X'&&yr>2024.5)l[3]=-.25;
+      if(u.s==='GC=F'&&yr>2023.8)l[2]=-.05;
+      if(u.s==='BTC-USD'&&yr<2020)l[0]=.05;
+      const nl=Math.sqrt(l.reduce((a,b)=>a+b*b,0)),e=Math.sqrt(Math.max(.05,1-Math.min(.95,nl*nl)));
+      const z=(l.reduce((a,b,k)=>a+b*f[k],0)/Math.max(1,nl))+e*gauss()*.6;
+      const sd=vol[u.s]/Math.sqrt(252)*shock;
+      if(u.g==='rt'){lvl[u.s]+=z*sd/100}else lvl[u.s]*=Math.exp(z*sd);
+      out[u.s].push({d,v:+lvl[u.s].toFixed(u.g==='rt'?3:5)});
+    })});
+  return {series:out,units:Object.fromEntries(U.map(u=>[u.s,u.g==='rt'?'pct':'price']))};
+}
+
+/* ---------- maths ---------- */
+const ms=d=>Date.parse(d+'T00:00:00Z');
+function buildGrid(){
+  const freq=S.freq,syms=U.map(u=>u.s);
+  /* calendar: weekdays (daily) or Fridays (weekly) between first and last observation */
+  let lo=Infinity,hi=-Infinity;
+  syms.forEach(s=>{const a=SERIES[s];if(a&&a.length){lo=Math.min(lo,ms(a[0].d));hi=Math.max(hi,ms(a[a.length-1].d))}});
+  const dates=[];
+  for(let t=lo;t<=hi;t+=864e5){const w=new Date(t).getUTCDay();if(freq==='D'?(w>0&&w<6):w===5)dates.push(t)}
+  if(freq==='W'&&new Date(hi).getUTCDay()!==5){/* include the current, unfinished week ending at the last print */dates.push(hi)}
+  const R=[],seen=[];
+  syms.forEach(s=>{const a=SERIES[s];if(!a||a.length<10){R.push(null);seen.push(null);return}
+    const pct=UNITS[s]==='pct';const r=new Float64Array(dates.length).fill(NaN);
+    let j=0,last=null,lastT=null,prev=null;
+    for(let i=0;i<dates.length;i++){
+      const t=dates[i];let got=false;
+      while(j<a.length&&ms(a[j].d)<=t){last=a[j].v;lastT=ms(a[j].d);j++;got=true}
+      /* a period counts only if the asset printed during it */
+      const fresh=got&&lastT>(i?dates[i-1]:-Infinity);
+      if(fresh&&prev!=null&&last!=null&&isFinite(last)){r[i]=pct?(last-prev)*100:Math.log(last/prev)}
+      if(last!=null)prev=last;
+    }
+    R.push(r)});
+  GRID={dates,R};CACHE={};
+}
+/* rolling correlation of assets i,j over window n periods; needs 70% valid pairs */
+function rolling(i,j,n){
+  const key=i+'|'+j+'|'+n;if(CACHE[key])return CACHE[key];
+  const x=GRID.R[i],y=GRID.R[j],T=GRID.dates.length,out=new Float64Array(T).fill(NaN);
+  if(!x||!y){CACHE[key]=out;return out}
+  let c=0,sx=0,sy=0,sxx=0,syy=0,sxy=0;const ok=new Uint8Array(T);
+  for(let t=0;t<T;t++){
+    if(isFinite(x[t])&&isFinite(y[t])){ok[t]=1;c++;sx+=x[t];sy+=y[t];sxx+=x[t]*x[t];syy+=y[t]*y[t];sxy+=x[t]*y[t]}
+    if(t>=n&&ok[t-n]){const a=x[t-n],b=y[t-n];c--;sx-=a;sy-=b;sxx-=a*a;syy-=b*b;sxy-=a*b}
+    if(t>=n-1&&c>=Math.max(8,n*.7)){const vx=sxx-sx*sx/c,vy=syy-sy*sy/c,cv=sxy-sx*sy/c;if(vx>0&&vy>0)out[t]=Math.max(-1,Math.min(1,cv/Math.sqrt(vx*vy)))}
+  }
+  CACHE[key]=out;return out;
+}
+const lastFinite=a=>{for(let t=a.length-1;t>=0;t--)if(isFinite(a[t]))return a[t];return NaN};
+function pairStats(a,b){
+  const i=IDX[a],j=IDX[b],rr=rolling(i,j,S.r),rb=rolling(i,j,S.b);
+  const cur=lastFinite(rr),base=lastFinite(rb);
+  const hist=[...rr].filter(isFinite).sort((p,q)=>p-q);
+  const med=hist.length?hist[Math.floor(hist.length/2)]:NaN;
+  const pc=hist.length&&isFinite(cur)?hist.filter(v=>v<=cur).length/hist.length*100:NaN;
+  return{a,b,cur,base,d:cur-base,med,pc,lo:hist[0],hi:hist[hist.length-1],
+    flip:isFinite(cur)&&isFinite(base)&&Math.sign(cur)!==Math.sign(base)&&Math.abs(cur)>=.2&&Math.abs(base)>=.2,
+    ext:isFinite(pc)&&(pc>=95||pc<=5),rr,rb};
+}
+function corrColor(v){if(!isFinite(v))return 'var(--track)';const a=Math.min(1,Math.abs(v));
+  return `color-mix(in srgb, ${v>=0?'var(--a2)':'var(--a1)'} ${Math.round(a*85)}%, var(--card))`}
+const cf=v=>!isFinite(v)?'—':(v>0?'+':v<0?'−':'')+Math.abs(v).toFixed(2);
+
+/* ---------- render ---------- */
+function segs(){
+  const mk=(el,list,cur,fn)=>{el.innerHTML=list.map(w=>`<button data-v="${w[0]}" class="${w[0]===cur?'on':''}">${JA()?w[2]:w[1]}</button>`).join('');
+    [...el.children].forEach(b=>b.onclick=()=>fn(+b.dataset.v))};
+  mk($('#rwin'),WINS[S.freq].r,S.r,v=>{S.r=v;save();render()});
+  mk($('#bwin'),WINS[S.freq].b,S.b,v=>{S.b=v;save();render()});
+  $$('#freq button').forEach(b=>b.classList.toggle('on',b.dataset.v===S.freq));
+  $$('#view button').forEach(b=>b.classList.toggle('on',b.dataset.v===S.view));
+}
+function render(){
+  if(!GRID)return;segs();
+  const per=S.freq==='W'?T('weekly','週次'):T('daily','日次');
+  const last=GRID.dates[GRID.dates.length-1];
+  $('#asof').textContent=T('Data to ','データ：')+fdate(new Date(last).toISOString().slice(0,10))+(LIVE?'':T(' · synthetic sample',' · 合成サンプル'));
+  /* all pairs */
+  const P=[];for(let i=0;i<U.length;i++)for(let j=i+1;j<U.length;j++)if(GRID.R[i]&&GRID.R[j])P.push(pairStats(U[i].s,U[j].s));
+  const okP=P.filter(p=>isFinite(p.cur)&&isFinite(p.base));
+  const avg=(arr,f)=>arr.length?arr.reduce((a,p)=>a+f(p),0)/arr.length:NaN;
+  const sb=pairStats('^GSPC','UST10Y');
+  const flips=okP.filter(p=>p.flip);
+  const mv=okP.slice().sort((p,q)=>Math.abs(q.d)-Math.abs(p.d))[0];
+  const aR=avg(okP,p=>Math.abs(p.cur)),aB=avg(okP,p=>Math.abs(p.base));
+  $('#kpis').innerHTML=[
+    [T('Average |correlation|','平均相関（絶対値）'),num(aR,2),T(`${winLab(S.r)} vs ${num(aB,2)} over ${winLab(S.b)}. `,`${winLab(S.r)}。${winLab(S.b)}は${num(aB,2)}。`)+(aR>aB+.03?T('Assets are moving more together.','資産がより連動。'):aR<aB-.03?T('Correlations are looser.','連動は弱まっている。'):T('About normal.','ほぼ平常。'))],
+    [T('Stocks vs 10Y yield','株と米10年金利'),`<span class="${sb.cur>0?'dn':'up'}">${cf(sb.cur)}</span>`,sb.cur>.15?T('Bonds are not hedging equities.','債券が株のヘッジになっていない。'):sb.cur<-.15?T('Bonds are hedging equities.','債券が株のヘッジとして機能。'):T('No clear link.','明確な関係なし。')],
+    [T('Sign flips','符号の反転'),String(flips.length),T(`of ${okP.length} pairs, both readings beyond ±0.20`,`${okP.length}組中（両窓とも±0.20超）`)],
+    [T('Biggest shift','最大の変化'),mv?cf(mv.d):'—',mv?`${esc(KEY(mv.a))} × ${esc(KEY(mv.b))}: ${cf(mv.base)} → ${cf(mv.cur)}`:'']
+  ].map(k=>`<div class="kpi"><span class="lbl">${k[0]}</span><span class="v">${k[1]}</span><span class="s">${k[2]}</span></div>`).join('');
+
+  /* classic table */
+  $('#clSub').textContent=T(`Correlation of ${per} returns (yields as bp changes). Recent = last ${winLab(S.r)}, baseline = last ${winLab(S.b)}. The marker shows where today sits in this pair’s own history since ${new Date(GRID.dates[0]).getUTCFullYear()}.`,
+    `${per}リターンの相関（金利はbp変化）。直近＝過去${winLab(S.r)}、比較＝過去${winLab(S.b)}。マーカーは${new Date(GRID.dates[0]).getUTCFullYear()}年以降のこの組み合わせの中での現在の位置。`);
+  const cls=CLASSIC.map(c=>({c,p:pairStats(c.a,c.b)}));
+  $('#classic').innerHTML=`<thead><tr><th>${T('Pair','組み合わせ')}</th><th>${T('Recent','直近')}</th><th>${T('Baseline','比較')}</th><th>${T('Median since','期間中央値')}</th><th>${T('Percentile','パーセンタイル')}</th><th>${T('Last 2 years','過去2年')}</th></tr></thead><tbody>`+
+    cls.map(({c,p})=>{const n=S.freq==='W'?104:504,sp=[...p.rr].slice(-n).map(v=>isFinite(v)?v:null);
+      return `<tr class="click" data-a="${c.a}" data-b="${c.b}"><td class="pair"><b>${JA()?c.ja:c.en}</b>${p.flip?`<span class="flag flip">${T('flipped','反転')}</span>`:''}${p.ext?`<span class="flag ext">${T('extreme','極端')}</span>`:''}<span class="nm" style="max-width:none;white-space:normal">${esc(NAME(c.a))} × ${esc(NAME(c.b))}. ${JA()?c.why[1]:c.why[0]}</span></td>
+      <td><span class="cell" style="background:${corrColor(p.cur)}">${cf(p.cur)}</span></td><td>${cf(p.base)}</td><td>${cf(p.med)}</td>
+      <td><span class="pctbar" title="${num(p.pc,0)}"><i style="left:calc(${isFinite(p.pc)?p.pc:50}% - 1px)"></i></span> ${isFinite(p.pc)?num(p.pc,0):'—'}</td>
+      <td>${spark(sp,120,28,'var(--ink)')}</td></tr>`}).join('')+'</tbody>';
+  $$('#classic tr.click').forEach(r=>r.onclick=()=>{S.pa=r.dataset.a;S.pb=r.dataset.b;save();pair();$('#pT').scrollIntoView({behavior:'smooth',block:'start'})});
+
+  heat(P);pair();diversify(P);shifts(okP);method();
+}
+function heat(P){
+  const svg=$('#hm'),n=U.length,M={};P.forEach(p=>{M[p.a+'|'+p.b]=p;M[p.b+'|'+p.a]=p});
+  const avail=($('.hm-wrap').clientWidth||700);
+  const lw=avail<520?58:96,top=avail<520?62:30;const cs=Math.max(24,Math.min(52,Math.floor((avail-lw-4)/n)));
+  const w=lw+cs*n+4,h=top+cs*n+4;
+  let g='';
+  /* group labels across the top, column keys */
+  const val=p=>!p?NaN:S.view==='r'?p.cur:S.view==='b'?p.base:p.d;
+  U.forEach((u,j)=>{const x=lw+j*cs+cs/2;
+    g+=avail<520?`<text x="${x}" y="${top-6}" transform="rotate(-60 ${x} ${top-6})">${esc(u.k)}</text>`:`<text x="${x}" y="${top-8}" text-anchor="middle">${esc(u.k)}</text>`});
+  U.forEach((u,i)=>{g+=`<text x="${lw-6}" y="${top+i*cs+cs/2+4}" text-anchor="end">${esc(avail<520?u.k:NAME(u.s))}</text>`;
+    U.forEach((v,j)=>{const x=lw+j*cs,y=top+i*cs;
+      if(i===j){g+=`<rect x="${x+1}" y="${y+1}" width="${cs-2}" height="${cs-2}" fill="var(--track)"/>`;return}
+      const p=M[u.s+'|'+v.s],c=val(p);
+      g+=`<rect class="c" data-a="${u.s}" data-b="${v.s}" x="${x+1}" y="${y+1}" width="${cs-2}" height="${cs-2}" fill="${S.view==='d'&&isFinite(c)?corrColor(Math.max(-1,Math.min(1,c*1.6))):corrColor(c)}"/>`;
+      if(cs>=36&&isFinite(c))g+=`<text class="v" x="${x+cs/2}" y="${y+cs/2+4}" text-anchor="middle" pointer-events="none">${(c<0?'−':'')+Math.abs(c).toFixed(2).replace(/^0/,'')}</text>`;
+      if(p&&p.flip&&S.view!=='b')g+=`<circle cx="${x+cs-6}" cy="${y+6}" r="2.5" fill="var(--warn)" pointer-events="none"/>`;
+    })});
+  /* group separators */
+  let k=0;['fx','eq','rt','cm','cr'].forEach(gk=>{const cnt=U.filter(u=>u.g===gk).length;if(k>0){const p=lw+k*cs,q=top+k*cs;g+=`<line x1="${p}" x2="${p}" y1="${top}" y2="${top+n*cs}" stroke="var(--bg)" stroke-width="3"/><line x1="${lw}" x2="${lw+n*cs}" y1="${q}" y2="${q}" stroke="var(--bg)" stroke-width="3"/>`}k+=cnt});
+  const si=IDX[S.pa],sj=IDX[S.pb];
+  if(si!=null&&sj!=null){g+=`<rect class="sel" x="${lw+sj*cs+1}" y="${top+si*cs+1}" width="${cs-2}" height="${cs-2}"/><rect class="sel" x="${lw+si*cs+1}" y="${top+sj*cs+1}" width="${cs-2}" height="${cs-2}"/>`}
+  svg.setAttribute('viewBox',`0 0 ${w} ${h}`);svg.setAttribute('width',w);svg.setAttribute('height',h);svg.innerHTML=g;
+  svg.querySelectorAll('rect.c').forEach(r=>{const p=M[r.dataset.a+'|'+r.dataset.b];
+    r.onmousemove=ev=>tip(`<div class="m">${esc(NAME(r.dataset.a))} × ${esc(NAME(r.dataset.b))}</div><div>${T('Recent','直近')} (${winLab(S.r)}) <b>${cf(p&&p.cur)}</b></div><div>${T('Baseline','比較')} (${winLab(S.b)}) <b>${cf(p&&p.base)}</b></div><div>${T('Change','変化')} <b>${cf(p&&p.d)}</b></div>${p&&p.flip?`<div>${T('Sign flipped','符号反転')}</div>`:''}`,ev);
+    r.onmouseleave=()=>tip(null);
+    r.onclick=()=>{S.pa=r.dataset.a;S.pb=r.dataset.b;save();heat(P);pair();$('#pT').scrollIntoView({behavior:'smooth',block:'start'})}});
+  $('#scale').innerHTML=`<span>${S.view==='d'?T('Lower now','低下'):'−1'}</span><span class="bar" style="background:linear-gradient(to right,${corrColor(-1)},${corrColor(-.5)},var(--card),${corrColor(.5)},${corrColor(1)})"></span><span>${S.view==='d'?T('Higher now','上昇'):'+1'}</span><span style="margin-left:10px"><svg width="8" height="8" style="vertical-align:0"><circle cx="4" cy="4" r="2.5" fill="var(--warn)"/></svg> ${T('sign flipped vs baseline','比較の窓から符号反転')}</span>`;
+}
+function fillSel(el,cur){el.innerHTML=Object.keys(GN).map(gk=>`<optgroup label="${GN[gk][JA()?1:0]}">`+U.filter(u=>u.g===gk&&GRID.R[IDX[u.s]]).map(u=>`<option value="${u.s}" ${u.s===cur?'selected':''}>${esc(NAME(u.s))}</option>`).join('')+'</optgroup>').join('')}
+function pair(){
+  fillSel($('#pa'),S.pa);fillSel($('#pb'),S.pb);
+  if(S.pa===S.pb){$('#pT').textContent=T('Pick two different assets','異なる2資産を選択');$('#pc').innerHTML='';$('#pStats').innerHTML='';$('#pSay').innerHTML='';return}
+  const p=pairStats(S.pa,S.pb);
+  $('#pT').textContent=`${NAME(S.pa)} × ${NAME(S.pb)}`;
+  $('#pSub').textContent=T(`Rolling correlation of ${S.freq==='W'?'weekly':'daily'} returns: ${winLab(S.r)} (solid) and ${winLab(S.b)} (dashed). Yields enter as bp changes, so a positive reading against an equity means stocks rise when yields rise (bonds fall).`,
+    `${S.freq==='W'?'週次':'日次'}リターンのローリング相関：${winLab(S.r)}（実線）と${winLab(S.b)}（破線）。金利はbp変化のため、株との正の相関は「金利上昇（債券安）で株高」を意味します。`);
+  const ser=[{name:T(`${winLab(S.r)} rolling`,`${winLab(S.r)}ローリング`),color:'var(--a2)',pts:[...p.rr].map((v,t)=>({x:GRID.dates[t],y:isFinite(v)?v:null}))},
+             {name:T(`${winLab(S.b)} rolling`,`${winLab(S.b)}ローリング`),color:'var(--ink)',dash:1,pts:[...p.rb].map((v,t)=>({x:GRID.dates[t],y:isFinite(v)?v:null}))}];
+  lineChart($('#pc'),ser,{h:280,xType:'date',zero:true,yFmt:v=>cf(v).replace('+0.00','0'),tipFmt:cf});
+  legend($('#pLeg'),ser);
+  $('#pStats').innerHTML=[[T('Recent','直近'),cf(p.cur)],[T('Baseline','比較'),cf(p.base)],[T('Median','中央値'),cf(p.med)],[T('Percentile now','現在の順位'),isFinite(p.pc)?num(p.pc,0):'—'],[T('Range','レンジ'),`${cf(p.lo)} … ${cf(p.hi)}`]]
+    .map(k=>`<div class="kpi"><span class="lbl">${k[0]}</span><span class="v">${k[1]}</span></div>`).join('');
+  let s='';
+  if(isFinite(p.cur)){
+    const str=a=>Math.abs(a)<.2?T('little','ほとんど'):Math.abs(a)<.5?T('moderately','緩やかに'):T('strongly','強く');
+    s=T(`Over the last ${winLab(S.r)}, ${NAME(S.pa)} and ${NAME(S.pb)} have moved ${str(p.cur)} ${p.cur>=0?'together':'in opposite directions'} (${cf(p.cur)}). `,
+        `過去${winLab(S.r)}、${NAME(S.pa)}と${NAME(S.pb)}は${p.cur>=0?'同じ方向に':'逆方向に'}${str(p.cur)}動いています（${cf(p.cur)}）。`);
+    if(p.flip)s+=T(`<b>That is the opposite sign to the ${winLab(S.b)} reading (${cf(p.base)}).</b> `,`<b>${winLab(S.b)}の値（${cf(p.base)}）と符号が逆です。</b>`);
+    if(isFinite(p.pc))s+=p.pc>=90?T(`It is in the top ${num(100-p.pc,0)||1}% of this pair’s history.`,`この組み合わせの過去の中で上位${num(100-p.pc,0)||1}%の水準です。`):p.pc<=10?T(`It is in the bottom ${num(p.pc,0)||1}% of this pair’s history.`,`この組み合わせの過去の中で下位${num(p.pc,0)||1}%の水準です。`):T(`That is within its usual range (percentile ${num(p.pc,0)}).`,`過去の通常レンジ内です（${num(p.pc,0)}パーセンタイル）。`);
+  }
+  $('#pSay').innerHTML=s;
+}
+function diversify(P){
+  fillSel($('#anchor'),S.anchor);
+  $('#dvSub').textContent=T(`Correlation with ${NAME(S.anchor)} over the last ${winLab(S.r)} (bar) and ${winLab(S.b)} (tick). Lowest first: the assets that have offset it best recently.`,
+    `${NAME(S.anchor)}との相関。棒＝過去${winLab(S.r)}、目盛り＝${winLab(S.b)}。低い順＝最近もっとも打ち消し合った資産。`);
+  const rows=U.filter(u=>u.s!==S.anchor&&GRID.R[IDX[u.s]]).map(u=>pairStats(S.anchor,u.s)).filter(p=>isFinite(p.cur)).sort((p,q)=>p.cur-q.cur);
+  const X=v=>(v+1)/2*100;
+  $('#dv').innerHTML=`<div class="dvax"><span></span><div><span>−1</span><span>0</span><span>+1</span></div><span></span></div>`+rows.map(p=>{const a=X(Math.min(0,p.cur)),b=X(Math.max(0,p.cur));
+    return `<div class="dvrow"><span>${esc(NAME(p.b))}</span><span class="t"><b style="left:${a}%;width:${b-a}%;background:${p.cur>=0?'var(--a2)':'var(--a1)'}"></b>${isFinite(p.base)?`<i style="left:calc(${X(p.base)}% - 1px)"></i>`:''}</span><span class="n">${cf(p.cur)}</span></div>`}).join('');
+}
+function shifts(okP){
+  const top=okP.slice().sort((p,q)=>Math.abs(q.d)-Math.abs(p.d)).slice(0,10);
+  $('#shifts').innerHTML=`<thead><tr><th>${T('Pair','組み合わせ')}</th><th>${T('Baseline','比較')}</th><th>${T('Recent','直近')}</th><th>${T('Change','変化')}</th></tr></thead><tbody>`+
+    top.map(p=>`<tr class="click" data-a="${p.a}" data-b="${p.b}"><td>${esc(KEY(p.a))} × ${esc(KEY(p.b))}${p.flip?`<span class="flag flip">${T('flip','反転')}</span>`:''}</td><td>${cf(p.base)}</td><td><span class="cell" style="background:${corrColor(p.cur)}">${cf(p.cur)}</span></td><td class="${p.d>0?'':''}">${cf(p.d)}</td></tr>`).join('')+'</tbody>';
+  $$('#shifts tr.click').forEach(r=>r.onclick=()=>{S.pa=r.dataset.a;S.pb=r.dataset.b;save();render();$('#pT').scrollIntoView({behavior:'smooth',block:'start'})});
+}
+function method(){
+  $('#method').innerHTML=T(`<b>Method.</b> Log returns of closing prices; UST and JGB yields as changes in basis points (Fed H.15 and Japan MOF). Weekly returns run Friday to Friday and avoid most of the time-zone mismatch between Tokyo, London and New York closes; daily returns understate correlation between a Tokyo asset and a New York one, because news after the Nikkei close shows up there a day later. A period counts only when the asset printed in it; a window needs 70% of its periods. Correlation is linear and backward-looking: it says how assets moved, not how they will. ${LIVE?'Data: Keel (Yahoo Finance, Fed, MOF through OpenBB); free sources can be delayed.':'<b>Synthetic sample, not market data.</b> Connect Keel for live figures.'}`,
+    `<b>手法。</b>終値の対数リターン。米国債・日本国債の利回りはbp変化（FRB H.15、財務省）。週次は金曜〜金曜で、東京・ロンドン・ニューヨークの終値時刻のずれをほぼ回避します。日次では、日経平均の引け後のニュースが翌日に反映されるため、東京とニューヨークの資産間の相関が低めに出ます。各期間は価格が付いた場合のみ計上し、窓の70%以上の期間が必要です。相関は線形で過去の値であり、将来の動きを示すものではありません。${LIVE?'データ：Keel（OpenBB経由のYahoo Finance、FRB、財務省）。無料ソースのため遅延の可能性があります。':'<b>合成サンプルであり、市場データではありません。</b>Keelに接続すると実データを表示します。'}`);
+}
+window.redraw=render;
+
+/* ---------- load ---------- */
+async function load(fresh){
+  setStatus('busy');
+  const start=new Date(Date.now()-10*365.25*864e5).toISOString().slice(0,10);
+  const syms=U.map(u=>u.s),half=[syms.slice(0,7),syms.slice(7)];
+  const rs=await Promise.all(half.map(h=>keel('api_history',{symbols:h.join(','),interval:'D',start},{fresh})));
+  const good=rs.filter(r=>r.ok&&r.data&&r.data.series);
+  if(good.length){
+    SERIES={};UNITS={};good.forEach(r=>{Object.assign(SERIES,r.data.series);Object.assign(UNITS,r.data.units||{})});
+    LIVE=true;STORED=rs.map(r=>r.storedAt).filter(Boolean)[0]||null;setStatus('live');
+    const bad=rs.find(r=>!r.ok);if(bad){const b=$('#banner');b.hidden=false;b.innerHTML=`<span>${T('Part of the data did not load: ','一部のデータを取得できません：')}${esc(keelMsg(bad.code,bad.message))}</span>`}
+  }else{
+    const sm=sample();SERIES=sm.series;UNITS=sm.units;LIVE=false;
+    const r=rs[0];setStatus(r.code==='no_mcp'?'sample':'err',r.code,r.message);
+  }
+  buildGrid();render();
+}
+$$('#freq button').forEach(b=>b.onclick=()=>{if(S.freq===b.dataset.v)return;S.freq=b.dataset.v;S.r=WINS[S.freq].dr;S.b=WINS[S.freq].db;save();buildGrid();render()});
+$$('#view button').forEach(b=>b.onclick=()=>{S.view=b.dataset.v;save();render()});
+$('#pa').onchange=e=>{S.pa=e.target.value;save();render()};
+$('#pb').onchange=e=>{S.pb=e.target.value;save();render()};
+$('#anchor').onchange=e=>{S.anchor=e.target.value;save();render()};
+$('#refresh').onclick=()=>load(true);
+$('#how').innerHTML=howHtml();
+$$('#langSeg button').forEach(b=>b.onclick=()=>{setLang(b.dataset.l);$('#how').innerHTML=howHtml();restatus();render()});
+setLang(LANG);
+/* first paint from the sample so the page is never empty, then try Keel */
+{const sm=sample();SERIES=sm.series;UNITS=sm.units;buildGrid();render()}
+load(false);
+</script>

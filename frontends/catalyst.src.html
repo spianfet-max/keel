@@ -1,0 +1,315 @@
+<title>Catalyst</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@300;400;500;600&family=Noto+Sans+JP:wght@300;400&display=swap">
+<style>
+/*CORE_CSS*/
+/* Catalyst: what the next central-bank and data events have done to markets before, and whether today's option price pays for it.
+   Order: what is coming → the board (asset × event) → one cell in depth → the implied-vs-history check. Event multiple is drawn in red by strength. */
+.app{padding-left:max(20px,env(safe-area-inset-left,0px));padding-right:max(20px,env(safe-area-inset-right,0px))}
+@media (max-width:480px){.app{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}}
+.next{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:0;border-bottom:1px solid var(--line)}
+.ev{all:unset;box-sizing:border-box;cursor:pointer;display:flex;flex-direction:column;gap:3px;padding:14px 14px 12px 0;min-width:0;border-top:2px solid transparent}
+.ev:focus-visible{outline:2px solid var(--ink);outline-offset:-2px}
+.ev.on{border-top-color:var(--red)}
+.ev .d{font-size:12px;color:var(--mute);font-variant-numeric:tabular-nums}
+.ev .n{font-size:16px;font-weight:400}
+.ev .c{font-size:12px;color:var(--mute)}
+.ev .c b{color:var(--ink);font-weight:500}
+.tag{display:inline-block;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;padding:1px 6px;border:1px solid var(--line);color:var(--mute);margin-left:6px;vertical-align:2px}
+table.board td.m{cursor:pointer;min-width:118px}
+table.board td.m:hover{outline:1px solid var(--ink);outline-offset:-1px}
+table.board td.m.on{outline:2px solid var(--ink);outline-offset:-2px}
+table.board .mv{display:block;font-size:15px}
+table.board .mx{display:block;font-size:11.5px;color:var(--ink);opacity:.72}
+table.board td .nm{max-width:none;white-space:normal}
+table.board th.evh{cursor:pointer}
+table.board th.evh.on{color:var(--ink)}
+.calc{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px 22px;align-items:end}
+.fld{display:flex;flex-direction:column;gap:5px;min-width:0}
+.fld input[type=number]{width:100%}
+.fld .u{font-size:12px;color:var(--mute)}
+.ex{font-size:11px;color:var(--warn);margin-left:4px}
+.verdict{display:inline-block;padding:3px 10px;font-size:13px;border:1px solid var(--ink);font-weight:500}
+.verdict.rich{border-color:var(--neg);color:var(--neg)}
+.verdict.cheap{border-color:var(--pos);color:var(--pos)}
+.say{font-size:15px;line-height:1.55;max-width:78ch;margin:14px 0 0}
+.say b{font-weight:500}
+.occ td:nth-child(2){font-weight:400}
+.sel2{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+</style>
+
+<div class="app">
+  <header class="top">
+    <div class="brand"><h1 data-ja="カタリスト">Catalyst</h1><span data-ja="FOMC・日銀・米CPI・雇用統計が過去に市場をどれだけ動かしたか、そして今のオプションがその動きを織り込んでいるか">What FOMC, BoJ, US CPI and payrolls have done to markets before, and whether today’s options price it</span></div>
+    <div class="tright">
+      <span class="pill busy" id="status"><i></i></span>
+      <button class="btn q" id="refresh" data-ja="更新">Refresh</button>
+      <button class="btn q" id="themeBtn">Dark</button>
+      <div class="seg" id="langSeg"><button data-l="en">EN</button><button data-l="ja">日本語</button></div>
+    </div>
+  </header>
+  <div class="banner" id="banner" hidden></div>
+  <div class="help" id="how" hidden></div>
+
+  <section class="sec" style="padding-bottom:0;border:0">
+    <div class="sh"><h2 data-ja="今後のイベント">Coming up</h2><p id="nextSub"></p></div>
+    <div class="next" id="next"></div>
+  </section>
+
+  <div class="bar">
+    <div class="grp"><span class="lbl" data-ja="反応の期間">Reaction</span><div class="seg" id="win"><button data-v="1" data-ja="当日">1 day</button><button data-v="2" data-ja="2日間">2 days</button></div></div>
+    <div class="grp"><span class="lbl" data-ja="対象">Sample</span><div class="seg" id="look"><button data-v="8" data-ja="直近8回">Last 8</button><button data-v="12" data-ja="直近12回">Last 12</button><button data-v="99" data-ja="2022年以降すべて">All since 2022</button></div></div>
+    <span class="lbl" id="asof"></span>
+  </div>
+
+  <section class="sec">
+    <div class="sh"><h2 data-ja="イベントの値動き">Event moves</h2><p id="bSub"></p></div>
+    <div class="tw"><table class="board" id="board"></table></div>
+  </section>
+
+  <section class="sec two">
+    <div style="min-width:0">
+      <div class="sh"><h2 id="dT"></h2><p id="dSub"></p></div>
+      <svg class="ch" id="bars" height="280"></svg>
+      <div class="leg" id="bLeg"></div>
+      <p class="say" id="dSay"></p>
+    </div>
+    <div style="min-width:0">
+      <div class="sh"><h2 data-ja="過去の各回">Each occurrence</h2><p id="oSub"></p></div>
+      <div class="tw" style="max-height:420px;overflow-y:auto"><table class="occ" id="occ"></table></div>
+    </div>
+  </section>
+
+  <section class="sec">
+    <div class="sh"><h2 id="iT"></h2><p id="iSub"></p></div>
+    <div class="calc">
+      <div class="fld"><span class="lbl"><span id="ivL"></span><span class="ex" id="ivEx"></span></span><input type="number" id="iv" step="0.1" min="0"><span class="u" id="ivU"></span></div>
+      <div class="fld"><span class="lbl" data-ja="満期までの日数（暦日）">Days to expiry (calendar)</span><input type="number" id="dte" step="1" min="2"><span class="u" id="dteU"></span></div>
+      <div class="fld"><span class="lbl" data-ja="イベントを除く日々のボラ">Ex-event volatility</span><input type="number" id="bv" step="0.1" min="0"><span class="u" id="bvU"></span></div>
+    </div>
+    <div class="out kpis" id="iOut" style="margin-top:18px;border-top:1px solid var(--rule)"></div>
+    <p class="say" id="iSay"></p>
+  </section>
+  <p class="note" id="method"></p>
+</div>
+
+<script>
+/*CORE_JS*/
+/* ---------- assets ---------- */
+const A=[
+ {s:'USDJPY=X',en:'USD/JPY',ja:'ドル円',k:'p',ses:'g'},
+ {s:'EURUSD=X',en:'EUR/USD',ja:'ユーロドル',k:'p',ses:'g'},
+ {s:'^GSPC',en:'S&P 500',ja:'S&P500',k:'p',ses:'ny'},
+ {s:'^N225',en:'Nikkei 225',ja:'日経平均',k:'p',ses:'tk'},
+ {s:'UST2Y',en:'UST 2Y yield',ja:'米2年金利',k:'y',ses:'ny'},
+ {s:'UST10Y',en:'UST 10Y yield',ja:'米10年金利',k:'y',ses:'ny'},
+ {s:'JGB10Y',en:'JGB 10Y yield',ja:'日本10年金利',k:'y',ses:'tk'},
+ {s:'GC=F',en:'Gold',ja:'金',k:'p',ses:'ny'}];
+const AN=s=>{const a=A.find(x=>x.s===s);return a?(JA()?a.ja:a.en):s};
+const isY=s=>(A.find(x=>x.s===s)||{}).k==='y';
+
+/* ---------- event schedules (decision or release day, local date of the announcement) ----------
+   FOMC: federalreserve.gov meeting calendars (decision = second day). BoJ: boj.or.jp MPM schedule (decision = second day).
+   CPI and Employment Situation: bls.gov release archive and schedule, including the 2025 and 2026 lapse reschedules
+   (October 2025 CPI and payrolls were never published). */
+const EV={
+ FOMC:{reg:'us',en:'FOMC',ja:'FOMC',long:['Fed decision','FRB政策決定'],d:'2022-01-26 2022-03-16 2022-05-04 2022-06-15 2022-07-27 2022-09-21 2022-11-02 2022-12-14 2023-02-01 2023-03-22 2023-05-03 2023-06-14 2023-07-26 2023-09-20 2023-11-01 2023-12-13 2024-01-31 2024-03-20 2024-05-01 2024-06-12 2024-07-31 2024-09-18 2024-11-07 2024-12-18 2025-01-29 2025-03-19 2025-05-07 2025-06-18 2025-07-30 2025-09-17 2025-10-29 2025-12-10 2026-01-28 2026-03-18 2026-04-29 2026-06-17 2026-07-29 2026-09-16 2026-10-28 2026-12-09 2027-01-27 2027-03-17 2027-04-28 2027-06-09 2027-07-28 2027-09-15 2027-10-27 2027-12-08'},
+ BOJ:{reg:'jp',en:'BoJ',ja:'日銀',long:['BoJ decision','日銀政策決定'],d:'2022-01-18 2022-03-18 2022-04-28 2022-06-17 2022-07-21 2022-09-22 2022-10-28 2022-12-20 2023-01-18 2023-03-10 2023-04-28 2023-06-16 2023-07-28 2023-09-22 2023-10-31 2023-12-19 2024-01-23 2024-03-19 2024-04-26 2024-06-14 2024-07-31 2024-09-20 2024-10-31 2024-12-19 2025-01-24 2025-03-19 2025-05-01 2025-06-17 2025-07-31 2025-09-19 2025-10-30 2025-12-19 2026-01-23 2026-03-19 2026-04-28 2026-06-16 2026-07-31 2026-09-18 2026-10-30 2026-12-18 2027-01-22 2027-03-18 2027-04-28 2027-06-11 2027-07-22 2027-09-22 2027-10-29 2027-12-17'},
+ CPI:{reg:'us',en:'US CPI',ja:'米CPI',long:['US CPI release','米CPI発表'],d:'2022-01-12 2022-02-10 2022-03-10 2022-04-12 2022-05-11 2022-06-10 2022-07-13 2022-08-10 2022-09-13 2022-10-13 2022-11-10 2022-12-13 2023-01-12 2023-02-14 2023-03-14 2023-04-12 2023-05-10 2023-06-13 2023-07-12 2023-08-10 2023-09-13 2023-10-12 2023-11-14 2023-12-12 2024-01-11 2024-02-13 2024-03-12 2024-04-10 2024-05-15 2024-06-12 2024-07-11 2024-08-14 2024-09-11 2024-10-10 2024-11-13 2024-12-11 2025-01-15 2025-02-12 2025-03-12 2025-04-10 2025-05-13 2025-06-11 2025-07-15 2025-08-12 2025-09-11 2025-10-24 2025-12-18 2026-01-13 2026-02-13 2026-03-11 2026-04-10 2026-05-12 2026-06-10 2026-07-14 2026-08-12 2026-09-11 2026-10-14 2026-11-10 2026-12-10 2027-01-13 2027-02-11 2027-03-10 2027-04-13 2027-05-12 2027-06-10 2027-07-14 2027-08-11 2027-09-14 2027-10-14 2027-11-10 2027-12-10'},
+ NFP:{reg:'us',en:'Payrolls',ja:'雇用統計',long:['US payrolls (Employment Situation)','米雇用統計'],d:'2022-01-07 2022-02-04 2022-03-04 2022-04-01 2022-05-06 2022-06-03 2022-07-08 2022-08-05 2022-09-02 2022-10-07 2022-11-04 2022-12-02 2023-01-06 2023-02-03 2023-03-10 2023-04-07 2023-05-05 2023-06-02 2023-07-07 2023-08-04 2023-09-01 2023-10-06 2023-11-03 2023-12-08 2024-01-05 2024-02-02 2024-03-08 2024-04-05 2024-05-03 2024-06-07 2024-07-05 2024-08-02 2024-09-06 2024-10-04 2024-11-01 2024-12-06 2025-01-10 2025-02-07 2025-03-07 2025-04-04 2025-05-02 2025-06-06 2025-07-03 2025-08-01 2025-09-05 2025-11-20 2025-12-16 2026-01-09 2026-02-11 2026-03-06 2026-04-03 2026-05-08 2026-06-05 2026-07-02 2026-08-07 2026-09-04 2026-10-02 2026-11-06 2026-12-04 2027-01-08 2027-02-05 2027-03-05 2027-04-02 2027-05-07 2027-06-04 2027-07-02 2027-08-06 2027-09-03 2027-10-08 2027-11-05 2027-12-03'}};
+Object.values(EV).forEach(e=>e.dates=e.d.split(' '));
+const EVK=Object.keys(EV);
+const EN=k=>JA()?EV[k].ja:EV[k].en;
+
+/* ---------- state ---------- */
+let S={ev:'FOMC',asset:'USDJPY=X',win:1,look:12,iv:null,dte:null,bv:null};
+try{Object.assign(S,JSON.parse(localStorage.getItem('catalyst-state')||'{}'))}catch(e){}
+if(!EV[S.ev])S.ev='FOMC';if(!A.some(a=>a.s===S.asset))S.asset='USDJPY=X';
+S.iv=S.dte=S.bv=null; /* calculator inputs start from defaults each visit */
+const save=()=>{try{const{iv,dte,bv,_ivTouched,...k}=S;localStorage.setItem('catalyst-state',JSON.stringify(k))}catch(e){}};
+
+let SERIES=null,LIVE=false,TODAY=new Date();
+const iso=d=>d.toISOString().slice(0,10);
+
+/* ---------- synthetic sample ---------- */
+function sample(){
+  let seed=7112026;const rnd=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296};
+  const gauss=()=>{let u=0,v=0;while(!u)u=rnd();while(!v)v=rnd();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v)};
+  const vol={'USDJPY=X':.10,'EURUSD=X':.075,'^GSPC':.17,'^N225':.21,'UST2Y':95,'UST10Y':90,'JGB10Y':30,'GC=F':.16};
+  const lvl={'USDJPY=X':115,'EURUSD=X':1.13,'^GSPC':4700,'^N225':28500,'UST2Y':.75,'UST10Y':1.6,'JGB10Y':.08,'GC=F':1820};
+  const drift={'USDJPY=X':.06,'EURUSD=X':-.01,'^GSPC':.09,'^N225':.13,'UST2Y':0,'UST10Y':0,'JGB10Y':0,'GC=F':.18};
+  /* event-day volatility multiples by event and asset; US events hit Tokyo assets the next day */
+  const M={FOMC:{'USDJPY=X':1.6,'EURUSD=X':1.5,'^GSPC':1.9,'^N225':1.3,'UST2Y':2.1,'UST10Y':1.7,'JGB10Y':1.2,'GC=F':1.6},
+           BOJ:{'USDJPY=X':1.9,'EURUSD=X':1.05,'^GSPC':1.0,'^N225':1.5,'UST2Y':1.0,'UST10Y':1.1,'JGB10Y':2.6,'GC=F':1.0},
+           CPI:{'USDJPY=X':1.8,'EURUSD=X':1.6,'^GSPC':2.0,'^N225':1.3,'UST2Y':2.7,'UST10Y':2.1,'JGB10Y':1.2,'GC=F':1.8},
+           NFP:{'USDJPY=X':1.6,'EURUSD=X':1.5,'^GSPC':1.3,'^N225':1.2,'UST2Y':2.2,'UST10Y':1.9,'JGB10Y':1.1,'GC=F':1.5}};
+  const evday={};EVK.forEach(k=>EV[k].dates.forEach(d=>{(evday[d]=evday[d]||[]).push(k)}));
+  const out={};A.forEach(a=>out[a.s]=[]);
+  const days=[];for(let t=Date.UTC(2021,11,1);t<=Date.UTC(2026,10,6);t+=864e5){const w=new Date(t).getUTCDay();if(w&&w<6)days.push(iso(new Date(t)))}
+  days.forEach((d,i)=>{const prev=i?days[i-1]:null;
+    A.forEach(a=>{let m=1;
+      (evday[d]||[]).forEach(k=>{if(!(EV[k].reg==='us'&&a.ses==='tk'))m=Math.max(m,M[k][a.s])});
+      if(prev)(evday[prev]||[]).forEach(k=>{if(EV[k].reg==='us'&&a.ses==='tk')m=Math.max(m,M[k][a.s])});
+      const sd=vol[a.s]/Math.sqrt(252)*m,z=gauss()*(rnd()<.04?1.8:1);
+      if(a.k==='y')lvl[a.s]+=z*sd/100+(a.s==='JGB10Y'?.0007:.0006);else lvl[a.s]*=Math.exp(z*sd+drift[a.s]/252);
+      out[a.s].push({d,v:+lvl[a.s].toFixed(a.k==='y'?3:4)})})});
+  return out;
+}
+
+/* ---------- maths ---------- */
+/* move between closes, in % for prices and bp for yields */
+const chg=(s,a,b)=>isY(s)?(b-a)*100:(b/a-1)*100;
+function analyse(sym,evk){
+  const ser=SERIES[sym];if(!ser||ser.length<30)return null;
+  const a=A.find(x=>x.s===sym),D=ser.map(p=>p.d),V=ser.map(p=>p.v),n=D.length,w=S.win;
+  /* reaction day index for any event: first trading day on/after the date, or after it for a US event on a Tokyo asset */
+  const react=(k,d)=>{const strict=EV[k].reg==='us'&&a.ses==='tk';let lo=0,hi=n;while(lo<hi){const m=(lo+hi)>>1;if(strict?D[m]<=d:D[m]<d)lo=m+1;else hi=m}return lo<n?lo:-1};
+  const lastD=D[n-1];
+  /* mark reaction windows of every event type so 'normal days' exclude them */
+  const busy=new Uint8Array(n);
+  EVK.forEach(k=>EV[k].dates.forEach(d=>{if(d>lastD)return;const r=react(k,d);if(r>0)for(let q=r;q<Math.min(n,r+w);q++)busy[q]=1}));
+  const normal=[];for(let t=w;t<n;t++){let clean=true;for(let q=t-w+1;q<=t;q++)if(busy[q])clean=false;if(clean)normal.push(chg(sym,V[t-w],V[t]))}
+  const occ=[];EV[evk].dates.forEach(d=>{if(d>lastD)return;const r=react(evk,d);if(r<1||r+w-1>=n)return;
+    occ.push({date:d,react:D[r],mv:chg(sym,V[r-1],V[r+w-1]),from:V[r-1],to:V[r+w-1]})});
+  const recent=occ.slice(-S.look);
+  const abs=x=>x.map(Math.abs).sort((p,q)=>p-q);
+  const med=x=>x.length?(x.length%2?x[(x.length-1)/2]:(x[x.length/2-1]+x[x.length/2])/2):NaN;
+  const mean=x=>x.length?x.reduce((p,q)=>p+q,0)/x.length:NaN;
+  const nAbs=abs(normal),eAbs=abs(recent.map(o=>o.mv));
+  const nMed=med(nAbs),p90=nAbs[Math.floor(nAbs.length*.9)];
+  const sd=x=>{const m=mean(x);return Math.sqrt(mean(x.map(v=>(v-m)*(v-m))))};
+  /* ex-event realised vol over the last ~3 months (63 trading days), annualised */
+  const recentNormal=[];for(let t=Math.max(1,n-63);t<n;t++){if(!busy[t])recentNormal.push(chg(sym,V[t-1],V[t]))}
+  return{sym,evk,occ,recent,nMed,nMean:mean(nAbs),nSd:sd(normal),p90,eMed:med(eAbs),eMean:mean(eAbs),
+    mult:med(eAbs)/nMed,big:recent.length?recent.filter(o=>Math.abs(o.mv)>p90).length/recent.length*100:NaN,
+    up:recent.filter(o=>o.mv>0).length,baseVol:sd(recentNormal)*Math.sqrt(252),last:V[n-1],lastD};
+}
+const fmv=(s,v,signed=true)=>{if(v==null||!isFinite(v))return'—';if(isY(s)){const r=v.toFixed(1);return(signed&&v>0?'+':v<0?'−':'')+Math.abs(+r).toFixed(1)+'bp'}return(signed&&v>0?'+':v<0?'−':'')+Math.abs(v).toFixed(2)+'%'};
+const fabs=(s,v)=>fmv(s,v,false).replace('−','');
+const multCol=m=>!isFinite(m)?'transparent':`color-mix(in srgb, var(--a2) ${Math.round(Math.max(0,Math.min(1,(m-1)/2))*55)}%, var(--card))`;
+
+/* ---------- render ---------- */
+function upcoming(){
+  const today=iso(TODAY),lim=iso(new Date(+TODAY+60*864e5));
+  const list=[];EVK.forEach(k=>EV[k].dates.forEach(d=>{if(d>=today&&d<=lim)list.push({k,d})}));
+  list.sort((p,q)=>p.d<q.d?-1:1);
+  $('#nextSub').textContent=T('Next 60 days. Dates are when the decision or data is announced (local date). Pick one to load it below; the typical move shown is for the asset selected on the board.',
+    '今後60日間。日付は決定・発表日（現地日付）。クリックで下の分析に反映。「典型的な値動き」はボードで選んだ資産の値。');
+  $('#next').innerHTML=list.length?list.map(e=>{const R=SERIES?analyse(S.asset,e.k):null,days=Math.round((Date.parse(e.d+'T00:00:00Z')-Date.parse(today+'T00:00:00Z'))/864e5);
+    return `<button class="ev ${e.k===S.ev?'on':''}" data-k="${e.k}" data-d="${e.d}"><span class="d">${fdate(e.d,{weekday:'short',day:'numeric',month:'short'})} · ${days===0?T('today','本日'):days===1?T('tomorrow','明日'):T(days+' days',days+'日後')}</span><span class="n">${EN(e.k)}</span><span class="c">${esc(AN(S.asset))} ${T('typical','典型的')} <b>${R?fabs(S.asset,R.eMed):'—'}</b>${R&&isFinite(R.mult)?` · ${num(R.mult,1)}×`:''}</span></button>`}).join(''):`<p class="empty">${T('No scheduled events in the next 60 days.','今後60日間に予定イベントはありません。')}</p>`;
+  $$('#next .ev').forEach(b=>b.onclick=()=>{S.ev=b.dataset.k;S.dte=null;S.iv=null;S._ivTouched=false;save();render()});
+}
+function render(){
+  if(!SERIES)return;
+  $$('#win button').forEach(b=>b.classList.toggle('on',+b.dataset.v===S.win));
+  $$('#look button').forEach(b=>b.classList.toggle('on',+b.dataset.v===S.look));
+  const R={};A.forEach(a=>EVK.forEach(k=>{R[a.s+'|'+k]=analyse(a.s,k)}));
+  const any=Object.values(R).find(Boolean);
+  $('#asof').textContent=any?T('Data to ','データ：')+fdate(any.lastD)+(LIVE?'':T(' · synthetic sample',' · 合成サンプル')):'';
+  upcoming();
+  $('#bSub').innerHTML=T(`Median absolute move on the reaction ${S.win===1?'day':'two days'}, over the ${S.look>20?'events since 2022':'last '+S.look+' events'}. The multiple compares it with the median move on ordinary days (no FOMC, BoJ, CPI or payrolls); the deeper the red, the more the event moves that market. Click a cell for detail.`,
+    `反応${S.win===1?'当日':'2日間'}の値動き（絶対値の中央値、${S.look>20?'2022年以降すべて':'直近'+S.look+'回'}）。倍率はイベントのない通常日の中央値との比較で、赤が濃いほどそのイベントで大きく動く市場。セルをクリックで詳細。`);
+  $('#board').innerHTML=`<thead><tr><th>${T('Asset','資産')}</th>${EVK.map(k=>`<th class="evh ${k===S.ev?'on':''}" data-k="${k}">${EN(k)}</th>`).join('')}<th>${T('Ordinary day','通常日')}</th></tr></thead><tbody>`+
+    A.map(a=>{const r0=R[a.s+'|FOMC']||R[a.s+'|CPI'];
+      return `<tr><td>${esc(AN(a.s))}<span class="nm">${a.ses==='tk'?T('Tokyo close: US events count next day','東京引け：米イベントは翌日で計測'):isY(a.s)?T('change in bp','bp変化'):''}</span></td>`+
+      EVK.map(k=>{const r=R[a.s+'|'+k];return `<td class="m ${k===S.ev&&a.s===S.asset?'on':''}" data-a="${a.s}" data-k="${k}" style="background:${r?multCol(r.mult):'transparent'}">${r?`<span class="mv">${fabs(a.s,r.eMed)}</span><span class="mx">${num(r.mult,1)}× · ${T('n','n')}=${r.recent.length}</span>`:'—'}</td>`}).join('')+
+      `<td>${r0?fabs(a.s,r0.nMed):'—'}</td></tr>`}).join('')+'</tbody>';
+  $$('#board td.m').forEach(c=>c.onclick=()=>{S.asset=c.dataset.a;S.ev=c.dataset.k;S.iv=S.bv=S.dte=null;S._ivTouched=false;save();render()});
+  $$('#board th.evh').forEach(c=>c.onclick=()=>{S.ev=c.dataset.k;S.dte=null;S.iv=null;S._ivTouched=false;save();render()});
+  detail(R[S.asset+'|'+S.ev]);implied(R[S.asset+'|'+S.ev]);method();
+}
+function detail(r){
+  const s=S.asset;
+  $('#dT').textContent=`${AN(s)} · ${EN(S.ev)}`;
+  if(!r){$('#dSub').textContent=T('No data for this asset.','この資産のデータがありません。');$('#bars').innerHTML='';$('#occ').innerHTML='';$('#dSay').innerHTML='';return}
+  $('#dSub').textContent=T(`Signed move on each ${EV[S.ev].long[0]} since 2022 (${S.win===1?'reaction day':'two days'}). Highlighted bars are in the current sample. Dashed lines: the move that only 10% of ordinary ${S.win===1?'days':'two-day spells'} exceed.`,
+    `2022年以降の各回の値動き（${S.win===1?'反応当日':'2日間'}）。濃い棒が現在の対象回。破線：通常日の上位10%の値動き。`);
+  /* bar chart */
+  const svg=$('#bars'),w=W(svg),h=280,m={l:52,r:10,t:12,b:26},o=r.occ,N=o.length;
+  const ext=Math.max(r.p90*1.15,...o.map(x=>Math.abs(x.mv)))||1;const yt=niceTicks(-ext,ext,6),y0=yt[0],y1=yt[yt.length-1];
+  const Y=v=>m.t+(1-(v-y0)/(y1-y0))*(h-m.t-m.b),bw=(w-m.l-m.r)/Math.max(1,N),inS=new Set(r.recent.map(x=>x.date));
+  let g='';yt.forEach(v=>g+=`<line class="grd" x1="${m.l}" x2="${w-m.r}" y1="${Y(v)}" y2="${Y(v)}"/><text x="${m.l-6}" y="${Y(v)+4}" text-anchor="end">${fmv(s,v).replace('+0.00%','0').replace('+0.0bp','0')}</text>`);
+  g+=`<line class="zero" x1="${m.l}" x2="${w-m.r}" y1="${Y(0)}" y2="${Y(0)}"/>`;
+  [r.p90,-r.p90].forEach(v=>g+=`<line x1="${m.l}" x2="${w-m.r}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--ink)" stroke-dasharray="4 4" stroke-width="1" opacity=".6"/>`);
+  let lastY='';o.forEach((x,i)=>{const X=m.l+i*bw,yy=x.date.slice(0,4);
+    g+=`<rect data-i="${i}" x="${X+bw*.15}" width="${Math.max(1,bw*.7)}" y="${Math.min(Y(0),Y(x.mv))}" height="${Math.max(1,Math.abs(Y(x.mv)-Y(0)))}" fill="${x.mv>=0?'var(--a2)':'var(--a1)'}" opacity="${inS.has(x.date)?1:.35}"/>`;
+    if(yy!==lastY){g+=`<text x="${X}" y="${h-8}">${yy}</text>`;lastY=yy}});
+  g+=`<line class="ax" x1="${m.l}" x2="${w-m.r}" y1="${h-m.b}" y2="${h-m.b}"/><rect class="hit" x="${m.l}" y="${m.t}" width="${w-m.l-m.r}" height="${h-m.t-m.b}" fill="transparent"/>`;
+  svg.setAttribute('viewBox',`0 0 ${w} ${h}`);svg.setAttribute('height',h);svg.innerHTML=g;
+  svg.querySelector('.hit').onmousemove=ev=>{const b=svg.getBoundingClientRect(),i=Math.floor(((ev.clientX-b.left)/b.width*w-m.l)/bw);const x=o[i];if(!x){tip(null);return}
+    tip(`<div class="m">${EN(S.ev)} · ${fdate(x.date)}</div><div>${esc(AN(s))} <b>${fmv(s,x.mv)}</b></div><div class="m">${T('vs ordinary-day median','通常日中央値比')} ${num(Math.abs(x.mv)/r.nMed,1)}×</div>`,ev)};
+  svg.querySelector('.hit').onmouseleave=()=>tip(null);
+  $('#bLeg').innerHTML=`<span><i style="background:var(--a2)"></i>${T('Up','上昇')}</span><span><i style="background:var(--a1)"></i>${T('Down','下落')}</span><span><i class="d" style="border-color:var(--ink)"></i>${T('90th percentile of ordinary days','通常日の90パーセンタイル')} (±${fabs(s,r.p90)})</span>`;
+  const n=r.recent.length;
+  $('#dSay').innerHTML=n?T(`Over the last ${n} ${EN(S.ev)} events, ${AN(s)} moved a median <b>${fabs(s,r.eMed)}</b>, ${num(r.mult,1)} times an ordinary ${S.win===1?'day':'two days'} (${fabs(s,r.nMed)}). ${num(r.big,0)}% of them beat the ordinary-day 90th percentile, against 10% by chance. It rose ${r.up} times and fell ${n-r.up}.`,
+    `直近${n}回の${EN(S.ev)}で、${AN(s)}の値動きは中央値<b>${fabs(s,r.eMed)}</b>、通常日（${fabs(s,r.nMed)}）の${num(r.mult,1)}倍。通常日の90パーセンタイルを超えたのは${num(r.big,0)}%（偶然なら10%）。上昇${r.up}回、下落${n-r.up}回。`):'';
+  $('#oSub').textContent=T('Newest first. The reaction date can differ from the event date for Tokyo-close assets and holidays.','新しい順。東京引けの資産や休日は、反応日がイベント日と異なります。');
+  $('#occ').innerHTML=`<thead><tr><th>${T('Event','イベント')}</th><th>${T('Move','値動き')}</th><th>${T('× ordinary','通常日比')}</th><th>${T('Measured','計測日')}</th></tr></thead><tbody>`+
+    r.occ.slice().reverse().map(x=>`<tr class="${inS.has(x.date)?'':'old'}" style="${inS.has(x.date)?'':'opacity:.55'}"><td>${fdate(x.date)}</td><td class="${x.mv>0?'up':x.mv<0?'dn':''}">${fmv(s,x.mv)}</td><td>${num(Math.abs(x.mv)/r.nMed,1)}×</td><td>${x.react!==x.date?fdate(x.react,{day:'numeric',month:'short'}):'—'}</td></tr>`).join('')+'</tbody>';
+}
+function nextDate(k){const t=iso(TODAY);return EV[k].dates.find(d=>d>=t)}
+function implied(r){
+  const s=S.asset,y=isY(s);
+  $('#iT').textContent=T(`Is the ${EN(S.ev)} move priced? ${AN(s)}`,`${EN(S.ev)}の値動きは織り込まれているか：${AN(s)}`);
+  $('#iSub').innerHTML=T(`Enter the at-the-money implied volatility of an option expiring after the event. Taking out the variance of the ordinary days left to expiry leaves the variance the market charges for the event day. Its expected absolute move (0.8 × the event-day standard deviation) is compared with the historical average${S.win===2?' (this check always uses one event day)':''}.`,
+    `イベント後に満期を迎えるATMオプションのインプライド・ボラを入力。満期までの通常日の分散を差し引くと、市場がイベント日に織り込む分散が残ります。その期待絶対値（イベント日標準偏差×0.8）を過去の平均と比較します${S.win===2?'（この計算は常にイベント1日分）':''}。`);
+  if(!r){$('#iOut').innerHTML='';$('#iSay').innerHTML='';return}
+  const nd=nextDate(S.ev);const toEv=nd?Math.max(1,Math.round((Date.parse(nd+'T00:00:00Z')-Date.parse(iso(TODAY)+'T00:00:00Z'))/864e5)):7;
+  const bvDef=+r.baseVol.toFixed(y?0:1);
+  if(S.bv==null)S.bv=bvDef;if(S.dte==null)S.dte=toEv+7;
+  if(S.iv==null){/* example: the vol that would price the historical average move exactly */
+    const h=analyse1(s,S.ev),nn=Math.max(1,Math.round(S.dte*252/365)),es=h&&isFinite(h.eMean)?h.eMean/.798:0;
+    S.iv=+Math.sqrt((S.bv*S.bv*Math.max(0,nn-1)/252+es*es)*252/nn).toFixed(y?0:1)}
+  $('#ivL').textContent=T('ATM implied vol','ATMインプライド・ボラ');$('#ivEx').textContent=S._ivTouched?'':T('example: the vol that prices history; enter your quote','例：過去並みを織り込む水準。実際の値を入力');
+  $('#ivU').textContent=y?T('bp a year (normal vol)','年率bp（ノーマル・ボラ）'):T('% a year','年率%');
+  $('#bvU').textContent=(y?T('bp a year','年率bp'):T('% a year','年率%'))+T(`; last 3 months excluding event days: ${num(bvDef,y?0:1)}`,`。直近3ヶ月の通常日実現値：${num(bvDef,y?0:1)}`);
+  $('#dteU').textContent=nd?T(`Next ${EN(S.ev)}: ${fdate(nd)}, in ${toEv} days`,`次回${EN(S.ev)}：${fdate(nd)}（${toEv}日後）`):'';
+  ['iv','dte','bv'].forEach(id=>{const el=$('#'+id);if(document.activeElement!==el)el.value=S[id]});
+  const n=Math.max(1,Math.round(S.dte*252/365)),tot=S.iv*S.iv*n/252,base=S.bv*S.bv*Math.max(0,n-1)/252,evVar=tot-base;
+  const evSd=evVar>0?Math.sqrt(evVar):0,exp=.798*evSd,expAll=.798*S.iv/Math.sqrt(252);
+  const hist1=analyse1(s,S.ev),hm=hist1?hist1.eMean:NaN,ratio=exp/hm;
+  const v=!isFinite(ratio)||evVar<=0?['',T('No event premium','イベント・プレミアムなし')]:ratio>1.15?['rich',T('Rich','割高')]:ratio<.85?['cheap',T('Cheap','割安')]:['',T('Fair','妥当')];
+  const u=x=>y?num(x,1)+'bp':num(x,2)+'%';
+  $('#iOut').innerHTML=[
+    [T('Implied event-day move','織り込まれたイベント日の値動き'),evVar>0?u(exp):'—',T('expected absolute move','期待絶対値')],
+    [T('Historical average','過去の平均'),isFinite(hm)?u(hm):'—',T(`mean |move|, ${hist1?hist1.recent.length:0} events, reaction day`,`|値動き|の平均、${hist1?hist1.recent.length:0}回、反応当日`)],
+    [T('Implied ÷ history','織り込み÷過去'),isFinite(ratio)&&evVar>0?num(ratio,2)+'×':'—',`<span class="verdict ${v[0]}">${v[1]}</span>`],
+    [T('Event-day vol','イベント日ボラ'),evVar>0?num(evSd*Math.sqrt(252),y?0:1)+(y?'bp':'%'):'—',T(`vs ${num(S.iv,y?0:1)} for the option and ${num(S.bv,y?0:1)} ex-event`,`オプション${num(S.iv,y?0:1)}、通常日${num(S.bv,y?0:1)}`)]
+  ].map(k=>`<div class="kpi"><span class="lbl">${k[0]}</span><span class="v">${k[1]}</span><span class="s">${k[2]}</span></div>`).join('');
+  let t='';
+  if(evVar<=0)t=T(`At ${num(S.iv,y?0:1)} implied, the option is priced below the ordinary-day volatility of ${num(S.bv,y?0:1)} for ${n} trading days, so it charges nothing extra for ${EN(S.ev)}. Either the ex-event vol is set too high or the event is cheap.`,
+    `インプライド${num(S.iv,y?0:1)}は、${n}営業日の通常日ボラ${num(S.bv,y?0:1)}を下回っており、${EN(S.ev)}への上乗せがありません。通常日ボラの設定が高すぎるか、イベントが割安です。`);
+  else t=T(`An option at ${num(S.iv,y?0:1)} for ${n} trading days prices a ${EN(S.ev)}-day move of about <b>${u(exp)}</b>; without the event it would price ${u(expAll*S.bv/S.iv)} a day. ${AN(s)} has averaged ${u(hm)} on the reaction day. `,
+    `${n}営業日で${num(S.iv,y?0:1)}のオプションは、${EN(S.ev)}当日に約<b>${u(exp)}</b>の値動きを織り込んでいます（イベントがなければ1日${u(expAll*S.bv/S.iv)}）。${AN(s)}の反応当日の平均は${u(hm)}です。`)+
+    (v[0]==='rich'?T('The event looks expensive against its own history: a reason to sell event vol, or to fund a structure with it.','過去と比べて割高：イベント・ボラの売り、またはストラクチャーの原資に。'):v[0]==='cheap'?T('The event looks cheap against its own history: a reason to own a straddle or a short-dated option across it.','過去と比べて割安：ストラドルや短期オプションの買い。'):T('That is in line with history.','過去並みです。'));
+  $('#iSay').innerHTML=t;
+}
+/* same as analyse, but always the one-day reaction for the implied check */
+function analyse1(s,k){const w=S.win;S.win=1;const r=analyse(s,k);S.win=w;return r}
+function method(){
+  $('#method').innerHTML=T(`<b>Method.</b> Daily closes; UST and JGB yields as bp changes (Fed H.15, Japan MOF). A move runs from the close before the reaction day to the close of the reaction day (or the day after, with “2 days”). US events land on the same day for New York and global markets and on the next Tokyo session for the Nikkei and JGBs; BoJ decisions land the same day everywhere. Ordinary days exclude every FOMC, BoJ, CPI and payrolls reaction. Event dates come from the Fed, BoJ and BLS calendars, including the 2025 and 2026 US shutdown reschedules. Other news on the same day is counted in. The implied check is a standard event-variance split and ignores skew, weekends and other events before expiry. History describes the past, not probabilities; not investment advice. ${LIVE?'Data: Keel (Yahoo Finance, Fed, MOF through OpenBB); free sources can be delayed.':'<b>Synthetic sample, not market data.</b> Connect Keel for live figures.'}`,
+    `<b>手法。</b>日次終値。米国債・日本国債の利回りはbp変化（FRB H.15、財務省）。値動きは反応日の前日終値から反応日（「2日間」では翌日）の終値まで。米国イベントはニューヨーク・グローバル市場では当日、日経平均と日本国債では翌営業日に計測。日銀決定はすべて当日。通常日はFOMC・日銀・CPI・雇用統計の反応日をすべて除外。イベント日程はFRB・日銀・BLSの公表日程（2025年・2026年の米政府閉鎖による変更を含む）。同日の他のニュースも含まれます。織り込みの計算は標準的なイベント分散の分解で、スキュー、週末、満期までの他のイベントは考慮していません。過去の記述であり確率ではありません。投資助言ではありません。${LIVE?'データ：Keel（OpenBB経由のYahoo Finance、FRB、財務省）。無料ソースのため遅延の可能性があります。':'<b>合成サンプルであり、市場データではありません。</b>Keelに接続すると実データを表示します。'}`);
+}
+window.redraw=render;
+
+/* ---------- load ---------- */
+async function load(fresh){
+  setStatus('busy');
+  const r=await keel('api_history',{symbols:A.map(a=>a.s).join(','),interval:'D',start:'2021-12-01'},{fresh});
+  if(r.ok&&r.data&&r.data.series&&Object.keys(r.data.series).length){SERIES=r.data.series;LIVE=true;setStatus('live');
+    if(r.data.missing&&r.data.missing.length){const b=$('#banner');b.hidden=false;b.innerHTML=`<span>${T('Not loaded: ','未取得：')}${esc(r.data.missing.join(', '))}</span>`}}
+  else{SERIES=sample();LIVE=false;setStatus(r.code==='no_mcp'?'sample':'err',r.code,r.message)}
+  S.iv=S.bv=S.dte=null;S._ivTouched=false;render();
+}
+['iv','dte','bv'].forEach(id=>$('#'+id).oninput=e=>{const v=parseFloat(e.target.value);if(!isFinite(v)||v<=0)return;S[id]=id==='dte'?Math.max(2,Math.round(v)):v;if(id==='iv')S._ivTouched=true;implied(analyse(S.asset,S.ev))});
+$$('#win button').forEach(b=>b.onclick=()=>{S.win=+b.dataset.v;save();render()});
+$$('#look button').forEach(b=>b.onclick=()=>{S.look=+b.dataset.v;save();render()});
+$('#refresh').onclick=()=>load(true);
+$('#how').innerHTML=howHtml();
+$$('#langSeg button').forEach(b=>b.onclick=()=>{setLang(b.dataset.l);$('#how').innerHTML=howHtml();restatus();render()});
+setLang(LANG);
+SERIES=sample();render();
+load(false);
+</script>
