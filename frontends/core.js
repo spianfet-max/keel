@@ -59,7 +59,9 @@ async function keel(tool,input,{fresh=false}={}){
       if(typeof d==='string'){try{d=JSON.parse(d)}catch(e){return{ok:false,code:'tool_error',message:d.slice(0,200)}}}
       return{ok:true,data:d,storedAt:r.cache?.storedAt};
     }catch(e){
-      if(e&&e.retryable&&attempt===0){await new Promise(ok=>setTimeout(ok,Math.min(e.retryAfterMs||4000+Math.random()*3000,20000)));continue}
+      /* the free server sometimes drops a long response; treat a dropped or timed-out stream as worth one more try */
+      const transient=/upstream closed|closed the stream|timed? ?out|timeout|ECONNRESET|50[234]/i.test(String(e&&e.message||''));
+      if(e&&(e.retryable||transient)&&attempt===0){await new Promise(ok=>setTimeout(ok,Math.min(e.retryAfterMs||4000+Math.random()*3000,20000)));continue}
       return{ok:false,code:e?.code||'upstream_error',message:e?.message||''};
     }
   }

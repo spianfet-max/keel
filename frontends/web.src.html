@@ -164,7 +164,7 @@ const WINS={W:{r:[[13,'3M','3ヶ月'],[26,'6M','6ヶ月'],[52,'1Y','1年']],b:[[
 if(!WINS[S.freq].r.some(w=>w[0]===S.r))S.r=WINS[S.freq].dr;if(!WINS[S.freq].b.some(w=>w[0]===S.b))S.b=WINS[S.freq].db;
 const winLab=(n)=>{for(const k of['r','b'])for(const w of WINS[S.freq][k])if(w[0]===n)return JA()?w[2]:w[1];return n};
 
-let SERIES=null,UNITS={},LIVE=false,STORED=null;
+let SERIES=null,UNITS={},LIVE=false,STORED=null,SER={W:null,D:null};
 let GRID=null; /* {dates:[ms], R:[Float64Array|null per asset], valid:[Uint8Array]} */
 let CACHE={}; /* rolling series per pair+window */
 
@@ -495,26 +495,43 @@ function method(){
 }
 window.redraw=render;
 
-/* ---------- load ---------- */
-async function load(fresh){
-  setStatus('busy');
-  const start=new Date(Date.now()-10*365.25*864e5).toISOString().slice(0,10);
-  const syms=U.map(u=>u.s),half=[syms.slice(0,7),syms.slice(7)];
-  const rs=[];for(const h of half)rs.push(await keel('api_history',{symbols:h.join(','),interval:'D',start},{fresh}));
-  const cv=await keel('api_history',{symbols:['UST','JGB'].flatMap(c=>CVT.map(m=>c+m+'Y')).join(','),interval:'D',start},{fresh});
-  CURVE=cv.ok&&cv.data&&cv.data.series?cv.data.series:(rs.some(r=>r.ok)?null:curveSample());
-  const good=rs.filter(r=>r.ok&&r.data&&r.data.series);
-  if(good.length){
-    SERIES={};UNITS={};good.forEach(r=>{Object.assign(SERIES,r.data.series);Object.assign(UNITS,r.data.units||{})});
-    LIVE=true;STORED=rs.map(r=>r.storedAt).filter(Boolean)[0]||null;setStatus('live');
-    const bad=rs.find(r=>!r.ok);if(bad){const b=$('#banner');b.hidden=false;b.innerHTML=`<span>${T('Part of the data did not load: ','一部のデータを取得できません：')}${esc(keelMsg(bad.code,bad.message))}</span>`}
-  }else{
-    const sm=sample();SERIES=sm.series;UNITS=sm.units;LIVE=false;
-    const r=rs[0];setStatus(r.code==='no_mcp'?'sample':'err',r.code,r.message);
-  }
-  buildGrid();render();
+/* ---------- load ----------
+   Weekly closes load first (small); daily closes only when the Daily view is chosen, in small batches, because the
+   free server can drop very long responses. Curve factors need one year of daily yields plus the year before. */
+const yearsAgo=y=>new Date(Date.now()-y*365.25*864e5).toISOString().slice(0,10);
+async function fetchSet(interval,start,fresh,size){
+  const syms=U.map(u=>u.s),groups=[];for(let i=0;i<syms.length;i+=size)groups.push(syms.slice(i,i+size));
+  const series={},units={};let ok=0,bad=null;
+  for(const g of groups){const r=await keel('api_history',{symbols:g.join(','),interval,start},{fresh});
+    if(r.ok&&r.data&&r.data.series){Object.assign(series,r.data.series);Object.assign(units,r.data.units||{});ok++}else bad=r}
+  return{ok,bad,all:ok===groups.length,series,units};
 }
-$$('#freq button').forEach(b=>b.onclick=()=>{if(S.freq===b.dataset.v)return;S.freq=b.dataset.v;S.r=WINS[S.freq].dr;S.b=WINS[S.freq].db;save();buildGrid();render()});
+function partial(r,what){const b=$('#banner');if(!r){b.hidden=true;return}b.hidden=false;
+  b.innerHTML=`<span>${what} ${esc(keelMsg(r.code,r.message))}</span> <button class="btn q" id="retry">${T('Try again','再試行')}</button>`;$('#retry').onclick=()=>load(true)}
+async function loadDaily(fresh){
+  setStatus('busy');const d=await fetchSet('D',yearsAgo(10),fresh,4);
+  if(d.ok){SER.D=d.series;Object.assign(UNITS,d.units);setStatus('live');partial(d.all?null:d.bad,T('Some daily series did not load:','一部の日次データを取得できません：'));return true}
+  setStatus('live');partial(d.bad,T('Daily data did not load, so the weekly view is shown.','日次データを取得できなかったため、週次表示のままです。'));return false;
+}
+async function load(fresh){
+  setStatus('busy');partial(null);
+  const w=await fetchSet('W',yearsAgo(10),fresh,7);
+  const cv=await keel('api_history',{symbols:['UST','JGB'].flatMap(c=>CVT.map(m=>c+m+'Y')).join(','),interval:'D',start:yearsAgo(2.6)},{fresh});
+  if(w.ok){
+    SER={W:w.series,D:null};UNITS=w.units;LIVE=true;setStatus('live');
+    CURVE=cv.ok&&cv.data&&cv.data.series?cv.data.series:null;
+    if(!w.all)partial(w.bad,T('Some markets did not load:','一部の市場を取得できません：'));
+    else if(!CURVE)partial(cv,T('Curve data did not load:','カーブのデータを取得できません：'));
+    if(S.freq==='D'&&!(await loadDaily(fresh)))S.freq='W';
+  }else{
+    const sm=sample();SER={W:sm.series,D:sm.series};UNITS=sm.units;CURVE=curveSample();LIVE=false;
+    const r=w.bad||{};setStatus(r.code==='no_mcp'?'sample':'err',r.code,r.message);
+  }
+  SERIES=S.freq==='D'?SER.D:SER.W;buildGrid();render();
+}
+$$('#freq button').forEach(b=>b.onclick=async()=>{if(S.freq===b.dataset.v)return;
+  if(b.dataset.v==='D'&&!SER.D){if(!(await loadDaily(false)))return}
+  S.freq=b.dataset.v;S.r=WINS[S.freq].dr;S.b=WINS[S.freq].db;save();SERIES=S.freq==='D'?SER.D:SER.W;buildGrid();render()});
 $$('#view button').forEach(b=>b.onclick=()=>{S.view=b.dataset.v;save();render()});
 $('#pa').onchange=e=>{S.pa=e.target.value;save();render()};
 $('#pb').onchange=e=>{S.pb=e.target.value;save();render()};
@@ -526,6 +543,6 @@ $('#how').innerHTML=howHtml();
 $$('#langSeg button').forEach(b=>b.onclick=()=>{setLang(b.dataset.l);$('#how').innerHTML=howHtml();restatus();render()});
 setLang(LANG);
 /* first paint from the sample so the page is never empty, then try Keel */
-{const sm=sample();SERIES=sm.series;UNITS=sm.units;CURVE=curveSample();buildGrid();render()}
+{const sm=sample();SER={W:sm.series,D:sm.series};SERIES=sm.series;UNITS=sm.units;CURVE=curveSample();buildGrid();render()}
 load(false);
 </script>
