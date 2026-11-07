@@ -314,7 +314,7 @@ async function rangeView(){
     `他のイベントのない前日の${AN(s)}の値動きは通常日の${num(pre,2)}倍、翌日は${num(post,2)}倍：${post<r.prof[3]*.6?'ショックはすぐに消え、リスクは当日に集中します。':'値動きは翌日にも続きやすい傾向です。'}`);
   if(y||!LIVE){$('#rng').innerHTML='';$('#rSay').innerHTML=base+(y?'':' '+T('Intraday ranges load with live data.','日中レンジはライブデータで表示されます。'));return}
   if(!OH[s]&&!OHB[s]){OHB[s]=1;$('#rSay').innerHTML=base+' '+T('Loading intraday ranges…','日中レンジを読み込み中…');
-    const q=await keel('api_ohlc',{symbols:s,interval:'D',start:'2009-12-01'});OHB[s]=0;
+    const q=await keel('api_ohlc',{symbols:s,interval:'D',start:'2009-12-01',compact:true});OHB[s]=0;
     OH[s]=q.ok&&q.data&&q.data.series&&q.data.series[s]?new Map(q.data.series[s].filter(b=>b.h>0&&b.l>0).map(b=>[b.d,Math.log(b.h/b.l)*100])):new Map();
     if(S.asset===s)rangeView();return}
   if(OHB[s])return;
@@ -444,7 +444,7 @@ async function load(fresh){
   /* three small requests in turn: the free server can drop one very long response */
   setStatus('busy');const groups=[A.slice(0,4),A.slice(4,7),A.slice(7)].map(g=>g.map(a=>a.s));
   const series={};let bad=null;
-  for(const g of groups){const r=await keel('api_history',{symbols:g.join(','),interval:'D',start:'2009-12-01'},{fresh});
+  for(const g of groups){const r=await keel('api_history',{symbols:g.join(','),interval:'D',start:'2009-12-01',compact:true},{fresh});
     if(r.ok&&r.data&&r.data.series)Object.assign(series,r.data.series);else bad=r}
   const b=$('#banner');b.hidden=true;
   if(Object.keys(series).length){SERIES=series;LIVE=true;setStatus('live');

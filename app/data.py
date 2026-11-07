@@ -17,7 +17,9 @@ from __future__ import annotations
 
 import io
 import logging
+import math
 import threading
+from collections import OrderedDict
 import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime, timedelta
@@ -52,8 +54,37 @@ def obb():
 # Cache
 # --------------------------------------------------------------------------- #
 
-_cache: dict = {}
+# Bounded LRU: Render's free instance has 512 MB, and long price histories add up, so evict the least
+# recently used entries once the cache passes either limit.
+_cache: "OrderedDict" = OrderedDict()
+_sizes: dict = {}
 _lock = threading.Lock()
+CACHE_MAX_ITEMS = 300
+CACHE_MAX_BYTES = 120 * 1024 * 1024
+
+
+def _nbytes(v) -> int:
+    try:
+        if isinstance(v, pd.DataFrame):
+            return int(v.memory_usage(index=True, deep=False).sum())
+        if isinstance(v, pd.Series):
+            return int(v.memory_usage(index=True, deep=False))
+        if isinstance(v, dict):
+            return sum(_nbytes(x) for x in v.values()) + 64 * len(v)
+        if isinstance(v, (list, tuple)):
+            return sum(_nbytes(x) for x in v[:50]) * max(1, len(v) // 50) + 64
+    except Exception:  # noqa: BLE001
+        pass
+    return 256
+
+
+def _put(key, now, val):
+    _cache[key] = (now, val)
+    _cache.move_to_end(key)
+    _sizes[key] = _nbytes(val)
+    while _cache and (len(_cache) > CACHE_MAX_ITEMS or sum(_sizes.values()) > CACHE_MAX_BYTES):
+        old, _ = _cache.popitem(last=False)
+        _sizes.pop(old, None)
 
 
 def _has_data(v) -> bool:
@@ -77,14 +108,15 @@ def cached(ttl: int):
             with _lock:
                 hit = _cache.get(key)
                 if hit and now - hit[0] < ttl:
+                    _cache.move_to_end(key)
                     return hit[1]
             val = fn(*args, **kwargs)
             if _has_data(val):  # never cache an empty answer (e.g. Yahoo throttling)
                 with _lock:
-                    _cache[key] = (now, val)
+                    _put(key, now, val)
             return val
 
-        wrapper.cache_clear = lambda: _cache.clear()  # type: ignore[attr-defined]
+        wrapper.cache_clear = lambda: (_cache.clear(), _sizes.clear())  # type: ignore[attr-defined]
         return wrapper
 
     return deco
@@ -180,6 +212,18 @@ def resample_ohlc(df: pd.DataFrame, interval: str) -> pd.DataFrame:
     rule = "W-FRI" if interval == "W" else "ME"
     agg = df.resample(rule).agg({"open": "first", "high": "max", "low": "min", "close": "last", "volume": "sum"})
     return agg.dropna(subset=["close"])
+
+
+YEAR_BUCKETS = (3, 5, 10, 17, 26)
+
+
+def year_bucket(years: float) -> float:
+    """Round a look-back up to a few fixed lengths, so pages asking for slightly different start dates
+    share one cached download (the routes trim to the start date they were given)."""
+    for b in YEAR_BUCKETS:
+        if years <= b:
+            return float(b)
+    return float(math.ceil(years))
 
 
 def many_closes(symbols: list[str], years: float = 3, dividends: bool = False) -> dict[str, pd.Series]:

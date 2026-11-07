@@ -436,7 +436,7 @@ window.redraw=render;
 async function load(fresh){
   setStatus('busy');
   const series={};let ok=0,err=null;
-  for(const b of BATCHES){const r=await keel('api_history',{symbols:b.join(','),interval:'D',start:'2011-01-01',total:true},{fresh});
+  for(const b of BATCHES){const r=await keel('api_history',{symbols:b.join(','),interval:'D',start:'2011-01-01',total:true,compact:true},{fresh});
     if(r.ok&&r.data&&r.data.series){Object.assign(series,r.data.series);ok++}else err=r}
   const cr=await keel('api_fxcarry',{years:16},{fresh});CARRY=cr.ok&&cr.data&&cr.data.rate?cr.data:null;
   if(ok){SERIES=series;LIVE=true;setStatus('live');

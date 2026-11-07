@@ -502,7 +502,7 @@ const yearsAgo=y=>new Date(Date.now()-y*365.25*864e5).toISOString().slice(0,10);
 async function fetchSet(interval,start,fresh,size){
   const syms=U.map(u=>u.s),groups=[];for(let i=0;i<syms.length;i+=size)groups.push(syms.slice(i,i+size));
   const series={},units={};let ok=0,bad=null;
-  for(const g of groups){const r=await keel('api_history',{symbols:g.join(','),interval,start},{fresh});
+  for(const g of groups){const r=await keel('api_history',{symbols:g.join(','),interval,start,compact:true},{fresh});
     if(r.ok&&r.data&&r.data.series){Object.assign(series,r.data.series);Object.assign(units,r.data.units||{});ok++}else bad=r}
   return{ok,bad,all:ok===groups.length,series,units};
 }
@@ -516,7 +516,7 @@ async function loadDaily(fresh){
 async function load(fresh){
   setStatus('busy');partial(null);
   const w=await fetchSet('W',yearsAgo(10),fresh,7);
-  const cv=await keel('api_history',{symbols:['UST','JGB'].flatMap(c=>CVT.map(m=>c+m+'Y')).join(','),interval:'D',start:yearsAgo(2.6)},{fresh});
+  const cv=await keel('api_history',{symbols:['UST','JGB'].flatMap(c=>CVT.map(m=>c+m+'Y')).join(','),interval:'D',start:yearsAgo(2.6),compact:true},{fresh});
   if(w.ok){
     SER={W:w.series,D:null};UNITS=w.units;LIVE=true;setStatus('live');
     CURVE=cv.ok&&cv.data&&cv.data.series?cv.data.series:null;

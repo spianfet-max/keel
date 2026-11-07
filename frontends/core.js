@@ -32,7 +32,7 @@ const unwrap=p=>{if(p&&typeof p==='object'&&!Array.isArray(p)&&Object.keys(p).le
 /* Outside claude.ai (GitHub Pages, a local file, VS Code Live Server) there is no connector:
    call the Keel REST API directly. Address can be changed with localStorage 'keel-url'. */
 let KEEL_URL='https://keel-api-tqpz.onrender.com';try{KEEL_URL=localStorage.getItem('keel-url')||KEEL_URL}catch(e){}
-const REST={api_yields:'/api/yields',api_brief:'/api/brief',api_sp_screen:'/api/sp/screen',api_comps:'/api/comps',api_history:'/api/history',api_returns:'/api/returns',api_ppp:'/api/ppp',api_snapshot:'/api/snapshot',api_fxcarry:'/api/fxcarry'};
+const REST={api_yields:'/api/yields',api_brief:'/api/brief',api_sp_screen:'/api/sp/screen',api_comps:'/api/comps',api_history:'/api/history',api_returns:'/api/returns',api_ppp:'/api/ppp',api_snapshot:'/api/snapshot',api_fxcarry:'/api/fxcarry',api_ohlc:'/api/ohlc'};
 let VIA=null;
 async function keelRest(tool,input){
   const path=REST[tool];if(!path)return{ok:false,code:'no_mcp'};
@@ -48,7 +48,21 @@ async function keelRest(tool,input){
   }
   return{ok:false,code:'rest_unreachable'};
 }
-async function keel(tool,input,{fresh=false}={}){
+/* compact history/ohlc replies come as columns; turn them back into the row shape the pages use */
+function expandCompact(d){
+  if(!d||!d.compact||!d.series)return d;const out={};
+  Object.entries(d.series).forEach(([k,c])=>{if(!c||!Array.isArray(c.d)){out[k]=c;return}
+    const keys=Object.keys(c).filter(x=>x!=='d');out[k]=c.d.map((dt,i)=>{const r={d:dt};keys.forEach(x=>{const v=c[x][i];if(v!=null)r[x]=v});return r})});
+  return{...d,series:out,compact:false};
+}
+async function keel(tool,input,o={}){
+  let r=await keelCall(tool,input,o);
+  /* a Keel that predates `compact` rejects the argument: ask again without it */
+  if(!r.ok&&input&&input.compact&&!['no_mcp','not_granted','capability_disabled','capability_removed','server_not_connected','selection_required','server_not_found','needs_reauth','not_in_manifest','blocked_by_policy','approval_required'].includes(r.code)){const{compact,...rest}=input;r=await keelCall(tool,rest,o)}
+  if(r.ok)r.data=expandCompact(r.data);
+  return r;
+}
+async function keelCall(tool,input,{fresh=false}={}){
   const m=await mcpReady();
   if(!m)return keelRest(tool,input);
   VIA='mcp';

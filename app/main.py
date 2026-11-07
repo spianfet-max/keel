@@ -73,6 +73,14 @@ def _short_name(n):
     return n.strip() or None
 
 
+def _sig(v, n: int = 6):
+    """Round to n significant figures (prices from 0.5 to 50,000 keep their meaningful digits)."""
+    v = float(v)
+    if not math.isfinite(v) or v == 0:
+        return v if math.isfinite(v) else None
+    return round(v, max(0, n - 1 - int(math.floor(math.log10(abs(v))))))
+
+
 def _safe(v):
     """JSON-safe floats (NaN/inf -> None), rounded."""
     if isinstance(v, float):
@@ -320,6 +328,8 @@ def history(
     interval: str = Query("M", pattern="^(D|W|M)$", description="D, W or M (period-end closes)"),
     total: bool = Query(False, description="Adjust for dividends and distributions (total return); "
                         "ignored for FX, indices and government yields"),
+    compact: bool = Query(False, description="Columns instead of rows per symbol ({d: [...], v: [...]}), "
+                          "about half the size; for long histories"),
 ):
     """Closing prices per symbol, resampled to day, week or month end.
     With `total=true`, funds and stocks are adjusted for distributions (a total-return index).
@@ -331,7 +341,7 @@ def history(
     years = max(1.0, (pd.Timestamp(date.today()) - st).days / 365.25 + 0.1)
     ysyms = [s for s in syms if s.upper() in YIELD_SYMS]
     psyms = [s for s in syms if s not in ysyms]
-    got = D.many_closes(psyms, years, dividends=total) if psyms else {}
+    got = D.many_closes(psyms, D.year_bucket(years), dividends=total) if psyms else {}
     for s in ysyms:
         try:
             ys = _yield_series(s.upper(), years)
@@ -347,10 +357,14 @@ def history(
             c = c.resample("W-FRI").last()
         elif interval == "M":
             c = c.resample("ME").last()
-        out[s] = [{"d": str(i.date()), "v": float(v)} for i, v in c.dropna().items()]
+        c = c.dropna()
+        if compact:
+            out[s] = {"d": [str(i.date()) for i in c.index], "v": [_sig(v) for v in c.values]}
+        else:
+            out[s] = [{"d": str(i.date()), "v": float(v)} for i, v in c.items()]
     units = {s: ("pct" if s in ysyms else "price") for s in out}
     return _safe({"series": out, "units": units, "missing": [s for s in syms if s not in out],
-                  "total_return": bool(total)})
+                  "total_return": bool(total), **({"compact": True} if compact else {})})
 
 
 @app.get("/api/ohlc", operation_id="price_bars", dependencies=[Depends(check_token)])
@@ -359,6 +373,8 @@ def ohlc_bars(
                          "(yields: close only, so open = high = low = close)"),
     start: str | None = Query(None, description="YYYY-MM-DD; default 2 years ago"),
     interval: str = Query("D", pattern="^(D|W|M)$", description="D, W (Friday) or M (month-end) bars"),
+    compact: bool = Query(False, description="Columns instead of rows per symbol ({d, o, h, l, c, v} arrays), "
+                          "about half the size; for long histories"),
 ):
     """Open, high, low, close and volume bars per symbol, for bar-pattern studies (e.g. DeMark).
     Prices are split-adjusted but not dividend-adjusted. `close_only` lists symbols whose
@@ -368,7 +384,8 @@ def ohlc_bars(
     years = max(1.0, (pd.Timestamp(date.today()) - st).days / 365.25 + 0.1)
     ysyms = [s for s in syms if s.upper() in YIELD_SYMS]
     psyms = [s for s in syms if s not in ysyms]
-    got = D._pool(lambda s: D.ohlc(s, years), psyms, workers=3) if psyms else {}
+    yb = D.year_bucket(years)
+    got = D._pool(lambda s: D.ohlc(s, yb), psyms, workers=3) if psyms else {}
     got = {k: v for k, v in got.items() if v is not None and len(v)}
     for s in ysyms:
         try:
@@ -381,11 +398,15 @@ def ohlc_bars(
     out = {}
     for s, df in got.items():
         df = D.resample_ohlc(df[df.index >= st], interval)
+        if compact:
+            out[s] = {"d": [str(i.date()) for i in df.index], **{k[0]: [_sig(x) for x in df[k].values] for k in ("open", "high", "low", "close")},
+                      "v": [float(x) if pd.notna(x) and x > 0 else None for x in df["volume"].values]}
+            continue
         out[s] = [{"d": str(i.date()), "o": float(r.open), "h": float(r.high), "l": float(r.low), "c": float(r.close),
                    **({"v": float(r.volume)} if pd.notna(r.volume) and r.volume > 0 else {})}
                   for i, r in df.iterrows()]
     return _safe({"series": out, "close_only": [s for s in ysyms if s in out],
-                  "missing": [s for s in syms if s not in out], "interval": interval})
+                  "missing": [s for s in syms if s not in out], "interval": interval, **({"compact": True} if compact else {})})
 
 
 @app.get("/api/sp/screen", operation_id="structured_product_screen", dependencies=[Depends(check_token)])

@@ -611,3 +611,42 @@ def test_fx_close_fix():
     assert (f["high"] >= f["close"]).all() and (f["low"] <= f["close"]).all()
     clean = pd.DataFrame({"open": o, "high": o + 1, "low": o - 1, "close": o + .6}, index=idx)
     assert fx_close_fix(clean).equals(clean)  # a healthy series is left alone
+
+
+def test_history_compact(client):
+    rows = client.get("/api/history", params={"symbols": "USDJPY=X,^N225", "start": "2025-01-01", "interval": "D"}).json()
+    col = client.get("/api/history", params={"symbols": "USDJPY=X,^N225", "start": "2025-01-01", "interval": "D", "compact": "true"}).json()
+    assert col["compact"] is True and "compact" not in rows
+    for s in ("USDJPY=X", "^N225"):
+        a, b = rows["series"][s], col["series"][s]
+        assert [x["d"] for x in a] == b["d"]
+        assert all(abs(x["v"] - y) <= 1e-5 * abs(x["v"]) for x, y in zip(a, b["v"]))
+
+
+def test_ohlc_compact(client, monkeypatch):
+    def fake_ohlc(sym, years=3):
+        c = gbm(seed=3, s0=150, start="2017-01-02")
+        return pd.DataFrame({"open": c * 0.999, "high": c * 1.004, "low": c * 0.995, "close": c, "volume": 1000.0})
+    monkeypatch.setattr(D, "ohlc", fake_ohlc)
+    j = client.get("/api/ohlc", params={"symbols": "USDJPY=X", "start": "2025-01-01", "compact": "true"}).json()
+    b = j["series"]["USDJPY=X"]
+    assert j["compact"] is True and len(b["d"]) == len(b["o"]) == len(b["h"]) == len(b["l"]) == len(b["c"]) > 100
+    assert all(l <= c <= h for l, c, h in zip(b["l"], b["c"], b["h"]))
+
+
+def test_year_bucket():
+    assert D.year_bucket(2.1) == 3 and D.year_bucket(10.1) == 17 and D.year_bucket(16.9) == 17 and D.year_bucket(30) == 30
+
+
+def test_cache_is_bounded(monkeypatch):
+    monkeypatch.setattr(D, "CACHE_MAX_ITEMS", 5)
+    D._cache.clear(); D._sizes.clear()
+
+    @D.cached(ttl=60)
+    def f(i):
+        return pd.Series(np.arange(10.0) + i)
+
+    for i in range(12):
+        f(i)
+    assert len(D._cache) == 5
+    assert ("f", (11,), ()) in D._cache and ("f", (0,), ()) not in D._cache
