@@ -60,7 +60,7 @@ async function keel(tool,input,{fresh=false}={}){
       return{ok:true,data:d,storedAt:r.cache?.storedAt};
     }catch(e){
       /* the free server sometimes drops a long response; treat a dropped or timed-out stream as worth one more try */
-      const transient=/upstream closed|closed the stream|timed? ?out|timeout|ECONNRESET|50[234]/i.test(String(e&&e.message||''));
+      const transient=/upstream closed|closed the stream|timed? ?out|timeout|ECONNRESET|50[234]|unavailable|call failed/i.test(String(e&&e.message||''))||['upstream_error','unavailable','server_unavailable'].includes(e&&e.code);
       if(e&&(e.retryable||transient)&&attempt===0){await new Promise(ok=>setTimeout(ok,Math.min(e.retryAfterMs||4000+Math.random()*3000,20000)));continue}
       return{ok:false,code:e?.code||'upstream_error',message:e?.message||''};
     }
@@ -81,7 +81,9 @@ function keelMsg(code,message){
     case 'blocked_by_policy':case 'approval_required':return T('This page reached a connector that cannot serve it. Make sure your custom connector is named exactly “keel” (lowercase), not the directory’s “Keel”.','このページは別のコネクタに接続されています。カスタムコネクタ名が小文字の「keel」であることを確認してください（ディレクトリの「Keel」とは別物です）。');
     case 'server_unavailable':return T('Keel did not answer. The free server may be waking up; try Refresh in a minute.','Keelが応答しません。無料サーバーの起動中の可能性があります。1分後に更新してください。');
     case 'tool_error':return T('Keel reported an error: ','Keelのエラー：')+(message||'');
-    default:return T('Live data unavailable','ライブデータを取得できません')+(message?': '+message:'.');
+    case 'upstream_error':case 'unavailable':case 'timeout':
+      return T('Keel did not answer. Its server runs on Render’s free tier and may be restarting or overloaded; try again in a minute.','Keelが応答しません。サーバーはRenderの無料枠で動いており、再起動中か混雑している可能性があります。1分後に再試行してください。')+(message?' ('+message+')':'');
+    default:return T('Keel did not answer. Its server runs on Render’s free tier and may be restarting or overloaded; try again in a minute.','Keelが応答しません。サーバーはRenderの無料枠で動いており、再起動中か混雑している可能性があります。1分後に再試行してください。')+(message?' ('+message+')':'');
   }
 }
 let STAT=null;
@@ -93,8 +95,9 @@ function setStatus(state,code,message){
   const b=$('#banner');if(!b)return;
   if(state==='live'||state==='busy'){b.hidden=true;return}
   b.hidden=false;
-  b.innerHTML=`<span>${state==='sample'&&code==='no_mcp'?'':'<b>'+T('Showing sample figures.','サンプル数値を表示中。')+'</b> '}${esc(keelMsg(code,message))}</span><button class="lnk" id="howBtn">${T('How to connect','接続方法')}</button>`;
+  b.innerHTML=`<span>${state==='sample'&&code==='no_mcp'?'':'<b>'+T('Showing sample figures.','サンプル数値を表示中。')+'</b> '}${esc(keelMsg(code,message))}</span>${code&&code!=='no_mcp'&&typeof load==='function'?`<button class="lnk" id="retryBtn">${T('Try again','再試行')}</button>`:''}<button class="lnk" id="howBtn">${T('How to connect','接続方法')}</button>`;
   $('#howBtn').onclick=()=>{const h=$('#how');h.hidden=!h.hidden};
+  const rb=$('#retryBtn');if(rb)rb.onclick=()=>load(true);
 }
 function howHtml(){return `<b>${T('Connect live data (one time)','ライブデータの接続（初回のみ）')}</b><ol>
 <li>${T('Deploy the Keel repo on Render (Blueprint). It creates <code>keel-api</code> and <code>keel-mcp</code>.','KeelリポジトリをRenderにデプロイ（Blueprint）。<code>keel-api</code>と<code>keel-mcp</code>が作成されます。')}</li>
