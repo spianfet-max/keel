@@ -31,6 +31,8 @@ table.board th.evh.on{color:var(--ink)}
 .fld input[type=number]{width:100%}
 .fld .u{font-size:12px;color:var(--mute)}
 .ex{font-size:11px;color:var(--warn);margin-left:4px}
+.wtin{width:64px;font:inherit;font-variant-numeric:tabular-nums;padding:2px 6px}
+td.evn{white-space:normal;min-width:140px}
 .verdict{display:inline-block;padding:3px 10px;font-size:13px;border:1px solid var(--ink);font-weight:500}
 .verdict.rich{border-color:var(--neg);color:var(--neg)}
 .verdict.cheap{border-color:var(--pos);color:var(--pos)}
@@ -67,7 +69,8 @@ table.board th.evh.on{color:var(--ink)}
 
   <section class="sec">
     <div class="sh"><h2 data-ja="イベントの値動き">Event moves</h2><p id="bSub"></p></div>
-    <div class="bar" style="border:0;padding-top:0"><div class="seg" id="grp"><button data-v="cb" data-ja="中央銀行">Central banks</button><button data-v="us" data-ja="米経済指標">US data</button><button data-v="all" data-ja="すべて">All</button></div></div>
+    <div class="bar" style="border:0;padding-top:0"><div class="seg" id="grp"><button data-v="cb" data-ja="中央銀行">Central banks</button><button data-v="us" data-ja="米経済指標">US data</button><button data-v="all" data-ja="すべて">All</button></div>
+      <div class="seg" id="met"><button data-v="mv" data-ja="値動き">Move</button><button data-v="wt" data-ja="分散ウェイト">Variance weight</button></div></div>
     <div class="tw"><table class="board" id="board"></table></div>
   </section>
 
@@ -77,6 +80,9 @@ table.board th.evh.on{color:var(--ink)}
       <svg class="ch" id="bars" height="280"></svg>
       <div class="leg" id="bLeg"></div>
       <p class="say" id="dSay"></p>
+      <div style="margin-top:16px"><span class="lbl" data-ja="イベント前後の値動き（通常日比、他のイベントの日は除く）">Moves around the event (× an ordinary day; days with other events left out)</span><svg class="ch" id="prof" height="170"></svg></div>
+      <div class="kpis" id="rng"></div>
+      <p class="say" id="rSay"></p>
     </div>
     <div style="min-width:0">
       <div class="sh"><h2 data-ja="過去の各回">Each occurrence</h2><p id="oSub"></p></div>
@@ -85,14 +91,13 @@ table.board th.evh.on{color:var(--ink)}
   </section>
 
   <section class="sec">
-    <div class="sh"><h2 id="iT"></h2><p id="iSub"></p></div>
-    <div class="calc">
-      <div class="fld"><span class="lbl"><span id="ivL"></span><span class="ex" id="ivEx"></span></span><input type="number" id="iv" step="0.1" min="0"><span class="u" id="ivU"></span></div>
-      <div class="fld"><span class="lbl" data-ja="満期までの日数（暦日）">Days to expiry (calendar)</span><input type="number" id="dte" step="1" min="2"><span class="u" id="dteU"></span></div>
-      <div class="fld"><span class="lbl" data-ja="イベントを除く日々のボラ">Ex-event volatility</span><input type="number" id="bv" step="0.1" min="0"><span class="u" id="bvU"></span></div>
-    </div>
-    <div class="out kpis" id="iOut" style="margin-top:18px;border-top:1px solid var(--rule)"></div>
-    <p class="say" id="iSay"></p>
+    <div class="sh"><h2 id="vT"></h2><p id="vSub"></p></div>
+    <div class="calc" id="pill"></div>
+    <p class="minor" id="pillNote" style="margin-top:8px"></p>
+    <div style="margin-top:14px"><span class="lbl" id="fwdL"></span><svg class="ch" id="fwd" height="260"></svg><div class="leg" id="fLeg"></div></div>
+    <div class="tw" style="margin-top:14px"><table id="evt"></table></div>
+    <div class="out kpis" id="vOut" style="margin-top:18px;border-top:1px solid var(--rule)"></div>
+    <p class="say" id="vSay"></p>
   </section>
   <p class="note" id="method"></p>
 </div>
@@ -140,9 +145,9 @@ const cols=()=>EVK.filter(k=>S.grp==='all'||EV[k].grp===S.grp);
 const late=(k,a)=>EV[k].t>=a.c; /* announced after this market's close: measure on its next session */
 
 /* ---------- state ---------- */
-let S={ev:'FOMC',asset:'USDJPY=X',win:1,look:12,grp:'cb',ovl:'in',iv:null,dte:null,bv:null};
+let S={ev:'FOMC',asset:'USDJPY=X',win:1,look:12,grp:'cb',ovl:'in',met:'mv',iv:null,dte:null,bv:null};
 try{Object.assign(S,JSON.parse(localStorage.getItem('catalyst-state')||'{}'))}catch(e){}
-if(!EV[S.ev])S.ev='FOMC';if(!GRP[S.grp])S.grp='cb';if(S.ovl!=='ex')S.ovl='in';if(![8,12,24,999].includes(S.look))S.look=12;if(!A.some(a=>a.s===S.asset))S.asset='USDJPY=X';
+if(!EV[S.ev])S.ev='FOMC';if(!GRP[S.grp])S.grp='cb';if(S.ovl!=='ex')S.ovl='in';if(S.met!=='wt')S.met='mv';if(![8,12,24,999].includes(S.look))S.look=12;if(!A.some(a=>a.s===S.asset))S.asset='USDJPY=X';
 S.iv=S.dte=S.bv=null; /* calculator inputs start from defaults each visit */
 const save=()=>{try{const{iv,dte,bv,_ivTouched,...k}=S;localStorage.setItem('catalyst-state',JSON.stringify(k))}catch(e){}};
 
@@ -194,10 +199,10 @@ function analyse(sym,evk){
   const busy=new Uint16Array(n);
   EVK.forEach((k,bi)=>EV[k].dates.forEach(d=>{if(d>lastD)return;const r=react(k,d);if(r>0)for(let q=r;q<Math.min(n,r+w);q++)busy[q]|=1<<bi}));
   const own=1<<EVK.indexOf(evk);
-  const normal=[];for(let t=w;t<n;t++){let clean=true;for(let q=t-w+1;q<=t;q++)if(busy[q])clean=false;if(clean)normal.push(chg(sym,V[t-w],V[t]))}
+  const normal=[],nd=[];for(let t=w;t<n;t++){let clean=true;for(let q=t-w+1;q<=t;q++)if(busy[q])clean=false;if(clean){normal.push(chg(sym,V[t-w],V[t]));nd.push(D[t])}}
   const all=[];EV[evk].dates.forEach(d=>{if(d>lastD)return;const r=react(evk,d);if(r<1||r+w-1>=n)return;
     let other=0;for(let q=r;q<r+w;q++)other|=busy[q]&~own;
-    all.push({date:d,react:D[r],mv:chg(sym,V[r-1],V[r+w-1]),from:V[r-1],to:V[r+w-1],other:EVK.filter((k,bi)=>other&(1<<bi))})});
+    all.push({date:d,react:D[r],ri:r,mv:chg(sym,V[r-1],V[r+w-1]),from:V[r-1],to:V[r+w-1],other:EVK.filter((k,bi)=>other&(1<<bi))})});
   const occ=S.ovl==='ex'?all.filter(o=>!o.other.length):all;
   const recent=occ.slice(-S.look);
   const abs=x=>x.map(Math.abs).sort((p,q)=>p-q);
@@ -208,11 +213,18 @@ function analyse(sym,evk){
   const sd=x=>{const m=mean(x);return Math.sqrt(mean(x.map(v=>(v-m)*(v-m))))};
   /* ex-event realised vol over the last ~3 months (63 trading days), annualised */
   const recentNormal=[];for(let t=Math.max(1,n-63);t<n;t++){if(!busy[t])recentNormal.push(chg(sym,V[t-1],V[t]))}
-  return{sym,evk,occ,recent,nMed,nMean:mean(nAbs),nSd:sd(normal),p90,eMed:mean(eAbs),eMean:mean(eAbs),nAll:all.length,
+  /* variance weight: how much more variance the event day carries than an ordinary day (squares capped at 6 ordinary sd) */
+  const nsd=sd(normal),cap=36*nsd*nsd,sq=x=>Math.min(cap,x*x);
+  const wvar=recent.length&&normal.length?mean(recent.map(o=>sq(o.mv)))/mean(normal.map(sq)):NaN;
+  /* moves on the days around each event, one day at a time, against the ordinary one-day average */
+  const one=[];for(let t=1;t<n;t++)if(!busy[t])one.push(Math.abs(chg(sym,V[t-1],V[t])));const oneM=mean(one);
+  const prof=[-3,-2,-1,0,1,2,3].map(k=>{const v=recent.map(o=>{const t=o.ri+k;return t>0&&t<n&&(k===0||!busy[t])?Math.abs(chg(sym,V[t-1],V[t])):NaN}).filter(isFinite);return v.length?mean(v)/oneM:NaN});
+  return{sym,evk,occ,recent,nMed,nd,wvar,prof,nMean:mean(nAbs),nSd:sd(normal),p90,eMed:mean(eAbs),eMean:mean(eAbs),nAll:all.length,
     mult:mean(eAbs)/nMed,big:recent.length?recent.filter(o=>Math.abs(o.mv)>p90).length/recent.length*100:NaN,
     up:recent.filter(o=>o.mv>0).length,baseVol:sd(recentNormal)*Math.sqrt(252),last:V[n-1],lastD};
 }
 const fmv=(s,v,signed=true)=>{if(v==null||!isFinite(v))return'—';if(isY(s)){const r=v.toFixed(1);return(signed&&v>0?'+':v<0?'−':'')+Math.abs(+r).toFixed(1)+'bp'}return(signed&&v>0?'+':v<0?'−':'')+Math.abs(v).toFixed(2)+'%'};
+const prc=v=>{if(!isFinite(v))return'—';const d=v>=1000?0:v>=100?2:v>=10?3:4;return num(v,d)};
 const fabs=(s,v)=>fmv(s,v,false).replace('−','');
 const multCol=m=>!isFinite(m)?'transparent':`color-mix(in srgb, var(--a2) ${Math.round(Math.max(0,Math.min(1,(m-1)/2))*55)}%, var(--card))`;
 
@@ -233,20 +245,22 @@ function render(){
   $$('#look button').forEach(b=>b.classList.toggle('on',+b.dataset.v===S.look));
   $$('#grp button').forEach(b=>b.classList.toggle('on',b.dataset.v===S.grp));
   $$('#ovl button').forEach(b=>b.classList.toggle('on',b.dataset.v===S.ovl));
+  $$('#met button').forEach(b=>b.classList.toggle('on',b.dataset.v===S.met));
   const R={};const C=cols();if(!R[S.asset+'|'+S.ev])R[S.asset+'|'+S.ev]=analyse(S.asset,S.ev);A.forEach(a=>C.forEach(k=>{R[a.s+'|'+k]=analyse(a.s,k)}));
   const any=Object.values(R).find(Boolean);
   $('#asof').textContent=any?T('Data to ','データ：')+fdate(any.lastD)+(LIVE?'':T(' · synthetic sample',' · 合成サンプル')):'';
   upcoming();
-  $('#bSub').innerHTML=T(`Average absolute move on the reaction ${S.win===1?'day':'two days'}, over the ${S.look>100?'events since 2010':'last '+S.look+' events'}. The multiple compares it with the average move on ordinary days (none of the nine events below); the deeper the red, the more the event moves that market. Click a cell for detail.`,
+  $('#bSub').innerHTML=S.met==='wt'?T(`Variance weight: how many ordinary days of variance the reaction day carries (average squared move against an ordinary day’s, one-day reaction, outliers capped). This is the unit option traders use to load event days in the vol calendar below. Click a cell for detail.`,`分散ウェイト：反応日が通常日の何日分の分散を持つか（二乗した値動きの平均の比、反応当日、外れ値は上限設定）。下のボラ・カレンダーでイベント日に配分する単位です。セルをクリックで詳細。`):T(`Average absolute move on the reaction ${S.win===1?'day':'two days'}, over the ${S.look>100?'events since 2010':'last '+S.look+' events'}. The multiple compares it with the average move on ordinary days (none of the nine events below); the deeper the red, the more the event moves that market. Click a cell for detail.`,
     `反応${S.win===1?'当日':'2日間'}の値動き（絶対値の平均、${S.look>100?'2010年以降すべて':'直近'+S.look+'回'}）。倍率は9種類のイベントのいずれもない通常日の平均との比較で、赤が濃いほどそのイベントで大きく動く市場。セルをクリックで詳細。`);
   $('#board').innerHTML=`<thead><tr><th>${T('Asset','資産')}</th>${cols().map(k=>`<th class="evh ${k===S.ev?'on':''}" data-k="${k}">${EN(k)}</th>`).join('')}<th>${T('Ordinary day','通常日')}</th></tr></thead><tbody>`+
     A.map(a=>{const r0=R[a.s+'|'+cols()[0]];
       return `<tr><td>${esc(AN(a.s))}<span class="nm">${a.c<10?T('Tokyo close: US and European events count next day','東京引け：欧米イベントは翌日で計測'):a.c<18?T('Europe close: FOMC counts next day','欧州引け：FOMCは翌日で計測'):''}${isY(a.s)?(a.c<10?' · ':'')+T('change in bp','bp変化'):''}</span></td>`+
-      cols().map(k=>{const r=R[a.s+'|'+k];return `<td class="m ${k===S.ev&&a.s===S.asset?'on':''}" data-a="${a.s}" data-k="${k}" style="background:${r?multCol(r.mult):'transparent'}">${r?`<span class="mv">${fabs(a.s,r.eMed)}</span><span class="mx">${num(r.mult,1)}× · ${T('n','n')}=${r.recent.length}</span>`:'—'}</td>`}).join('')+
+      cols().map(k=>{const r=R[a.s+'|'+k];if(S.met==='wt'){const q=analyse1(a.s,k);return `<td class="m ${k===S.ev&&a.s===S.asset?'on':''}" data-a="${a.s}" data-k="${k}" style="background:${q?multCol(1+(q.wvar-1)/2):'transparent'}">${q?`<span class="mv">${num(q.wvar,1)}</span><span class="mx">${T('ordinary days','通常日分')} · n=${q.recent.length}</span>`:'—'}</td>`}
+        return `<td class="m ${k===S.ev&&a.s===S.asset?'on':''}" data-a="${a.s}" data-k="${k}" style="background:${r?multCol(r.mult):'transparent'}">${r?`<span class="mv">${fabs(a.s,r.eMed)}</span><span class="mx">${num(r.mult,1)}× · ${T('n','n')}=${r.recent.length}</span>`:'—'}</td>`}).join('')+
       `<td>${r0?fabs(a.s,r0.nMed):'—'}</td></tr>`}).join('')+'</tbody>';
   $$('#board td.m').forEach(c=>c.onclick=()=>{S.asset=c.dataset.a;S.ev=c.dataset.k;S.iv=S.bv=S.dte=null;S._ivTouched=false;save();render()});
   $$('#board th.evh').forEach(c=>c.onclick=()=>{S.ev=c.dataset.k;S.dte=null;S.iv=null;S._ivTouched=false;save();render()});
-  detail(R[S.asset+'|'+S.ev]);implied(R[S.asset+'|'+S.ev]);method();
+  detail(R[S.asset+'|'+S.ev]);volCal();method();
 }
 function detail(r){
   const s=S.asset;
@@ -273,68 +287,176 @@ function detail(r){
   const n=r.recent.length;
   $('#dSay').innerHTML=n?T(`Over the last ${n} ${EN(S.ev)} events, ${AN(s)} moved an average <b>${fabs(s,r.eMed)}</b>, ${num(r.mult,1)} times an ordinary ${S.win===1?'day':'two days'} (${fabs(s,r.nMed)}). ${num(r.big,0)}% of them beat the ordinary-day 90th percentile, against 10% by chance. It rose ${r.up} times and fell ${n-r.up}.`,
     `直近${n}回の${EN(S.ev)}で、${AN(s)}の値動きは平均<b>${fabs(s,r.eMed)}</b>、通常日（${fabs(s,r.nMed)}）の${num(r.mult,1)}倍。通常日の90パーセンタイルを超えたのは${num(r.big,0)}%（偶然なら10%）。上昇${r.up}回、下落${n-r.up}回。`):'';
+  profile();rangeView();
   $('#oSub').textContent=T(`Newest first. The reaction date can differ from the event date when the announcement comes after that market’s close. “Same day as” lists other events in the same reaction window${S.ovl==='ex'?`; ${r.nAll-r.occ.length} such days are excluded`:''}.`,`新しい順。発表が市場の引け後の場合、反応日はイベント日と異なります。「同日のイベント」は同じ反応期間内の他のイベント${S.ovl==='ex'?`（${r.nAll-r.occ.length}回を除外中）`:''}。`);
   $('#occ').innerHTML=`<thead><tr><th>${T('Event','イベント')}</th><th>${T('Move','値動き')}</th><th>${T('× ordinary','通常日比')}</th><th>${T('Measured','計測日')}</th><th>${T('Same day as','同日のイベント')}</th></tr></thead><tbody>`+
     r.occ.slice().reverse().map(x=>`<tr class="${inS.has(x.date)?'':'old'}" style="${inS.has(x.date)?'':'opacity:.55'}"><td>${fdate(x.date)}</td><td class="${x.mv>0?'up':x.mv<0?'dn':''}">${fmv(s,x.mv)}</td><td>${num(Math.abs(x.mv)/r.nMed,1)}×</td><td>${x.react!==x.date?fdate(x.react,{day:'numeric',month:'short'}):'—'}</td><td>${x.other.length?esc(x.other.map(EN).join(', ')):'—'}</td></tr>`).join('')+'</tbody>';
 }
+/* the shape of an event: quiet before, burst on the day, fast decay after */
+function profile(){
+  const r=analyse1(S.asset,S.ev),svg=$('#prof');if(!r){svg.innerHTML='';return}
+  const w=W(svg),h=170,m={l:36,r:10,t:16,b:24},ks=[-3,-2,-1,0,1,2,3],mx=Math.max(1.6,...r.prof.filter(isFinite))*1.1,yt=niceTicks(0,mx,4);
+  const Y=v=>m.t+(1-v/yt[yt.length-1])*(h-m.t-m.b),bw=(w-m.l-m.r)/7;let g='';
+  yt.forEach(v=>g+=`<line class="grd" x1="${m.l}" x2="${w-m.r}" y1="${Y(v)}" y2="${Y(v)}"/><text x="${m.l-6}" y="${Y(v)+4}" text-anchor="end">${num(v,1)}</text>`);
+  g+=`<line x1="${m.l}" x2="${w-m.r}" y1="${Y(1)}" y2="${Y(1)}" stroke="var(--ink)" stroke-dasharray="4 4" opacity=".55"/>`;
+  r.prof.forEach((v,i)=>{const X=m.l+i*bw;if(isFinite(v))g+=`<rect x="${X+bw*.2}" width="${bw*.6}" y="${Y(v)}" height="${Y(0)-Y(v)}" fill="${ks[i]===0?'var(--a2)':'var(--a1)'}" opacity="${ks[i]===0?1:.6}"/><text x="${X+bw/2}" y="${Y(v)-4}" text-anchor="middle" style="font-size:10.5px">${num(v,2)}×</text>`;
+    g+=`<text x="${X+bw/2}" y="${h-7}" text-anchor="middle">${ks[i]===0?T('Event','当日'):(ks[i]>0?'+':'−')+Math.abs(ks[i])}</text>`});
+  g+=`<line class="ax" x1="${m.l}" x2="${w-m.r}" y1="${Y(0)}" y2="${Y(0)}"/>`;
+  svg.setAttribute('viewBox',`0 0 ${w} ${h}`);svg.setAttribute('height',h);svg.innerHTML=g;
+}
+/* close-to-close move against the day's high-low range: the second reading of event-day volatility */
+let OH={},OHB={};
+async function rangeView(){
+  const s=S.asset,r=analyse1(s,S.ev),y=isY(s);
+  if(!r){$('#rng').innerHTML='';$('#rSay').innerHTML='';return}
+  const pre=r.prof[2],post=r.prof[4];
+  const base=T(`On event-free sessions just before, ${AN(s)} has moved ${num(pre,2)}× an ordinary day, and ${num(post,2)}× on the session after: ${post<r.prof[3]*.6?'the shock fades fast, so the risk sits on the day itself.':'the move tends to carry into the next session.'}`,
+    `他のイベントのない前日の${AN(s)}の値動きは通常日の${num(pre,2)}倍、翌日は${num(post,2)}倍：${post<r.prof[3]*.6?'ショックはすぐに消え、リスクは当日に集中します。':'値動きは翌日にも続きやすい傾向です。'}`);
+  if(y||!LIVE){$('#rng').innerHTML='';$('#rSay').innerHTML=base+(y?'':' '+T('Intraday ranges load with live data.','日中レンジはライブデータで表示されます。'));return}
+  if(!OH[s]&&!OHB[s]){OHB[s]=1;$('#rSay').innerHTML=base+' '+T('Loading intraday ranges…','日中レンジを読み込み中…');
+    const q=await keel('api_ohlc',{symbols:s,interval:'D',start:'2009-12-01'});OHB[s]=0;
+    OH[s]=q.ok&&q.data&&q.data.series&&q.data.series[s]?new Map(q.data.series[s].filter(b=>b.h>0&&b.l>0).map(b=>[b.d,Math.log(b.h/b.l)*100])):new Map();
+    if(S.asset===s)rangeView();return}
+  if(OHB[s])return;
+  const M_=OH[s],mean=x=>x.length?x.reduce((a,b)=>a+b,0)/x.length:NaN;
+  const er=mean(r.recent.map(o=>M_.get(o.react)).filter(isFinite)),nr=mean(r.nd.map(d=>M_.get(d)).filter(isFinite));
+  if(!isFinite(er)||!isFinite(nr)){$('#rng').innerHTML='';$('#rSay').innerHTML=base;return}
+  const rm=er/nr,cm=r.mult;
+  $('#rng').innerHTML=[[T('Close-to-close','終値ベース'),num(cm,2)+'×',T('event day vs ordinary','イベント日÷通常日')],[T('High–low range','高値−安値レンジ'),num(rm,2)+'×',T(`avg range ${num(er,2)}% vs ${num(nr,2)}%`,`平均レンジ${num(er,2)}%対${num(nr,2)}%`)]]
+    .map(k=>`<div class="kpi"><span class="lbl">${k[0]}</span><span class="v">${k[1]}</span><span class="s">${k[2]}</span></div>`).join('');
+  $('#rSay').innerHTML=base+' '+(rm>cm*1.1?T(`The intraday range expands more than the close-to-close move (${num(rm,2)}× against ${num(cm,2)}×): ${AN(s)} often swings and comes back, which pays a trader who hedges an overnight straddle intraday more than one who holds it for direction.`,`日中レンジの拡大（${num(rm,2)}倍）が終値ベース（${num(cm,2)}倍）を上回ります：${AN(s)}は上下に振れて戻ることが多く、O/Nストラドルを日中にヘッジするトレーダーの方が、方向を狙って保有するより有利です。`):
+    rm<cm*.9?T(`The close-to-close move expands more than the intraday range (${num(cm,2)}× against ${num(rm,2)}×): the reaction is a clean step, which favours holding an option for direction.`,`終値ベースの拡大（${num(cm,2)}倍）が日中レンジ（${num(rm,2)}倍）を上回ります：反応は一方向の段差で、方向を狙ったオプション保有に有利です。`):
+    T(`Range and close-to-close expand about equally (${num(rm,2)}× and ${num(cm,2)}×).`,`日中レンジと終値ベースはほぼ同じだけ拡大します（${num(rm,2)}倍と${num(cm,2)}倍）。`));
+}
 function nextDate(k){const t=iso(TODAY);return EV[k].dates.find(d=>d>=t)}
-function implied(r){
-  const s=S.asset,y=isY(s);
-  $('#iT').textContent=T(`Is the ${EN(S.ev)} move priced? ${AN(s)}`,`${EN(S.ev)}の値動きは織り込まれているか：${AN(s)}`);
-  $('#iSub').innerHTML=T(`Enter the at-the-money implied volatility of an option expiring after the event. Taking out the variance of the ordinary days left to expiry leaves the variance the market charges for the event day. Its expected absolute move (0.8 × the event-day standard deviation) is compared with the historical average${S.win===2?' (this check always uses one event day)':''}.`,
-    `イベント後に満期を迎えるATMオプションのインプライド・ボラを入力。満期までの通常日の分散を差し引くと、市場がイベント日に織り込む分散が残ります。その期待絶対値（イベント日標準偏差×0.8）を過去の平均と比較します${S.win===2?'（この計算は常にイベント1日分）':''}。`);
-  if(!r){$('#iOut').innerHTML='';$('#iSay').innerHTML='';return}
-  const nd=nextDate(S.ev);const toEv=nd?Math.max(1,Math.round((Date.parse(nd+'T00:00:00Z')-Date.parse(iso(TODAY)+'T00:00:00Z'))/864e5)):7;
-  const bvDef=+r.baseVol.toFixed(y?0:1);
-  if(S.bv==null)S.bv=bvDef;if(S.dte==null)S.dte=toEv+7;
-  if(S.iv==null){/* example: the vol that would price the historical average move exactly */
-    const h=analyse1(s,S.ev),nn=Math.max(1,Math.round(S.dte*252/365)),es=h&&isFinite(h.eMean)?h.eMean/.798:0;
-    S.iv=+Math.sqrt((S.bv*S.bv*Math.max(0,nn-1)/252+es*es)*252/nn).toFixed(y?0:1)}
-  $('#ivL').textContent=T('ATM implied vol','ATMインプライド・ボラ');$('#ivEx').textContent=S._ivTouched?'':T('example: the vol that prices history; enter your quote','例：過去並みを織り込む水準。実際の値を入力');
-  $('#ivU').textContent=y?T('bp a year (normal vol)','年率bp（ノーマル・ボラ）'):T('% a year','年率%');
-  $('#bvU').textContent=(y?T('bp a year','年率bp'):T('% a year','年率%'))+T(`; last 3 months excluding event days: ${num(bvDef,y?0:1)}`,`。直近3ヶ月の通常日実現値：${num(bvDef,y?0:1)}`);
-  $('#dteU').textContent=nd?T(`Next ${EN(S.ev)}: ${fdate(nd)}, in ${toEv} days`,`次回${EN(S.ev)}：${fdate(nd)}（${toEv}日後）`):'';
-  ['iv','dte','bv'].forEach(id=>{const el=$('#'+id);if(document.activeElement!==el)el.value=S[id]});
-  const n=Math.max(1,Math.round(S.dte*252/365)),tot=S.iv*S.iv*n/252,base=S.bv*S.bv*Math.max(0,n-1)/252,evVar=tot-base;
-  const evSd=evVar>0?Math.sqrt(evVar):0,exp=.798*evSd,expAll=.798*S.iv/Math.sqrt(252);
-  const hist1=analyse1(s,S.ev),hm=hist1?hist1.eMean:NaN,ratio=exp/hm;
-  const v=!isFinite(ratio)||evVar<=0?['',T('No event premium','イベント・プレミアムなし')]:ratio>1.15?['rich',T('Rich','割高')]:ratio<.85?['cheap',T('Cheap','割安')]:['',T('Fair','妥当')];
-  const u=x=>y?num(x,1)+'bp':num(x,2)+'%';
-  $('#iOut').innerHTML=[
-    [T('Implied event-day move','織り込まれたイベント日の値動き'),evVar>0?u(exp):'—',T('expected absolute move','期待絶対値')],
-    [T('Historical average','過去の平均'),isFinite(hm)?u(hm):'—',T(`mean |move|, ${hist1?hist1.recent.length:0} events, reaction day`,`|値動き|の平均、${hist1?hist1.recent.length:0}回、反応当日`)],
-    [T('Implied ÷ history','織り込み÷過去'),isFinite(ratio)&&evVar>0?num(ratio,2)+'×':'—',`<span class="verdict ${v[0]}">${v[1]}</span>`],
-    [T('Event-day vol','イベント日ボラ'),evVar>0?num(evSd*Math.sqrt(252),y?0:1)+(y?'bp':'%'):'—',T(`vs ${num(S.iv,y?0:1)} for the option and ${num(S.bv,y?0:1)} ex-event`,`オプション${num(S.iv,y?0:1)}、通常日${num(S.bv,y?0:1)}`)]
+/* ---------- event vol calendar ----------
+   Option tenors price the total variance to expiry. Spreading each tenor's variance over the days it covers in proportion
+   to day weights (ordinary weekday 1, weekend near 0, event days heavier) gives an overnight forward volatility for every
+   future day. Event weights default to this market's own history; the market's weight can be backed out from the quotes. */
+const PILL=[['O/N',1],['1W',8],['2W',15],['1M',31],['2M',62]];
+const BE=Math.sqrt(2/(365*Math.PI));                 /* expected absolute daily move per unit of annualised vol */
+let VC={asset:null,vols:null,ov:null,wts:{},touched:false};
+function calDays(a){
+  /* day 1 is today; each event lands on its reaction session for this market */
+  const out=[],t0=Date.UTC(TODAY.getUTCFullYear(),TODAY.getUTCMonth(),TODAY.getUTCDate());
+  for(let i=1;i<=PILL[PILL.length-1][1];i++){const t=t0+(i-1)*864e5,d=new Date(t),wd=d.getUTCDay();out.push({i,t,d:iso(d),we:wd===0||wd===6,ev:[]})}
+  const nextSession=(k,dt)=>{let x=out.findIndex(o=>late(k,a)?o.d>dt&&!o.we:o.d>=dt&&!o.we);return x};
+  EVK.forEach(k=>EV[k].dates.forEach(dt=>{if(dt<out[0].d||dt>out[out.length-1].d)return;const x=nextSession(k,dt);if(x>=0)out[x].ev.push({k,date:dt})}));
+  return out;
+}
+function histWeight(sym,k){const r=analyse1(sym,k);return r&&isFinite(r.wvar)?Math.max(.5,Math.round(r.wvar*10)/10):1}
+function dayWeight(day,a){if(day.we)return isFX(a)?.1:0;if(!day.ev.length)return 1;return 1+day.ev.reduce((s,e)=>s+(evW(e,a)-1),0)}
+const isFX=a=>a.s.endsWith('=X');
+const evKey=e=>e.k+'|'+e.date;
+function evW(e,a){const k=evKey(e);return VC.wts[k]!=null?VC.wts[k]:histWeight(a.s,e.k)}
+/* forward variance per day from tenor vols: total variance to a tenor = vol² × day count; spread by weight within each segment */
+function fwdCurve(days,vols,wt){
+  const v=new Array(days.length).fill(NaN);let prevDay=0,prevV=0,neg=false;
+  PILL.forEach(([lab,D],p)=>{const vol=vols[p];if(!(vol>0))return;const V=vol*vol*D,seg=days.slice(prevDay,D),sw=seg.reduce((s,d)=>s+wt(d),0);
+    let inc=V-prevV;if(inc<0){neg=true;inc=0}const u=sw>0?inc/sw:0;seg.forEach(d=>v[d.i-1]=u*wt(d));prevDay=D;prevV=V});
+  return{fv:v.map(x=>isFinite(x)?Math.sqrt(Math.max(0,x)):NaN),neg,last:prevDay};
+}
+function volCal(){
+  const s=S.asset,a=A.find(x=>x.s===s),y=isY(s),r1=analyse1(s,S.ev);
+  $('#vT').textContent=T(`Event vol calendar: ${AN(s)}`,`イベント・ボラ・カレンダー：${AN(s)}`);
+  $('#vSub').innerHTML=T(`Each option tenor prices the variance up to its expiry. Spread over the days it covers, in proportion to how much each day is expected to move (weekdays 1, ${isFX(a)?'weekends 0.1':'weekends 0'}, event days heavier), it gives the overnight volatility the market expects on every single day ahead. Event weights start from this market’s own history. Enter the at-the-money vols you see; blanks are skipped.`,
+    `各オプション年限は満期までの分散を織り込んでいます。それを各日の予想される動きの大きさ（平日1、${isFX(a)?'週末0.1':'週末0'}、イベント日はより大きい）に比例して配分すると、今後の各日に市場が期待するオーバーナイト・ボラが得られます。イベントのウェイトの初期値はこの市場の過去実績。ATMボラを入力してください（空欄は無視）。`);
+  if(!r1){$('#pill').innerHTML='';return}
+  const days=calDays(a);
+  /* ordinary weekday overnight vol (calendar-day convention): recent ex-event daily sd × √365 */
+  const ovHist=r1.baseVol*Math.sqrt(365/252);
+  if(VC.asset!==s){VC={asset:s,vols:null,ov:+ovHist.toFixed(y?0:1),wts:{},touched:false}}
+  const wt=d=>dayWeight(d,a);
+  if(!VC.vols){/* example tenors that price history exactly: ordinary weekday at ov, events at their historical weights */
+    let cum=0;const byDay=days.map(d=>{cum+=VC.ov*VC.ov*wt(d);return cum});VC.vols=PILL.map(([l,D])=>+Math.sqrt(byDay[D-1]/D).toFixed(y?0:2))}
+  const unit=y?T('bp normal vol','bpノーマル・ボラ'):T('% vol','%ボラ');
+  if(!$('#pill').children.length||$('#pill').dataset.a!==s+(LIVE?'L':'S')){
+    $('#pill').dataset.a=s+(LIVE?'L':'S');
+    $('#pill').innerHTML=PILL.map(([l],p)=>`<div class="fld"><span class="lbl">${l} ${T('ATM','ATM')}</span><input type="number" id="pv${p}" step="0.05" min="0"><span class="u">${unit}</span></div>`).join('')+
+      `<div class="fld"><span class="lbl">${T('Ordinary-day vol','通常日のボラ')}</span><input type="number" id="pov" step="0.05" min="0"><span class="u" id="povU"></span></div>`;
+    PILL.forEach((x,p)=>$('#pv'+p).oninput=e=>{const v=parseFloat(e.target.value);VC.vols[p]=isFinite(v)&&v>0?v:NaN;VC.touched=true;volCal()});
+    $('#pov').oninput=e=>{const v=parseFloat(e.target.value);if(isFinite(v)&&v>0){VC.ov=v;volCal()}};
+  }
+  PILL.forEach((x,p)=>{const el=$('#pv'+p);if(document.activeElement!==el)el.value=isFinite(VC.vols[p])?VC.vols[p]:''});
+  if(document.activeElement!==$('#pov'))$('#pov').value=VC.ov;
+  $('#povU').textContent=T(`your view; last 3 months ex-events ${num(ovHist,y?0:2)}`,`見通し。直近3か月の通常日実績 ${num(ovHist,y?0:2)}`);
+  $('#pillNote').innerHTML=VC.touched?'':`<span class="ex">${T('Example tenors built from history, so the market weights below equal the historical ones. Replace them with live quotes.','例：過去実績から作成した年限ボラのため、下の市場ウェイトは過去と一致します。実際の値に置き換えてください。')}</span>`;
+  const{fv,neg,last}=fwdCurve(days,VC.vols,wt);
+  /* chart: overnight forward vol per day */
+  const svg=$('#fwd'),w=W(svg),h=260,m={l:44,r:10,t:22,b:26},N=Math.min(last||days.length,days.length);
+  $('#fwdL').textContent=T(`Overnight forward vol for each day, next ${N} days (${y?'bp':'%'}, annualised)`,`今後${N}日間の各日のオーバーナイト・フォワード・ボラ（${y?'bp':'%'}、年率）`);
+  const mx=Math.max(1,...fv.slice(0,N).filter(isFinite))*1.12,yt=niceTicks(0,mx,5),Y=v=>m.t+(1-v/yt[yt.length-1])*(h-m.t-m.b),bw=(w-m.l-m.r)/N;
+  let g='';yt.forEach(v=>g+=`<line class="grd" x1="${m.l}" x2="${w-m.r}" y1="${Y(v)}" y2="${Y(v)}"/><text x="${m.l-6}" y="${Y(v)+4}" text-anchor="end">${num(v,0)}</text>`);
+  g+=`<line x1="${m.l}" x2="${w-m.r}" y1="${Y(VC.ov)}" y2="${Y(VC.ov)}" stroke="var(--ink)" stroke-dasharray="4 4" opacity=".55"/>`;
+  let lm=-1;days.slice(0,N).forEach((d,k)=>{const v=fv[k];if(!isFinite(v))return;const X=m.l+k*bw;
+    g+=`<rect x="${X+bw*.12}" width="${Math.max(1,bw*.76)}" y="${Y(v)}" height="${Math.max(0,Y(0)-Y(v))}" fill="${d.ev.length?'var(--a2)':'var(--a1)'}" opacity="${d.we?.25:d.ev.length?1:.55}"/>`;
+    if(d.ev.length&&bw>3)g+=`<text x="${X+bw/2}" y="${Y(v)-5}" text-anchor="middle" style="font-size:10px">${esc(d.ev.map(e=>EN(e.k)).join('/'))}</text>`;
+    const mo=new Date(d.t).getUTCMonth();if(mo!==lm){g+=`<text x="${X}" y="${h-8}">${new Date(d.t).toLocaleDateString(JA()?'ja-JP':'en-GB',{day:'numeric',month:'short',timeZone:'UTC'})}</text>`;lm=mo}});
+  g+=`<line class="ax" x1="${m.l}" x2="${w-m.r}" y1="${h-m.b}" y2="${h-m.b}"/><rect class="hit" x="${m.l}" y="${m.t}" width="${w-m.l-m.r}" height="${h-m.t-m.b}" fill="transparent"/>`;
+  svg.setAttribute('viewBox',`0 0 ${w} ${h}`);svg.setAttribute('height',h);svg.innerHTML=g;
+  svg.querySelector('.hit').onmousemove=ev=>{const b=svg.getBoundingClientRect(),k=Math.floor(((ev.clientX-b.left)/b.width*w-m.l)/bw),d=days[k];if(!d||!isFinite(fv[k])){tip(null);return}
+    tip(`<div class="m">${fdate(d.d,{weekday:'short',day:'numeric',month:'short'})}${d.ev.length?' · '+esc(d.ev.map(e=>EN(e.k)).join(', ')):''}</div><div>${T('O/N forward vol','O/Nフォワード・ボラ')} <b>${num(fv[k],y?0:2)}</b></div><div>${T('Weight','ウェイト')} ${num(wt(d),1)}</div>`,ev)};
+  svg.querySelector('.hit').onmouseleave=()=>tip(null);
+  $('#fLeg').innerHTML=`<span><i style="background:var(--a2)"></i>${T('Event day','イベント日')}</span><span><i style="background:var(--a1);opacity:.55"></i>${T('Ordinary day','通常日')}</span><span><i class="d" style="border-color:var(--ink)"></i>${T('Your ordinary-day vol','通常日ボラ（入力値）')}</span>`;
+  /* event table: forward vol, premium over the day before, straddle breakeven, history, market-implied weight */
+  const spot=r1.last,ov2=VC.ov*VC.ov,segOf=i=>{let p0=0;for(const[l,D]of PILL){if(!(VC.vols[PILL.findIndex(x=>x[1]===D)]>0))continue;if(i<=D)return[p0,D];p0=D}return null};
+  const rows=[];days.slice(0,N).forEach((d,k)=>d.ev.forEach(e=>{
+    const f=fv[k];let ref=NaN;for(let q=k-1;q>=0;q--)if(!days[q].we&&!days[q].ev.length){ref=fv[q];break}
+    /* market-implied weight: segment variance minus the other days at the ordinary-day vol, in units of an ordinary day */
+    let iw=NaN;const sg=segOf(d.i);if(sg){const[p0,D]=sg,pv=VC.vols[PILL.findIndex(x=>x[1]===D)],pp=p0?VC.vols[PILL.findIndex(x=>x[1]===p0)]:0;
+      const inc=pv*pv*D-(p0?pp*pp*p0:0);let others=0;days.slice(p0,D).forEach(o=>{if(o===d)others+=wt(o)-evW(e,a);else others+=wt(o)});iw=(inc-ov2*others)/ov2}
+    const h=analyse1(s,e.k),be=y?f*BE:spot*f/100*BE,hm=h?(y?h.eMean:spot*h.eMean/100):NaN;
+    rows.push({d,e,f,ref,prem:f-ref,be,hm,hw:histWeight(s,e.k),w:evW(e,a),iw})}));
+  const dp=spot>=100?2:spot>=10?3:4,pf=v=>!isFinite(v)?'—':y?num(v,1)+'bp':num(v,dp);
+  $('#evt').innerHTML=`<thead><tr><th>${T('Event','イベント')}</th><th>${T('Weight used','使用ウェイト')}</th><th>${T('O/N fwd vol','O/Nフォワード・ボラ')}</th><th>${T('Premium','プレミアム')}</th><th>${T('Straddle breakeven','ストラドル損益分岐')}</th><th>${T('Avg move in history','過去の平均値動き')}</th><th>${T('History ÷ breakeven','過去÷損益分岐')}</th><th>${T('Market weight','市場ウェイト')}</th><th>${T('History weight','過去ウェイト')}</th></tr></thead><tbody>`+
+    (rows.length?rows.map(o=>{const rr=o.hm/o.be;return `<tr><td class="evn">${fdate(o.d.d,{weekday:'short',day:'numeric',month:'short'})} · <b>${EN(o.e.k)}</b>${o.d.d!==o.e.date?` <span class="minor">(${T('announced','発表')} ${fdate(o.e.date,{day:'numeric',month:'short'})})</span>`:''}</td>
+      <td><input class="wtin" type="number" step="0.1" min="0" data-k="${evKey(o.e)}" value="${num(o.w,1)}" aria-label="weight"></td><td>${num(o.f,y?0:2)}</td><td class="${o.prem>0?'dn':'up'}">${isFinite(o.prem)?(o.prem>0?'+':'')+num(o.prem,y?0:2):'—'}</td>
+      <td>± ${pf(o.be)}${y?'':` <span class="minor">(${num(o.be/spot*100,2)}%)</span>`}</td><td>${pf(o.hm)}</td><td class="${rr>1.15?'up':rr<.85?'dn':''}">${isFinite(rr)?num(rr,2)+'×':'—'}</td><td><b>${isFinite(o.iw)?num(o.iw,1):'—'}</b></td><td>${num(o.hw,1)}</td></tr>`}).join(''):`<tr><td colspan="9" class="empty">${T('No scheduled events in this window.','この期間に予定イベントはありません。')}</td></tr>`)+'</tbody>';
+  $$('#evt .wtin').forEach(el=>el.onchange=e=>{const v=parseFloat(e.target.value);if(isFinite(v)&&v>=0){VC.wts[el.dataset.k]=v;volCal()}});
+  /* headline for the next event of the selected type */
+  const sel=rows.find(o=>o.e.k===S.ev)||rows[0];
+  if(!sel){$('#vOut').innerHTML='';$('#vSay').innerHTML=neg?T('The tenors you entered imply negative variance between two expiries; check the quotes.','入力した年限の間で分散が負になっています。値を確認してください。'):'';return}
+  const ratio=sel.iw/sel.hw,v=!isFinite(ratio)?['','—']:ratio>1.25?['rich',T('Rich','割高')]:ratio<.8?['cheap',T('Cheap','割安')]:['',T('Fair','妥当')];
+  $('#vOut').innerHTML=[
+    [T(`${EN(sel.e.k)} overnight vol`,`${EN(sel.e.k)}のO/Nボラ`),num(sel.f,y?0:2),T(`${fdate(sel.d.d,{day:'numeric',month:'short'})}; the day before ${num(sel.ref,y?0:2)}`,`${fdate(sel.d.d,{day:'numeric',month:'short'})}、前日${num(sel.ref,y?0:2)}`)],
+    [T('Breakeven range','損益分岐レンジ'),y?'± '+pf(sel.be):`${num(spot-sel.be,dp)} – ${num(spot+sel.be,dp)}`,T('overnight straddle on the event day','イベント日のO/Nストラドル')],
+    [T('Market weight vs history','市場ウェイト対過去'),`${num(sel.iw,1)} / ${num(sel.hw,1)}`,`<span class="verdict ${v[0]}">${v[1]}</span>`],
+    [T('Average move in history','過去の平均値動き'),pf(sel.hm),T(`${r1.recent.length} events, reaction day`,`${r1.recent.length}回、反応当日`)]
   ].map(k=>`<div class="kpi"><span class="lbl">${k[0]}</span><span class="v">${k[1]}</span><span class="s">${k[2]}</span></div>`).join('');
-  let t='';
-  if(evVar<=0)t=T(`At ${num(S.iv,y?0:1)} implied, the option is priced below the ordinary-day volatility of ${num(S.bv,y?0:1)} for ${n} trading days, so it charges nothing extra for ${EN(S.ev)}. Either the ex-event vol is set too high or the event is cheap.`,
-    `インプライド${num(S.iv,y?0:1)}は、${n}営業日の通常日ボラ${num(S.bv,y?0:1)}を下回っており、${EN(S.ev)}への上乗せがありません。通常日ボラの設定が高すぎるか、イベントが割安です。`);
-  else t=T(`An option at ${num(S.iv,y?0:1)} for ${n} trading days prices a ${EN(S.ev)}-day move of about <b>${u(exp)}</b>; without the event it would price ${u(expAll*S.bv/S.iv)} a day. ${AN(s)} has averaged ${u(hm)} on the reaction day. `,
-    `${n}営業日で${num(S.iv,y?0:1)}のオプションは、${EN(S.ev)}当日に約<b>${u(exp)}</b>の値動きを織り込んでいます（イベントがなければ1日${u(expAll*S.bv/S.iv)}）。${AN(s)}の反応当日の平均は${u(hm)}です。`)+
-    (v[0]==='rich'?T('The event looks expensive against its own history: a reason to sell event vol, or to fund a structure with it.','過去と比べて割高：イベント・ボラの売り、またはストラクチャーの原資に。'):v[0]==='cheap'?T('The event looks cheap against its own history: a reason to own a straddle or a short-dated option across it.','過去と比べて割安：ストラドルや短期オプションの買い。'):T('That is in line with history.','過去並みです。'));
-  $('#iSay').innerHTML=t;
+  let t=T(`The tenors put ${EN(sel.e.k)} on ${fdate(sel.d.d,{weekday:'short',day:'numeric',month:'short'})} at <b>${num(sel.f,y?0:2)}</b> overnight vol, ${num(sel.prem,y?0:2)} above the day before. An overnight straddle needs ${AN(s)} to move ${y?pf(sel.be):pf(sel.be)+' ('+num(sel.be/spot*100,2)+'%)'} either way to break even; on past ${EN(sel.e.k)} days it moved ${pf(sel.hm)} on average. `,
+    `年限ボラから、${fdate(sel.d.d,{weekday:'short',day:'numeric',month:'short'})}の${EN(sel.e.k)}のO/Nボラは<b>${num(sel.f,y?0:2)}</b>、前日より${num(sel.prem,y?0:2)}高い水準です。O/Nストラドルの損益分岐には${AN(s)}が上下に${y?pf(sel.be):pf(sel.be)+'（'+num(sel.be/spot*100,2)+'%）'}動く必要があり、過去の${EN(sel.e.k)}の日の平均値動きは${pf(sel.hm)}でした。`);
+  t+=!isFinite(ratio)?'':ratio>1.25?T(`The market weights the day at ${num(sel.iw,1)} ordinary days against ${num(sel.hw,1)} in history: rich, a case for selling event vol or using it to fund a structure.`,`市場はこの日を通常日の${num(sel.iw,1)}日分と評価し、過去は${num(sel.hw,1)}日分：割高。イベント・ボラの売り、またはストラクチャーの原資に。`):
+    ratio<.8?T(`The market weights the day at ${num(sel.iw,1)} ordinary days against ${num(sel.hw,1)} in history: cheap, a case for owning a short-dated straddle across it.`,`市場はこの日を通常日の${num(sel.iw,1)}日分と評価し、過去は${num(sel.hw,1)}日分：割安。イベントをまたぐ短期ストラドルの買い。`):
+    T(`The market weights the day at ${num(sel.iw,1)} ordinary days, close to the ${num(sel.hw,1)} history suggests.`,`市場はこの日を通常日の${num(sel.iw,1)}日分と評価し、過去の${num(sel.hw,1)}日分に近い水準です。`);
+  if(neg)t+=' '+T('Note: two of the tenors imply negative variance between them; check the quotes.','注：2つの年限の間で分散が負になっています。値を確認してください。');
+  $('#vSay').innerHTML=t;
 }
 /* same as analyse, but always the one-day reaction for the implied check */
 function analyse1(s,k){const w=S.win;S.win=1;const r=analyse(s,k);S.win=w;return r}
 function method(){
-  $('#method').innerHTML=T(`<b>Method.</b> Daily closes since December 2009; UST and JGB yields as bp changes (Fed H.15, Japan MOF). A move runs from the close before the reaction day to the close of the reaction day (or the day after, with “2 days”). The reaction day is the announcement date when the market is still open at the announcement, otherwise its next session: so US data, ECB and BoE land the next day for the Nikkei and JGBs, and the FOMC lands the next day for Europe and Tokyo. Ordinary days exclude every reaction day of all nine events. Event dates: Fed, ECB, BoJ and BoE calendars and archives; BLS archives for CPI and payrolls; ALFRED release vintages for retail sales, PCE and GDP (annual-revision releases removed), with the Census and BEA schedules ahead; the 2013, 2018–19, 2025 and 2026 shutdown reschedules are included. Other news on the same day is counted in, and older years ran under different policy regimes, so compare the last 12 or 24 with the full history. The implied check is a standard event-variance split and ignores skew, weekends and other events before expiry. History describes the past, not probabilities; not investment advice. ${LIVE?'Data: Keel (Yahoo Finance, Fed, MOF through OpenBB); free sources can be delayed.':'<b>Synthetic sample, not market data.</b> Connect Keel for live figures.'}`,
-    `<b>手法。</b>2009年12月以降の日次終値。米国債・日本国債の利回りはbp変化（FRB H.15、財務省）。値動きは反応日の前日終値から反応日（「2日間」では翌日）の終値まで。発表時に市場が開いていれば発表日、引け後なら翌営業日を反応日とします。米指標・ECB・英中銀は日経平均と日本国債では翌日、FOMCは欧州と東京で翌日に計測。通常日は9種類すべてのイベントの反応日を除外。イベント日程：FRB・ECB・日銀・英中銀の日程と記録、CPIと雇用統計はBLSの記録、小売売上高・PCE・GDPはALFRED（セントルイス連銀）の公表履歴（年次改定のみの公表は除外）と国勢調査局・BEAの予定。2013年、2018〜19年、2025年、2026年の政府閉鎖による日程変更を含みます。同日の他のニュースも含まれ、古い年は政策環境が異なるため、直近12回・24回と全期間を見比べてください。織り込みの計算は標準的なイベント分散の分解で、スキュー、週末、満期までの他のイベントは考慮していません。過去の記述であり確率ではありません。投資助言ではありません。${LIVE?'データ：Keel（OpenBB経由のYahoo Finance、FRB、財務省）。無料ソースのため遅延の可能性があります。':'<b>合成サンプルであり、市場データではありません。</b>Keelに接続すると実データを表示します。'}`);
+  $('#method').innerHTML=T(`<b>Method.</b> Daily closes since December 2009; UST and JGB yields as bp changes (Fed H.15, Japan MOF). A move runs from the close before the reaction day to the close of the reaction day (or the day after, with “2 days”). The reaction day is the announcement date when the market is still open at the announcement, otherwise its next session: so US data, ECB and BoE land the next day for the Nikkei and JGBs, and the FOMC lands the next day for Europe and Tokyo. Ordinary days exclude every reaction day of all nine events. Event dates: Fed, ECB, BoJ and BoE calendars and archives; BLS archives for CPI and payrolls; ALFRED release vintages for retail sales, PCE and GDP (annual-revision releases removed), with the Census and BEA schedules ahead; the 2013, 2018–19, 2025 and 2026 shutdown reschedules are included. Other news on the same day is counted in, and older years ran under different policy regimes, so compare the last 12 or 24 with the full history. The vol calendar spreads each tenor’s total variance (vol² × days to expiry, counting today as day 1) over the days it covers in proportion to day weights, so each day’s overnight forward vol is the square root of its share; a day’s weight is how many ordinary days of variance it carries. Weekends weigh 0.1 in FX and 0 elsewhere; holidays are not modelled. The straddle breakeven is spot × vol × √(2/(365π)), about vol/24 as a percentage move. Moves around the event use one-day closes; intraday ranges use daily high and low and are not available for government yields. History describes the past, not probabilities; not investment advice. ${LIVE?'Data: Keel (Yahoo Finance, Fed, MOF through OpenBB); free sources can be delayed.':'<b>Synthetic sample, not market data.</b> Connect Keel for live figures.'}`,
+    `<b>手法。</b>2009年12月以降の日次終値。米国債・日本国債の利回りはbp変化（FRB H.15、財務省）。値動きは反応日の前日終値から反応日（「2日間」では翌日）の終値まで。発表時に市場が開いていれば発表日、引け後なら翌営業日を反応日とします。米指標・ECB・英中銀は日経平均と日本国債では翌日、FOMCは欧州と東京で翌日に計測。通常日は9種類すべてのイベントの反応日を除外。イベント日程：FRB・ECB・日銀・英中銀の日程と記録、CPIと雇用統計はBLSの記録、小売売上高・PCE・GDPはALFRED（セントルイス連銀）の公表履歴（年次改定のみの公表は除外）と国勢調査局・BEAの予定。2013年、2018〜19年、2025年、2026年の政府閉鎖による日程変更を含みます。同日の他のニュースも含まれ、古い年は政策環境が異なるため、直近12回・24回と全期間を見比べてください。ボラ・カレンダーは、各年限の総分散（ボラ²×満期までの日数、本日を1日目とする）を対象期間の各日にウェイトに比例して配分し、その平方根を各日のオーバーナイト・フォワード・ボラとします。ウェイトは通常日の何日分の分散を持つかを表します。週末は為替0.1、その他0、祝日は考慮していません。ストラドルの損益分岐はスポット×ボラ×√(2/(365π))（変動率で約ボラ/24）。イベント前後の値動きは1日ごとの終値、日中レンジは日次の高値・安値を使用（国債利回りは対象外）。過去の記述であり確率ではありません。投資助言ではありません。${LIVE?'データ：Keel（OpenBB経由のYahoo Finance、FRB、財務省）。無料ソースのため遅延の可能性があります。':'<b>合成サンプルであり、市場データではありません。</b>Keelに接続すると実データを表示します。'}`);
 }
 window.redraw=render;
 
 /* ---------- load ---------- */
 async function load(fresh){
-  setStatus('busy');
-  const r=await keel('api_history',{symbols:A.map(a=>a.s).join(','),interval:'D',start:'2009-12-01'},{fresh});
-  if(r.ok&&r.data&&r.data.series&&Object.keys(r.data.series).length){SERIES=r.data.series;LIVE=true;setStatus('live');
-    if(r.data.missing&&r.data.missing.length){const b=$('#banner');b.hidden=false;b.innerHTML=`<span>${T('Not loaded: ','未取得：')}${esc(r.data.missing.join(', '))}</span>`}}
-  else{SERIES=sample();LIVE=false;setStatus(r.code==='no_mcp'?'sample':'err',r.code,r.message)}
-  S.iv=S.bv=S.dte=null;S._ivTouched=false;render();
+  /* three small requests in turn: the free server can drop one very long response */
+  setStatus('busy');const groups=[A.slice(0,4),A.slice(4,7),A.slice(7)].map(g=>g.map(a=>a.s));
+  const series={};let bad=null;
+  for(const g of groups){const r=await keel('api_history',{symbols:g.join(','),interval:'D',start:'2009-12-01'},{fresh});
+    if(r.ok&&r.data&&r.data.series)Object.assign(series,r.data.series);else bad=r}
+  const b=$('#banner');b.hidden=true;
+  if(Object.keys(series).length){SERIES=series;LIVE=true;setStatus('live');
+    const miss=A.filter(a=>!series[a.s]).map(a=>AN(a.s));
+    if(miss.length){b.hidden=false;b.innerHTML=`<span>${T('Not loaded: ','未取得：')}${esc(miss.join(', '))}${bad?' · '+esc(keelMsg(bad.code,bad.message)):''}</span> <button class="btn q" id="retry">${T('Try again','再試行')}</button>`;$('#retry').onclick=()=>load(true)}}
+  else{SERIES=sample();LIVE=false;setStatus(bad&&bad.code==='no_mcp'?'sample':'err',bad&&bad.code,bad&&bad.message)}
+  VC.asset=null;OH={};render();
 }
-['iv','dte','bv'].forEach(id=>$('#'+id).oninput=e=>{const v=parseFloat(e.target.value);if(!isFinite(v)||v<=0)return;S[id]=id==='dte'?Math.max(2,Math.round(v)):v;if(id==='iv')S._ivTouched=true;implied(analyse(S.asset,S.ev))});
 $$('#win button').forEach(b=>b.onclick=()=>{S.win=+b.dataset.v;save();render()});
 $$('#look button').forEach(b=>b.onclick=()=>{S.look=+b.dataset.v;save();render()});
 $$('#ovl button').forEach(b=>b.onclick=()=>{S.ovl=b.dataset.v;S.iv=null;save();render()});
+$$('#met button').forEach(b=>b.onclick=()=>{S.met=b.dataset.v;save();render()});
 $$('#grp button').forEach(b=>b.onclick=()=>{S.grp=b.dataset.v;if(!cols().includes(S.ev)){S.ev=cols()[0];S.iv=S.dte=null;S._ivTouched=false}save();render()});
 $('#refresh').onclick=()=>load(true);
 $('#how').innerHTML=howHtml();
