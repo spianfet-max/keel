@@ -1,0 +1,440 @@
+<title>Factors</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@300;400;500;600&family=Noto+Sans+JP:wght@300;400&display=swap">
+<style>
+/*CORE_CSS*/
+/* Factors: currency factor investing for a fund manager. Scorecard first (what to buy and sell today), then the book and
+   ticket, then whether each factor works and when. Long = red (house colour marks the answer), short = steel. */
+.app{padding-left:max(20px,env(safe-area-inset-left,0px));padding-right:max(20px,env(safe-area-inset-right,0px))}
+@media (max-width:480px){.app{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}}
+.ctl{display:flex;flex-direction:column;gap:5px;min-width:0}
+.amt{width:130px;text-align:right;font-variant-numeric:tabular-nums;border:1px solid var(--line);background:var(--card);color:var(--ink);min-height:34px;padding:0 8px;font:inherit}
+.verdict{font-size:17px;line-height:1.55;max-width:80ch;margin:0;text-wrap:pretty}
+.verdict b{font-weight:500}.verdict .r{color:var(--red)}.verdict .s{color:var(--steel)}
+table.sc{font-size:13px}
+table.sc td,table.sc th{padding:5px 7px;text-align:center;white-space:nowrap}
+table.sc td:first-child,table.sc th:first-child{text-align:left}
+table.sc td.cell{font-variant-numeric:tabular-nums;min-width:52px}
+table.sc tr.g td{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--mute);padding-top:14px;text-align:left;border-bottom:1px solid var(--line)}
+.wbar{display:inline-block;position:relative;width:90px;height:12px;vertical-align:middle;background:linear-gradient(to right,transparent calc(50% - .5px),var(--line) calc(50% - .5px),var(--line) calc(50% + .5px),transparent calc(50% + .5px))}
+.wbar b{position:absolute;top:2px;height:8px}
+table.mt{font-size:13px}table.mt td,table.mt th{padding:5px 7px;text-align:right;white-space:nowrap}
+table.mt td:first-child,table.mt th:first-child{text-align:left}
+table.mt td.neg{color:var(--neg)}table.mt td.pos{color:var(--pos)}
+table.mt tr.hl td{background:var(--sel)}
+.hm{border-collapse:separate;border-spacing:2px;width:auto;font-size:12px}
+.hm th{border:0;padding:2px 6px;font-size:11.5px;font-weight:400;color:var(--mute)}
+.hm td{border:0;width:58px;height:30px;text-align:center;font-variant-numeric:tabular-nums}
+.ticket{font:12px/1.55 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:var(--track);padding:12px;white-space:pre-wrap;word-break:break-word;margin:0 0 10px;max-height:300px;overflow:auto}
+.routine{margin-top:18px;font-size:13px;line-height:1.5}.routine h3{font-size:14px;font-weight:500;margin:0 0 6px}
+.routine ol{margin:0;padding-left:18px;color:var(--mute)}.routine li{margin-bottom:4px}
+.stat{font-size:12.5px;line-height:1.5;color:var(--mute);margin-top:8px;max-width:76ch}.stat b{color:var(--ink);font-weight:500}
+.up{color:var(--pos)}.dn{color:var(--neg)}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.chip{border:1px solid var(--line);padding:3px 9px;font-size:12.5px}
+.chip.on{border-color:var(--ink)}
+</style>
+
+<div class="app">
+  <header class="top">
+    <div class="brand"><h1 data-ja="ファクター">Factors</h1><span data-ja="通貨ファクター：キャリー、バリュー、モメンタム、リバーサル、クオリティでG10と新興国通貨を毎日採点し、ブックに落とし込む">Currency factors: carry, value, momentum, reversals and quality, scoring G10 and EM currencies every day and turning the scores into a book</span></div>
+    <div class="tright">
+      <span class="pill busy" id="status"><i></i></span>
+      <button class="btn q" id="refresh" data-ja="更新">Refresh</button>
+      <button class="btn q" id="themeBtn">Dark</button>
+      <div class="seg" id="langSeg"><button data-l="en">EN</button><button data-l="ja">日本語</button></div>
+    </div>
+  </header>
+  <div class="banner" id="banner" hidden></div>
+  <div class="help" id="how" hidden></div>
+
+  <div class="bar">
+    <div class="ctl"><span class="lbl" data-ja="ユニバース">Universe</span><div class="seg" id="uSeg"><button data-v="ALL">G10 + EM</button><button data-v="G10">G10</button><button data-v="EM" data-ja="新興国">EM</button></div></div>
+    <div class="ctl"><span class="lbl" data-ja="シグナル">Signals</span><div class="seg" id="xSeg"><button data-v="raw" data-ja="生の値">Raw</button><button data-v="both" data-ja="生＋Zスコア">Raw + z-scores</button></div></div>
+    <div class="ctl"><span class="lbl" data-ja="ファクター配分">Factor mix</span><div class="seg" id="mSeg"><button data-v="ew" data-ja="均等">Equal</button><button data-v="rp" data-ja="リスク均等">Risk parity</button></div></div>
+    <div class="ctl"><span class="lbl" data-ja="目標ボラ">Target vol</span><div class="seg" id="vSeg"><button data-v="4">4%</button><button data-v="6">6%</button><button data-v="8">8%</button><button data-v="10">10%</button></div></div>
+    <div class="ctl"><span class="lbl" data-ja="NAV（米ドル）">NAV (USD)</span><input type="text" id="nav" class="amt" inputmode="numeric" aria-label="Fund NAV in dollars"></div>
+  </div>
+
+  <section class="sec"><p class="verdict" id="verdict"></p></section>
+  <section class="kpis" id="kpis"></section>
+
+  <section class="sec">
+    <div class="sh"><h2 data-ja="スコアカード">Scorecard</h2><p id="scSub"></p></div>
+    <div class="tw"><table class="sc" id="sc"></table></div>
+  </section>
+
+  <section class="sec two">
+    <div style="min-width:0">
+      <div class="sh"><h2 data-ja="ブック">Book</h2><p id="bkSub"></p></div>
+      <div class="tw"><table class="mt" id="book"></table></div>
+    </div>
+    <div style="min-width:0">
+      <div class="sh"><h2 data-ja="トレード・チケット">Trade ticket</h2><p data-ja="NAVの0.5%未満の変更は省略。月末にリバランス。">Changes under 0.5% of NAV are skipped. Rebalance at month end.</p></div>
+      <pre class="ticket" id="ticket"></pre>
+      <button class="btn" id="copy" data-ja="チケットをコピー">Copy ticket</button>
+      <div class="routine">
+        <h3 data-ja="毎日の使い方">Daily routine</h3>
+        <ol>
+          <li data-ja="スコアカードの順位変動（↑↓）を確認。上位・下位5通貨の入れ替わりが次のリバランスの取引になる。">Check rank changes on the scorecard. Currencies moving in or out of the top and bottom five are next month’s trades.</li>
+          <li data-ja="レジーム（景気・インフレ）と、そのレジームで過去に強かったファクターを確認。">Read the regime and which factors have done well in it before.</li>
+          <li data-ja="ファクター同士の直近相関が上がっていないか。上がると分散効果が落ち、ブックのリスクが増える。">Watch recent correlations between factors: when they rise, diversification falls and the book gets riskier.</li>
+          <li data-ja="ヘッジ比率の判断にも：自国通貨のスコアが低いほどヘッジを厚く、高いほど薄く。">Use it for hedge ratios too: hedge more of a currency that scores badly, less of one that scores well.</li>
+          <li data-ja="月末にチケットどおり執行。月中はシグナルの変化を見るだけで動かさない。">Execute the ticket at month end; intra-month, watch the signals but do not trade them.</li>
+        </ol>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec">
+    <div class="sh"><h2 data-ja="ファクターの実績">How each factor has done</h2><p id="pfSub"></p></div>
+    <svg class="ch" id="pf" height="300"></svg><div class="leg" id="pfLeg"></div>
+    <div class="tw" style="margin-top:14px"><table class="mt" id="pfT"></table></div>
+  </section>
+
+  <section class="sec two even">
+    <div style="min-width:0">
+      <div class="sh"><h2 data-ja="ファクター間の相関">Correlation between factors</h2><p data-ja="月次リターン。左下：全期間、右上：直近5年。">Monthly returns. Lower left: full sample; upper right: last five years.</p></div>
+      <div class="tw" id="corr"></div>
+      <p class="stat" id="corrSay"></p>
+    </div>
+    <div style="min-width:0">
+      <div class="sh"><h2 data-ja="レジーム別の成績">Through the cycle</h2><p id="rgSub"></p></div>
+      <div class="tw"><table class="mt" id="rg"></table></div>
+    </div>
+  </section>
+
+  <section class="sec two even">
+    <div style="min-width:0">
+      <div class="sh"><h2 data-ja="機会の大きさ：金利とバリュエーションのばらつき">The opportunity set: dispersion of rates and valuations</h2><p id="dsSub"></p></div>
+      <svg class="ch" id="ds" height="240"></svg><div class="leg" id="dsLeg"></div>
+    </div>
+    <div style="min-width:0">
+      <div class="sh"><h2 data-ja="キャリー・バスケットの事前キャリー">Ex-ante carry of the carry basket</h2><p id="ecSub"></p></div>
+      <svg class="ch" id="ec" height="240"></svg>
+    </div>
+  </section>
+
+  <section class="sec">
+    <div class="sh"><h2 data-ja="シグナル別の成績">Signal by signal</h2><p id="inSub"></p></div>
+    <div class="tw"><table class="mt" id="inT"></table></div>
+  </section>
+
+  <section class="sec">
+    <div class="sh"><h2 id="dtH"></h2><p id="dtSub"></p></div>
+    <div class="chips" id="dtPick"></div>
+    <div class="two" style="margin-top:12px">
+      <div style="min-width:0"><svg class="ch" id="dtRank" height="220"></svg><div class="leg" id="dtLeg"></div></div>
+      <div style="min-width:0"><div class="tw"><table class="mt" id="dtT"></table></div></div>
+    </div>
+  </section>
+  <p class="note" id="method"></p>
+</div>
+
+<script>
+/*CORE_JS*/
+/* ---------------- data and state ---------------- */
+let DATA=null,LIVE=false,R=null;
+let S={u:'ALL',x:'both',m:'ew',vol:8,nav:100e6,pick:'JPY'};
+try{Object.assign(S,JSON.parse(localStorage.getItem('keel-factors')||'{}'))}catch(e){}
+const save=()=>{try{localStorage.setItem('keel-factors',JSON.stringify(S))}catch(e){}};
+const PUB='2024-07';
+const FAC=[['carry','Carry','キャリー'],['value','Value','バリュー'],['mom','Momentum','モメンタム'],['rev','Reversals','リバーサル'],['qual','Quality','クオリティ']];
+const fname=k=>{const f=FAC.find(x=>x[0]===k);return f?f[JA()?2:1]:(k==='all'?T('All factors','全ファクター'):k)};
+const FCOL=()=>({carry:cssv('--red'),value:cssv('--a3'),mom:cssv('--a1'),rev:cssv('--a7'),qual:cssv('--a8'),all:cssv('--ink')});
+/* Indicators: value higher = more bullish for the currency against the dollar. lag = months of publication lag. */
+const IND=[
+  {k:'carry',f:'carry',en:'3M rate gap to USD',ja:'対ドル3か月金利差'},
+  {k:'c2v',f:'carry',en:'Carry ÷ volatility',ja:'キャリー÷ボラティリティ'},
+  {k:'y10',f:'carry',en:'10Y government yield',ja:'10年国債利回り'},
+  {k:'ppp',f:'value',en:'PPP (CPI-adjusted real rate vs its average)',ja:'PPP（CPIで調整した実質レートの平均からの乖離）'},
+  {k:'lt5',f:'value',en:'5-year price reversion',ja:'5年の価格リバージョン'},
+  {k:'m1',f:'mom',en:'Momentum 1M',ja:'モメンタム1か月'},{k:'m3',f:'mom',en:'Momentum 3M',ja:'モメンタム3か月'},
+  {k:'m6',f:'mom',en:'Momentum 6M',ja:'モメンタム6か月'},{k:'m12',f:'mom',en:'Momentum 12M',ja:'モメンタム12か月'},
+  {k:'e1',f:'mom',en:'Local equities 1M',ja:'自国株式1か月'},{k:'e3',f:'mom',en:'Local equities 3M',ja:'自国株式3か月'},
+  {k:'e6',f:'mom',en:'Local equities 6M',ja:'自国株式6か月'},{k:'e12',f:'mom',en:'Local equities 12M',ja:'自国株式12か月'},
+  {k:'r1',f:'rev',en:'Price reversion 1M',ja:'価格リバージョン1か月'},{k:'r12',f:'rev',en:'Price reversion 1Y',ja:'価格リバージョン1年'},
+  {k:'a3',f:'rev',en:'Acceleration 3M',ja:'加速度3か月'},{k:'a6',f:'rev',en:'Acceleration 6M',ja:'加速度6か月'},{k:'a12',f:'rev',en:'Acceleration 12M',ja:'加速度12か月'},
+  {k:'vol',f:'rev',en:'Realised volatility (implied-vol stand-in)',ja:'実現ボラティリティ（インプライドの代替）'},
+  {k:'cci',f:'qual',en:'Consumer confidence (z-score)',ja:'消費者信頼感（Zスコア）'},
+  {k:'cli',f:'qual',en:'Leading indicator, 3M change',ja:'景気先行指数の3か月変化'},
+];
+const iname=i=>JA()?i.ja:i.en;
+
+/* ---------------- maths ---------------- */
+const mean=a=>a.reduce((s,x)=>s+x,0)/(a.length||1);
+const sd=a=>{if(a.length<2)return NaN;const m=mean(a);return Math.sqrt(a.reduce((s,x)=>s+(x-m)**2,0)/(a.length-1))};
+const quant=(a,q)=>{const s=[...a].sort((x,y)=>x-y);if(!s.length)return NaN;const i=(s.length-1)*q,lo=Math.floor(i),hi=Math.ceil(i);return s[lo]+(s[hi]-s[lo])*(i-lo)};
+const corr=(a,b)=>{const ma=mean(a),mb=mean(b);let n=0,da=0,db=0;for(let i=0;i<a.length;i++){n+=(a[i]-ma)*(b[i]-mb);da+=(a[i]-ma)**2;db+=(b[i]-mb)**2}return n/Math.sqrt(da*db)};
+const pc=(v,d=1)=>v==null||!isFinite(v)?'—':pct(v*100,d);
+const ratio=v=>v==null||!isFinite(v)?'—':num(v,2);
+const usd=v=>v==null||!isFinite(v)?'—':(v<0?'−':'')+'$'+(Math.abs(v)>=1e6?num(Math.abs(v)/1e6,2)+'m':Math.abs(v)>=1e3?num(Math.abs(v)/1e3,0)+'k':num(Math.abs(v),0));
+const heat=(v,scale)=>{if(v==null||!isFinite(v))return'transparent';const a=Math.min(1,Math.abs(v)/scale)*.55+.04;return v>=0?`color-mix(in srgb, var(--pos) ${(a*100).toFixed(0)}%, transparent)`:`color-mix(in srgb, var(--neg) ${(a*100).toFixed(0)}%, transparent)`};
+const N=()=>DATA.months.length;
+const g=(o,c,t)=>{const a=o&&o[c];return a&&t>=0&&t<a.length?a[t]:null};
+const lag=(o,c,t,L)=>{for(let k=t-L;k>=Math.max(0,t-L-3);k--){const v=g(o,c,k);if(v!=null)return v}return null};
+
+function prep(){
+  const n=N(),C=DATA.ccys;
+  const LS={};C.forEach(c=>{LS[c]=c==='USD'?Array(n).fill(0):(DATA.spot[c]||[]).map(v=>v>0?Math.log(v):null)});
+  /* excess return of holding c against USD, funded in dollars, through month t */
+  const XR={};C.forEach(c=>{XR[c]=Array(n).fill(null);if(c==='USD'){XR[c]=Array(n).fill(0);return}
+    for(let t=1;t<n;t++){const a=LS[c][t-1],b=LS[c][t];if(a==null||b==null)continue;
+      const rc=g(DATA.rate,c,t-1),ru=g(DATA.rate,'USD',t-1);XR[c][t]=Math.exp(a-b)*(1+(rc==null?0:rc)/1200)-(1+(ru==null?0:ru)/1200)}});
+  const vol=(c,t,m)=>{const r=[];for(let k=t-m+1;k<=t;k++){const x=XR[c][k];if(x!=null)r.push(x)}return r.length>=Math.min(m,6)-1?sd(r)*Math.sqrt(12):null};
+  const ret=(c,t,m)=>{const a=LS[c][t-m],b=LS[c][t];return a==null||b==null?null:a-b}; /* currency log return vs USD */
+  const V={};IND.forEach(i=>{V[i.k]={};C.forEach(c=>V[i.k][c]=Array(n).fill(null))});
+  /* expanding PPP mean per currency */
+  const q={};C.forEach(c=>{q[c]=Array(n).fill(null);if(c==='USD')return;for(let t=0;t<n;t++){const a=lag(DATA.cpi,c,t,2),b=lag(DATA.cpi,'USD',t,2);if(LS[c][t]!=null&&a&&b)q[c][t]=LS[c][t]-Math.log(a/b)}});
+  C.forEach(c=>{let qs=0,qn=0;
+    for(let t=0;t<n;t++){
+      const rc=g(DATA.rate,c,t),ru=g(DATA.rate,'USD',t);const cg=rc!=null&&ru!=null?rc-ru:null;
+      V.carry[c][t]=c==='USD'?0:cg;
+      const v12=c==='USD'?null:vol(c,t,12);V.c2v[c][t]=c==='USD'?0:(cg!=null&&v12?cg/(v12*100):null);
+      V.y10[c][t]=g(DATA.y10,c,t);
+      if(c==='USD'){['ppp','lt5','r1','r12','a3','a6','a12'].forEach(k=>V[k][c][t]=0)}
+      else{
+        if(q[c][t]!=null){qs+=q[c][t];qn++;if(qn>=60)V.ppp[c][t]=q[c][t]-qs/qn}
+        if(t>=59){let s=0,k2=0;for(let k=t-59;k<=t;k++)if(LS[c][k]!=null){s+=LS[c][k];k2++}if(k2>=48&&LS[c][t]!=null)V.lt5[c][t]=LS[c][t]-s/k2}
+        const r1=ret(c,t,1);V.r1[c][t]=r1==null?null:-r1;
+        if(t>=11){let s=0,k2=0;for(let k=t-11;k<=t;k++)if(LS[c][k]!=null){s+=LS[c][k];k2++}if(k2>=10&&LS[c][t]!=null)V.r12[c][t]=LS[c][t]-s/k2}
+        [3,6,12].forEach(m=>{const a=ret(c,t,m),b=ret(c,t-m,m);V['a'+m][c][t]=a==null||b==null?null:-(a-b)});
+      }
+      const v12u=c==='USD'?null:vol(c,t,12);
+      [1,3,6,12].forEach(m=>{if(c==='USD'){V['m'+m][c][t]=0;return}let s=0,ok=true;for(let k=t-m+1;k<=t;k++){const x=XR[c][k];if(x==null){ok=false;break}s+=x}
+        V['m'+m][c][t]=ok&&v12u?s/(v12u*Math.sqrt(m/12)):null;
+        const e0=g(DATA.equity,c,t-m),e1=g(DATA.equity,c,t);V['e'+m][c][t]=e0&&e1?Math.log(e1/e0):null});
+      V.vol[c][t]=c==='USD'?null:vol(c,t,6);
+      const z=lag(DATA.cci,c,t,2);V.cci[c][t]=z;
+      const l0=lag(DATA.cli,c,t-3,2),l1=lag(DATA.cli,c,t,2);V.cli[c][t]=l0&&l1?l1-l0:null;
+    }});
+  /* consumer confidence as an expanding z-score per country (levels differ by survey) */
+  C.forEach(c=>{const a=V.cci[c];let s=0,s2=0,k=0;const out=Array(n).fill(null);for(let t=0;t<n;t++){if(a[t]!=null){s+=a[t];s2+=a[t]*a[t];k++;if(k>=24){const m=s/k,v=Math.sqrt(Math.max(s2/k-m*m,1e-9));out[t]=(a[t]-m)/v}}}V.cci[c]=out});
+  /* time-series z-score transform, expanding window, at least 36 months */
+  const Z={};IND.forEach(i=>{Z[i.k]={};C.forEach(c=>{const a=V[i.k][c];let s=0,s2=0,k=0;const out=Array(n).fill(null);
+    for(let t=0;t<n;t++){if(a[t]!=null){s+=a[t];s2+=a[t]*a[t];k++;if(k>=36){const m=s/k,v=Math.sqrt(Math.max(s2/k-m*m,1e-12));out[t]=(a[t]-m)/v}}}
+    Z[i.k][c]=out})});
+  return {LS,XR,V,Z,vol}}
+
+function universe(){const C=DATA.ccys,G=DATA.g10||[];return S.u==='G10'?C.filter(c=>G.includes(c)):S.u==='EM'?C.filter(c=>c==='USD'||!G.includes(c)):C}
+const topK=()=>S.u==='G10'?3:S.u==='EM'?4:5;
+
+/* long the top K, short the bottom K by an indicator at t; weights ±1/K */
+function lsW(src,t,U,K){const a=U.map(c=>[c,g(src,c,t)]).filter(([,v])=>v!=null&&isFinite(v));if(a.length<2*K+1)return null;
+  a.sort((x,y)=>y[1]-x[1]);const w={};a.slice(0,K).forEach(([c])=>w[c]=1/K);a.slice(-K).forEach(([c])=>w[c]=(w[c]||0)-1/K);return w}
+const addW=(A,B,k=1)=>{for(const c in B)A[c]=(A[c]||0)+B[c]*k;return A};
+function perf(W,P){ /* W[t]: weights formed at t, held through t+1 (smoothed); returns net of costs */
+  const n=N(),r=Array(n).fill(null);let prev={};
+  for(let t=1;t<n;t++){const w=W[t-1];if(!w){prev={};continue}let x=0;for(const c in w){const v=P.XR[c][t];if(v!=null)x+=w[c]*v}
+    let to=0;const ks=new Set([...Object.keys(w),...Object.keys(prev)]);ks.forEach(c=>to+=Math.abs((w[c]||0)-(prev[c]||0))*(DATA.cost_bp[c]||2)/1e4);
+    r[t]=x-to;prev=w}
+  return r}
+const smooth=W=>W.map((w,t)=>{if(!w)return null;const p=W[t-1];if(!p)return w;const o={};addW(o,w,.5);addW(o,p,.5);return o});
+function stats(r,from=0,to=1e9){const x=[];r.forEach((v,i)=>{if(v!=null&&i>=from&&i<=to)x.push(v)});if(x.length<12)return null;
+  let v=1,pk=1,mdd=0;x.forEach(y=>{v*=1+y;pk=Math.max(pk,v);mdd=Math.min(mdd,v/pk-1)});const m=mean(x),s=sd(x);
+  return {ret:m*12,vol:s*Math.sqrt(12),sh:m/s*Math.sqrt(12),mdd,n:x.length}}
+
+function run(){
+  const P=prep(),U=universe(),K=topK(),n=N();
+  const srcs=S.x==='raw'?['V']:['V','Z'];
+  const IW={},IR={};
+  IND.forEach(i=>{const Wv=[],Wz=[];for(let t=0;t<n;t++){Wv.push(lsW(P.V[i.k],t,U,K));Wz.push(lsW(P.Z[i.k],t,U,K))}
+    const comb=Wv.map((w,t)=>{const parts=srcs.map(s=>s==='V'?w:Wz[t]).filter(Boolean);if(!parts.length)return null;const o={};parts.forEach(p=>addW(o,p,1/parts.length));return o});
+    IW[i.k]=smooth(comb);IR[i.k]={raw:perf(smooth(Wv),P),z:perf(smooth(Wz),P),both:perf(IW[i.k],P)}});
+  /* factor weights = average of its indicators' weights; factor returns */
+  const FW={},FR={};FAC.forEach(([f])=>{const ks=IND.filter(i=>i.f===f).map(i=>i.k);FW[f]=Array(n).fill(null).map((_,t)=>{const parts=ks.map(k=>IW[k][t]).filter(Boolean);if(!parts.length)return null;const o={};parts.forEach(p=>addW(o,p,1/parts.length));return o});FR[f]=perf(FW[f],P)});
+  /* combine factors: equal weight, or inverse trailing-36m volatility (risk parity), known at t */
+  const AW=Array(n).fill(null).map((_,t)=>{const fs=FAC.map(([f])=>f).filter(f=>FW[f][t]);if(!fs.length)return null;
+    let wts=fs.map(()=>1);if(S.m==='rp')wts=fs.map(f=>{const r=FR[f].slice(Math.max(0,t-35),t+1).filter(v=>v!=null);const s=sd(r);return r.length>=24&&s>0?1/s:null});
+    if(wts.some(v=>v==null))wts=fs.map(()=>1);const tot=wts.reduce((a,b)=>a+b,0);const o={};fs.forEach((f,i)=>addW(o,FW[f][t],wts[i]/tot));return o});
+  FR.all=perf(AW,P);
+  /* scores: mean cross-sectional rank (1 = best) of the indicators in each factor, today and last month-end */
+  const score=t=>{const out={};FAC.forEach(([f])=>out[f]={});
+    IND.forEach(i=>{srcs.forEach(s=>{const src=s==='V'?P.V[i.k]:P.Z[i.k];const a=U.map(c=>[c,g(src,c,t)]).filter(([,v])=>v!=null&&isFinite(v)).sort((x,y)=>y[1]-x[1]);
+      if(a.length<2*K+1)return;a.forEach(([c],r)=>{(out[i.f][c]=out[i.f][c]||[]).push(r+1)})})});
+    const fs={};U.forEach(c=>{fs[c]={};let all=[];FAC.forEach(([f])=>{const x=out[f][c];fs[c][f]=x&&x.length?mean(x):null;if(x)all=all.concat(x)});fs[c].all=all.length?mean(all):null});
+    const ord=U.filter(c=>fs[c].all!=null).sort((a,b)=>fs[a].all-fs[b].all);ord.forEach((c,i)=>fs[c].rank=i+1);return fs};
+  const sNow=score(n-1),sPrev=score(n-2);
+  /* the book: today's target (signals at the latest close) and the book set at the last month end, scaled to target vol */
+  const cov=(t,cs)=>{const rows=[];for(let k=t-35;k<=t;k++){const r=cs.map(c=>P.XR[c][k]);if(r.every(v=>v!=null))rows.push(r)}if(rows.length<24)return null;
+    const m=cs.map((_,i)=>mean(rows.map(r=>r[i])));return cs.map((_,i)=>cs.map((_,j)=>12*rows.reduce((s,r)=>s+(r[i]-m[i])*(r[j]-m[j]),0)/(rows.length-1)))};
+  const scale=(w,t)=>{if(!w)return null;const cs=Object.keys(w).filter(c=>Math.abs(w[c])>1e-9);const S2=cov(t,cs);if(!S2)return null;
+    let v=0;cs.forEach((a,i)=>cs.forEach((b,j)=>v+=w[a]*S2[i][j]*w[b]));const k=S.vol/100/Math.sqrt(v);
+    /* cap any one currency at 30% of NAV per 8% of target vol, so one pair cannot dominate the book */
+    const cap=.3*S.vol/8,o={};cs.forEach(c=>o[c]=Math.max(-cap,Math.min(cap,w[c]*k)));
+    let v2=0;cs.forEach((a,i)=>cs.forEach((b,j)=>v2+=o[a]*S2[i][j]*o[b]));return {w:o,vol:Math.sqrt(v2),cs,S:S2,cap}};
+  const bookNow=scale(AW[n-1],n-1),bookPrev=scale(AW[n-2],n-2);
+  return {P,U,K,IW,IR,FW,FR,AW,sNow,sPrev,bookNow,bookPrev}}
+
+/* ---------------- regimes (US) ---------------- */
+function regimes(){const n=N(),cli=DATA.cli&&DATA.cli.USD,cpi=DATA.cpi&&DATA.cpi.USD;const mac=Array(n).fill(null),inf=Array(n).fill(null);
+  for(let t=0;t<n;t++){const l1=lag(DATA.cli,'USD',t,2),l0=lag(DATA.cli,'USD',t-1,2);if(l1!=null&&l0!=null)mac[t]=l1>=100?(l1>=l0?'exp':'slow'):(l1>=l0?'rec':'down');
+    const c=lag(DATA.cpi,'USD',t,2),c12=lag(DATA.cpi,'USD',t-12,2);if(c&&c12){const y=(c/c12-1)*100;const ys=[];for(let k=0;k<12;k++){const a=lag(DATA.cpi,'USD',t-k,2),b=lag(DATA.cpi,'USD',t-k-12,2);if(a&&b)ys.push((a/b-1)*100)}
+      if(ys.length>=10){const sma=mean(ys);inf[t]=y>2?(y>=sma?'rh':'fh'):(y>=sma?'rl':'fl')}}}
+  return {mac,inf}}
+const RGN={exp:['Expansion','拡大'],slow:['Slowdown','減速'],down:['Downturn','後退'],rec:['Recovery','回復'],rh:['High inflation, rising','高インフレ・上昇'],fh:['High inflation, falling','高インフレ・低下'],rl:['Low inflation, rising','低インフレ・上昇'],fl:['Low inflation, falling','低インフレ・低下']};
+const rgn=k=>RGN[k]?RGN[k][JA()?1:0]:'—';
+
+/* ---------------- render ---------------- */
+function nextRebal(){const d=new Date();const x=new Date(d.getFullYear(),d.getMonth()+1,0);while(x.getDay()===0||x.getDay()===6)x.setDate(x.getDate()-1);return x}
+const dtm=t=>+new Date(DATA.months[t]+'T00:00:00');
+function render(){
+  if(!DATA)return;R=run();const n=N(),RG=regimes(),col=FCOL();
+  const sc=R.sNow,ord=R.U.filter(c=>sc[c]&&sc[c].rank).sort((a,b)=>sc[a].rank-sc[b].rank);
+  const buy=ord.slice(0,3),sell=ord.slice(-3).reverse();
+  const macNow=RG.mac[n-1],infNow=RG.inf[n-1];
+  /* which factors have done best in the current macro regime */
+  const regPerf=(lab,key)=>FAC.map(([f])=>{const x=[];for(let t=1;t<n;t++)if(lab[t-1]===key&&R.FR[f][t]!=null)x.push(R.FR[f][t]);return [f,x.length>=12?mean(x)*12:null]}).filter(([,v])=>v!=null).sort((a,b)=>b[1]-a[1]);
+  const best=macNow?regPerf(RG.mac,macNow).slice(0,2).map(([f])=>fname(f)):[];
+  $('#verdict').innerHTML=T(`<b class="r">Buy ${buy.join(', ')}</b> and <b class="s">sell ${sell.join(', ')}</b> against the dollar: the best and worst average ranks across all signals today. The US is in <b>${rgn(macNow).toLowerCase()}</b> with <b>${rgn(infNow).toLowerCase()}</b>${best.length?`; ${esc(best.join(' and '))} have done best in this phase before`:''}.`,
+    `対ドルで<b class="r">${buy.join('、')}を買い</b>、<b class="s">${sell.join('、')}を売り</b>：全シグナルの平均順位が今日いちばん良い通貨と悪い通貨。米国は<b>${rgn(macNow)}</b>局面、<b>${rgn(infNow)}</b>${best.length?`。この局面では過去に${esc(best.join('と'))}が最も良好`:''}。`);
+  /* KPIs */
+  const g4=['USD','EUR','JPY','GBP'],rd=g4.map(c=>g(DATA.rate,c,n-1)).filter(v=>v!=null);
+  const vd=R.U.map(c=>R.P.V.ppp[c]&&R.P.V.ppp[c][n-1]).filter(v=>v!=null&&isFinite(v));
+  const carryW=R.FW.carry[n-1]||{};const exC=Object.entries(carryW).reduce((s,[c,w])=>s+w*((g(DATA.rate,c,n-1)??0)-(g(DATA.rate,'USD',n-1)??0)),0);
+  const st=stats(R.FR.all),stPost=stats(R.FR.all,DATA.months.findIndex(m=>m.slice(0,7)>PUB));
+  const B=R.bookNow;
+  const K=[
+    [T('US cycle','米国の景気'),rgn(macNow),T('OECD leading indicator, 2-month lag','OECD景気先行指数（2か月遅れ）')],
+    [T('US inflation','米国のインフレ'),rgn(infNow),T('CPI vs 2% and its 1-year average','CPIと2%・1年平均の比較')],
+    [T('G4 rate dispersion','G4の金利差'),rd.length?num(Math.max(...rd)-Math.min(...rd),2)+'%':'—',T('Highest minus lowest 3M rate: USD, EUR, JPY, GBP','USD・EUR・JPY・GBPの3か月金利の最大−最小')],
+    [T('Carry basket ex-ante','キャリー・バスケット'),pct(exC,1),T('Long-short rate gap a year, before FX moves','為替変動前のロング・ショートの金利差（年率）')],
+    [T('All factors, Sharpe','全ファクターのSharpe'),st?ratio(st.sh):'—',stPost?T(`Since Aug 2024: ${ratio(stPost.sh)}`,`2024年8月以降：${ratio(stPost.sh)}`):''],
+    [T('Next rebalance','次回リバランス'),nextRebal().toLocaleDateString(JA()?'ja-JP':'en-GB',{day:'numeric',month:'short'}),B?T(`Book vol ${num(B.vol*100,1)}% · 1m VaR95 ${usd(1.645*B.vol/Math.sqrt(12)*S.nav)}`,`ブックのボラ${num(B.vol*100,1)}%・1か月VaR95 ${usd(1.645*B.vol/Math.sqrt(12)*S.nav)}`):''],
+  ];
+  $('#kpis').innerHTML=K.map(([a,v,s])=>`<div class="kpi"><span class="lbl">${a}</span><span class="v" style="font-size:22px">${v}</span><span class="s">${s}</span></div>`).join('');
+  scorecard(ord);book();perfChart();correl();regTable(RG);disp();indTable();detail();method();
+}
+function scorecard(ord){
+  const sc=R.sNow,pv=R.sPrev,nU=R.U.length,G=DATA.g10||[];
+  const cell=v=>{if(v==null)return'<td class="cell" style="color:var(--mute)">—</td>';const z=1-2*(v-1)/(nU-1);return `<td class="cell" style="background:${heat(z,1)}">${num(v,1)}</td>`};
+  const w=R.bookNow?R.bookNow.w:{};const mx=Math.max(.01,...Object.values(w).map(Math.abs));
+  let h=`<tr><th>${T('Currency','通貨')}</th>${FAC.map(([f])=>`<th>${fname(f)}</th>`).join('')}<th>${T('Overall','総合')}</th><th>${T('Rank','順位')}</th><th>${T('vs last month','前月比')}</th><th>${T('Book','ブック')}</th></tr>`;
+  const groups=S.u==='ALL'?[[T('G10','G10'),ord.filter(c=>G.includes(c))],[T('Emerging','新興国'),ord.filter(c=>!G.includes(c))]]:[[null,ord]];
+  groups.forEach(([lab,list])=>{if(lab)h+=`<tr class="g"><td colspan="${FAC.length+5}">${lab}</td></tr>`;
+    list.forEach(c=>{const s=sc[c],p=pv[c],d=p&&p.rank?p.rank-s.rank:null,x=w[c]||0;
+      h+=`<tr><td><b style="font-weight:500">${c}</b></td>${FAC.map(([f])=>cell(s[f])).join('')}${cell(s.all)}<td><b style="font-weight:500">${s.rank}</b></td><td class="${d>0?'up':d<0?'dn':''}">${d==null?'—':d>0?'↑'+d:d<0?'↓'+(-d):'='}</td>
+        <td><span class="wbar"><b style="${x>=0?'left:50%':'right:50%'};width:${(Math.abs(x)/mx*50).toFixed(1)}%;background:${x>=0?'var(--red)':'var(--steel)'}"></b></span></td></tr>`})});
+  $('#sc').innerHTML=h;
+  $('#scSub').innerHTML=T(`Average rank of each currency on the signals in each factor (1 = best to buy, ${nU} = best to sell), using today’s close for prices and the latest published macro data. Green is a buy, red a sell. The book column is the position the combined model holds (red long, steel short against the dollar).`,
+    `各ファクターのシグナルでの平均順位（1＝最も買い、${nU}＝最も売り）。価格は今日の終値、マクロは最新の公表値。緑は買い、赤は売り。ブック欄は合成モデルのポジション（赤：対ドルでロング、青：ショート）。`);
+}
+function book(){
+  const B=R.bookNow,P=R.bookPrev,Nv=S.nav;if(!B){$('#book').innerHTML='';$('#ticket').textContent='';return}
+  const prev=P?P.w:{};const cs=[...new Set([...Object.keys(B.w),...Object.keys(prev)])].filter(c=>c!=='USD').sort((a,b)=>(B.w[b]||0)-(B.w[a]||0));
+  let h=`<tr><th>${T('Currency','通貨')}</th><th>${T('Side vs USD','対ドル')}</th><th>${T('Notional','想定元本')}</th><th>${T('% NAV','NAV比')}</th><th>${T('Carry a year','年キャリー')}</th><th>${T('Trade','取引')}</th></tr>`;
+  const lines=[];let carry=0,gross=0;
+  cs.forEach(c=>{const w=B.w[c]||0,d=w-(prev[c]||0),gap=(g(DATA.rate,c,N()-1)??0)-(g(DATA.rate,'USD',N()-1)??0);carry+=w*gap;gross+=Math.abs(w);
+    h+=`<tr><td>${c}</td><td class="${w>0?'pos':'neg'}">${Math.abs(w)<.001?'—':w>0?T('Long','ロング'):T('Short','ショート')}</td><td>${usd(Math.abs(w*Nv))}</td><td>${num(w*100,1)}%</td><td class="${w*gap>=0?'pos':'neg'}">${usd(w*gap/100*Nv)}</td><td>${Math.abs(d)<.005?'—':(d>0?T('Buy ','買い '):T('Sell ','売り '))+usd(Math.abs(d*Nv))}</td></tr>`;
+    if(Math.abs(d)>=.005)lines.push(`${(d>0?'BUY':'SELL').padEnd(5)} ${c}/USD  ${usd(Math.abs(d*Nv)).padStart(8)}  (target ${w>=0?'long':'short'} ${usd(Math.abs(w*Nv))}, ${num(w*100,1)}% NAV)`)});
+  h+=`<tr><td><b>${T('Total','合計')}</b></td><td></td><td>${T('gross','グロス')} ${usd(gross*Nv)}</td><td>${num(gross*100,0)}%</td><td><b>${usd(carry/100*Nv)}</b></td><td></td></tr>`;
+  $('#book').innerHTML=h;
+  $('#bkSub').innerHTML=T(`All five factors (${S.m==='ew'?'equal weight':'risk parity'}), long the top ${R.K} and short the bottom ${R.K} currencies on each signal, scaled to ${S.vol}% ex-ante volatility on ${usd(Nv)} with a 3-year covariance, no currency above ${num(B.cap*100,0)}% of NAV (ex-ante vol after the cap: <b>${num(B.vol*100,1)}%</b>). Trades are today’s target against the book set at the last month end (${fdate(DATA.months[N()-2])}). Positions are forwards against the dollar.`,
+    `5ファクター（${S.m==='ew'?'均等':'リスク均等'}）、各シグナルの上位${R.K}通貨をロング・下位${R.K}通貨をショート。3年の共分散で${usd(Nv)}に対し予想ボラ${S.vol}%に調整、1通貨あたりNAVの${num(B.cap*100,0)}%まで（上限適用後の予想ボラ<b>${num(B.vol*100,1)}%</b>）。取引は今日の目標と前月末（${fdate(DATA.months[N()-2])}）のブックとの差。対ドルのフォワード。`);
+  $('#ticket').textContent=`KEEL FX FACTORS · ${S.u} · ${S.x==='raw'?'raw':'raw+z'} · ${S.m.toUpperCase()} · vol ${S.vol}% · NAV ${usd(Nv)} · prices ${DATA.spot_asof||DATA.asof}\n`+(lines.length?lines.join('\n'):T('No trades over 0.5% of NAV.','NAVの0.5%を超える取引なし。'));
+}
+function perfChart(){
+  const col=FCOL(),toP=r=>{let v=1;return r.map((x,i)=>x==null?null:{x:dtm(i),y:((v*=1+x)-1)*100}).filter(Boolean)};
+  const S2=[...FAC.map(([f])=>({name:fname(f),color:col[f],pts:toP(R.FR[f]),width:1.3})),{name:fname('all'),color:col.all,pts:toP(R.FR.all),width:2.4}];
+  lineChart($('#pf'),S2,{xType:'date',h:300,yFmt:v=>num(v,0)+'%',tipFmt:v=>pct(v,1)});legend($('#pfLeg'),S2);
+  const pi=DATA.months.findIndex(m=>m.slice(0,7)>PUB),n5=N()-60;
+  let h=`<tr><th></th><th>${T('Return/yr','年率')}</th><th>${T('Vol','ボラ')}</th><th>Sharpe</th><th>${T('Max DD','最大DD')}</th><th>${T('MDD ÷ vol','MDD÷ボラ')}</th><th>${T('Sharpe, last 5Y','Sharpe（直近5年）')}</th><th>${T('Since Aug 2024','2024年8月以降')}</th></tr>`;
+  [...FAC.map(([f])=>f),'all'].forEach(f=>{const a=stats(R.FR[f]),b=stats(R.FR[f],n5),c=stats(R.FR[f],pi);if(!a)return;
+    h+=`<tr${f==='all'?' class="hl"':''}><td><span style="color:${col[f]}">■</span> ${fname(f)}</td><td class="${a.ret<0?'neg':''}">${pc(a.ret)}</td><td>${pc(a.vol).replace('+','')}</td><td><b>${ratio(a.sh)}</b></td><td class="neg">${pc(a.mdd)}</td><td>${num(-a.mdd/a.vol,1)}</td><td>${b?ratio(b.sh):'—'}</td><td>${c&&c.n>=12?ratio(c.sh):'—'}</td></tr>`});
+  $('#pfT').innerHTML=h;
+  const a=stats(R.FR.all),sr=FAC.map(([f])=>stats(R.FR[f])).filter(Boolean),avgSh=mean(sr.map(s=>s.sh));
+  $('#pfSub').innerHTML=T(`Long-short baskets against the dollar, net of trading costs (1bp G10 to 9bp THB one way), rebalanced monthly with weights smoothed over two months, not volatility-scaled. Average single-factor Sharpe <b>${ratio(avgSh)}</b>; all five together <b>${ratio(a&&a.sh)}</b>: the factors are different enough that combining them is the main source of the risk-adjusted return. The method was published in July 2024; later months are out of sample.`,
+    `対ドルのロング・ショート・バスケット。取引コスト（片道：G10は1bp〜THBは9bp）控除後、月次リバランス、ウェイトは2か月で平滑化、ボラ調整なし。単独ファクターの平均Sharpe <b>${ratio(avgSh)}</b>、5つ合計で<b>${ratio(a&&a.sh)}</b>：ファクター同士が十分に異なるため、組み合わせることがリスク調整後リターンの主な源泉。手法は2024年7月に公表、それ以降はアウト・オブ・サンプル。`);
+}
+function correl(){
+  const fs=FAC.map(([f])=>f),n5=N()-60;
+  const pair=(a,b,from)=>{const x=[],y=[];R.FR[a].forEach((v,i)=>{const w=R.FR[b][i];if(i>=from&&v!=null&&w!=null){x.push(v);y.push(w)}});return x.length>24?corr(x,y):NaN};
+  let h=`<table class="hm"><tr><th></th>${fs.map(f=>`<th>${fname(f)}</th>`).join('')}</tr>`;let recent=[],full=[];
+  fs.forEach((a,i)=>{h+=`<tr><th style="text-align:right">${fname(a)}</th>`+fs.map((b,j)=>{if(i===j)return'<td style="background:var(--track)"></td>';const v=i>j?pair(a,b,0):pair(a,b,n5);(i>j?full:recent).push(v);return `<td style="background:${heat(v,.8)}" title="${fname(a)} / ${fname(b)}">${num(v*100,0)}%</td>`}).join('')+'</tr>'});
+  $('#corr').innerHTML=h+'</table>';
+  const mf=mean(full.filter(isFinite)),mr=mean(recent.filter(isFinite));
+  $('#corrSay').innerHTML=T(`Average pairwise correlation <b>${num(mf*100,0)}%</b> over the full sample and <b>${num(mr*100,0)}%</b> in the last five years. ${mr>mf+.1?'Correlations have risen: the factors diversify each other less than they used to.':'Carry and value move together across G10 and EM (both buy cheap, high-yielding EM); quality tends to lean the other way, which is what makes the blend steady.'}`,
+    `ペアごとの平均相関は全期間<b>${num(mf*100,0)}%</b>、直近5年<b>${num(mr*100,0)}%</b>。${mr>mf+.1?'相関が上昇：ファクター間の分散効果が以前より小さい。':'G10＋新興国ではキャリーとバリューは同方向（どちらも割安・高金利の新興国を買う）。クオリティは逆方向に傾きやすく、それが合成を安定させる。'}`);
+}
+function regTable(RG){
+  const n=N(),fs=[...FAC.map(([f])=>f),'all'];
+  const row=(lab,key)=>{const c=fs.map(f=>{const x=[];for(let t=1;t<n;t++)if(lab[t-1]===key&&R.FR[f][t]!=null)x.push(R.FR[f][t]);return x.length>=12?mean(x)*12:null});
+    const cnt=lab.filter(v=>v===key).length;return {c,cnt}};
+  let h=`<tr><th>${T('Regime (US)','レジーム（米国）')}</th><th>${T('Months','月数')}</th>${fs.map(f=>`<th>${fname(f)}</th>`).join('')}</tr>`;
+  [['mac',['exp','slow','down','rec']],['inf',['rh','fh','rl','fl']]].forEach(([k,keys])=>{keys.forEach(key=>{const {c,cnt}=row(RG[k],key);const now=RG[k][n-1]===key;
+    h+=`<tr${now?' class="hl"':''}><td>${now?'<b>':''}${rgn(key)}${now?' ●</b>':''}</td><td>${cnt}</td>${c.map(v=>`<td class="${v==null?'':v<0?'neg':'pos'}">${v==null?'—':pc(v)}</td>`).join('')}</tr>`})});
+  $('#rg').innerHTML=h;
+  $('#rgSub').innerHTML=T('Average return a year of each factor in the month after each US regime (● = now). Carry, value and reversals are pro-cyclical; momentum and quality tend to hold up in slowdowns and downturns.','各レジームの翌月における各ファクターの年率平均リターン（●＝現在）。キャリー・バリュー・リバーサルは景気順応的、モメンタムとクオリティは減速・後退局面で持ちこたえやすい。');
+}
+function disp(){
+  const n=N(),col=FCOL(),g4=['USD','EUR','JPY','GBP'],rd=[],vd=[],ec=[];
+  for(let t=0;t<n;t++){const r=g4.map(c=>g(DATA.rate,c,t)).filter(v=>v!=null);if(r.length===4)rd.push({x:dtm(t),y:Math.max(...r)-Math.min(...r)});
+    const v=g4.map(c=>c==='USD'?0:R.P.V.ppp[c]&&R.P.V.ppp[c][t]).filter(v=>v!=null&&isFinite(v));if(v.length===4)vd.push({x:dtm(t),y:(Math.max(...v)-Math.min(...v))*100});
+    const w=R.FW.carry[t];if(w){const x=Object.entries(w).reduce((s,[c,a])=>s+a*((g(DATA.rate,c,t)??0)-(g(DATA.rate,'USD',t)??0)),0);ec.push({x:dtm(t),y:x})}}
+  const S2=[{name:T('G4 3M rate dispersion, %','G4の3か月金利差（%）'),color:col.carry,pts:rd},{name:T('G4 valuation dispersion, % (PPP)','G4のバリュエーション差（%、PPP）'),color:col.value,pts:vd.map(p=>({x:p.x,y:p.y/10})),dash:1}];
+  lineChart($('#ds'),S2,{xType:'date',h:240,yFmt:v=>num(v,1),tipFmt:v=>num(v,2)});legend($('#dsLeg'),S2);
+  $('#dsSub').innerHTML=T('Highest minus lowest 3-month rate among USD, EUR, JPY, GBP, and the spread between the cheapest and dearest of them on PPP (scaled ÷10). Wide dispersion means more for carry and value to earn, and more risk when it closes.','USD・EUR・JPY・GBPの3か月金利の最大−最小と、PPPで最も割安と割高の差（÷10で表示）。ばらつきが大きいほどキャリーとバリューの収益機会は大きく、縮小時のリスクも大きい。');
+  lineChart($('#ec'),[{name:T('Ex-ante carry','事前キャリー'),color:col.carry,pts:ec,area:1}],{xType:'date',h:240,yFmt:v=>num(v,0)+'%',tipFmt:v=>num(v,2)+'%'});
+  const last=ec.length?ec[ec.length-1].y:NaN,pr=ec.filter(p=>p.y<=last).length/Math.max(1,ec.length);
+  $('#ecSub').innerHTML=T(`The interest-rate gap a year the carry factor earns before currency moves: <b>${num(last,1)}%</b> today, higher than ${num(pr*100,0)}% of history. Forward returns of carry rise with ex-ante carry up to about 10–12%; beyond that, extra carry has not bought extra return.`,
+    `キャリー・ファクターが為替変動前に得る年率の金利差：現在<b>${num(last,1)}%</b>、過去の${num(pr*100,0)}%より高い水準。キャリー戦略の将来リターンは事前キャリー10〜12%程度までは比例して上昇するが、それを超えても追加のリターンは得られていない。`);
+}
+function indTable(){
+  let h=`<tr><th>${T('Signal','シグナル')}</th><th>${T('Factor','ファクター')}</th><th>${T('Sharpe, raw','Sharpe（生）')}</th><th>${T('Z-score','Zスコア')}</th><th>${T('Raw + z','生＋Z')}</th><th>${T('Last 5Y','直近5年')}</th><th>${T('Long now','現在ロング')}</th><th>${T('Short now','現在ショート')}</th></tr>`;
+  const n5=N()-60,col=FCOL();
+  FAC.forEach(([f])=>IND.filter(i=>i.f===f).forEach(i=>{const a=stats(R.IR[i.k].raw),z=stats(R.IR[i.k].z),b=stats(R.IR[i.k].both),r=stats(R.IR[i.k][S.x==='raw'?'raw':'both'],n5);const w=R.IW[i.k][N()-1]||{};
+    const L=Object.keys(w).filter(c=>w[c]>.01).join(' '),Sh=Object.keys(w).filter(c=>w[c]<-.01).join(' ');
+    const cl=s=>s==null?'':s.sh<0?'neg':s.sh>.4?'pos':'';
+    h+=`<tr><td>${esc(iname(i))}</td><td><span style="color:${col[f]}">■</span> ${fname(f)}</td><td class="${cl(a)}">${a?ratio(a.sh):'—'}</td><td class="${cl(z)}">${z?ratio(z.sh):'—'}</td><td class="${cl(b)}">${b?ratio(b.sh):'—'}</td><td class="${cl(r)}">${r?ratio(r.sh):'—'}</td><td style="text-align:left">${L||'—'}</td><td style="text-align:left">${Sh||'—'}</td></tr>`}));
+  $('#inT').innerHTML=h;
+  $('#inSub').innerHTML=T(`Each signal on its own: long the top ${R.K}, short the bottom ${R.K}, net of costs. The z-score version ranks each currency against its own history (expanding window, 36 months minimum) rather than against the others; it is less correlated with the raw signal, so adding it is a cheap source of diversification. Volatility-risk-premium signals need option prices and are left out.`,
+    `シグナル単独：上位${R.K}をロング、下位${R.K}をショート、コスト控除後。Zスコア版は他通貨とではなく自身の過去（拡大ウィンドウ、最低36か月）と比べて順位付け。生のシグナルとの相関が低く、加えることで安価に分散できる。ボラティリティ・リスク・プレミアムはオプション価格が必要なため除外。`);
+}
+function detail(){
+  const c=R.U.includes(S.pick)&&S.pick!=='USD'?S.pick:R.U.find(x=>x!=='USD');S.pick=c;
+  $('#dtPick').innerHTML=R.U.filter(x=>x!=='USD').map(x=>`<button class="chip ${x===c?'on':''}" data-c="${x}">${x}</button>`).join('');
+  $$('#dtPick button').forEach(b=>b.onclick=()=>{S.pick=b.dataset.c;save();detail()});
+  $('#dtH').textContent=T(`${c}: how its scores have moved`,`${c}：スコアの推移`);
+  const n=N(),col=FCOL(),U=R.U,K=R.K,from=Math.max(0,n-60);
+  /* rank history per factor (needs per-month scores: recompute cheaply on the last 60 months) */
+  const srcs=S.x==='raw'?['V']:['V','Z'];const hist={};FAC.forEach(([f])=>hist[f]=[]);
+  for(let t=from;t<n;t++){FAC.forEach(([f])=>{const rs=[];IND.filter(i=>i.f===f).forEach(i=>srcs.forEach(s=>{const src=s==='V'?R.P.V[i.k]:R.P.Z[i.k];const a=U.map(x=>[x,g(src,x,t)]).filter(([,v])=>v!=null&&isFinite(v)).sort((x,y)=>y[1]-x[1]);if(a.length<2*K+1)return;const k=a.findIndex(([x])=>x===c);if(k>=0)rs.push(k+1)}));hist[f].push(rs.length?{x:dtm(t),y:mean(rs)}:null)})}
+  const S2=FAC.map(([f])=>({name:fname(f),color:col[f],pts:hist[f].filter(Boolean)}));
+  lineChart($('#dtRank'),S2,{xType:'date',h:220,yFmt:v=>num(v,0),tipFmt:v=>num(v,1)});legend($('#dtLeg'),S2);
+  $('#dtSub').textContent=T(`Average rank on each factor over the last five years (1 = best to buy). Signal values today against their own history:`,`直近5年の各ファクターの平均順位（1＝最も買い）。今日のシグナル値と自身の過去との比較：`);
+  let h=`<tr><th>${T('Signal','シグナル')}</th><th>${T('Today','現在')}</th><th>${T('Z vs own history','自身の過去比Z')}</th><th>${T('Rank','順位')}</th></tr>`;
+  IND.forEach(i=>{const v=g(R.P.V[i.k],c,n-1),z=g(R.P.Z[i.k],c,n-1);if(v==null)return;const a=U.map(x=>[x,g(R.P.V[i.k],x,n-1)]).filter(([,y])=>y!=null&&isFinite(y)).sort((x,y)=>y[1]-x[1]);const k=a.findIndex(([x])=>x===c);
+    const fmt=['carry','y10'].includes(i.k)?num(v,2)+'%':['c2v','m1','m3','m6','m12','cci','cli'].includes(i.k)?num(v,2):pct(v*100,1);
+    h+=`<tr><td>${esc(iname(i))}</td><td>${fmt}</td><td style="background:${heat(z,2)}">${z==null?'—':num(z,1)}</td><td>${k>=0?(k+1)+' / '+a.length:'—'}</td></tr>`});
+  $('#dtT').innerHTML=h;
+}
+function method(){
+  const miss=(DATA.errors||[]);const bis=Object.entries(DATA.rate_src||{}).filter(([,v])=>v&&v!=='oecd').map(([c])=>c);
+  $('#method').innerHTML=T(`<b>Method.</b> ${DATA.ccys.length} currencies against the dollar, month-end data, the last month being today’s close. Each signal ranks the currencies; a basket buys the top ${R.K} and sells the bottom ${R.K} in equal amounts through one-month forwards (return = spot move + 3-month rate gap), held for the month, weights averaged with the previous month, net of one-way costs from 1bp (G10) to 9bp (THB). A factor is the average of its signals’ baskets; the model is the average of the five factors (or inverse 3-year volatility for risk parity). Carry: 3-month rate gap, gap ÷ 12-month volatility, 10-year yield. Value: real exchange rate (spot adjusted by relative CPI, two-month lag) against its long-run average; spot against its 5-year average. Momentum: 1 to 12-month risk-adjusted returns; local equity index returns. Reversals: last month’s move and the 1-year average (buy what fell), acceleration (sell what is speeding up), realised volatility as a stand-in for implied. Quality: consumer confidence z-score, change in the OECD leading indicator (two-month lag). Z-score variants compare each currency with its own history. Regimes: US OECD leading indicator level (100) and direction; US CPI against 2% and its 1-year average. Sources: Yahoo, OECD${bis.length?', BIS policy rates for '+esc(bis.join(', ')):''}. Data to ${fdate(DATA.spot_asof||DATA.asof)}${miss.length?'; missing: '+esc(miss.join('; ')):''}. A back-test on free public data describes the past; not a forecast or advice.`,
+    `<b>算出方法。</b>対ドルの${DATA.ccys.length}通貨、月末データ（最終月は今日の終値）。各シグナルで通貨を順位付けし、上位${R.K}を買い下位${R.K}を売る等金額バスケットを1か月フォワードで保有（リターン＝為替変動＋3か月金利差）。ウェイトは前月と平均し、片道コスト（G10は1bp〜THBは9bp）を控除。ファクターはシグナルのバスケットの平均、モデルは5ファクターの平均（リスク均等は3年ボラの逆数）。キャリー：3か月金利差、金利差÷12か月ボラ、10年金利。バリュー：相対CPIで調整した実質為替レート（2か月遅れ）の長期平均からの乖離、5年平均からの乖離。モメンタム：1〜12か月のリスク調整後リターン、自国株価指数のリターン。リバーサル：前月の値動きと1年平均（下げた通貨を買う）、加速度（加速している通貨を売る）、インプライドの代替として実現ボラ。クオリティ：消費者信頼感のZスコア、OECD景気先行指数の変化（2か月遅れ）。Zスコア版は各通貨を自身の過去と比較。レジーム：米国OECD先行指数の水準（100）と方向、米CPIと2%・1年平均。出所：Yahoo、OECD${bis.length?'、BIS政策金利（'+esc(bis.join('、'))+'）':''}。データは${fdate(DATA.spot_asof||DATA.asof)}まで${miss.length?'。欠損：'+esc(miss.join('; ')):''}。無料の公開データによるバックテストは過去の記述であり、予測や助言ではありません。`);
+}
+window.redraw=render;
+
+/* ---------------- wiring ---------------- */
+function sync(){[['#uSeg',S.u],['#xSeg',S.x],['#mSeg',S.m],['#vSeg',String(S.vol)]].forEach(([id,v])=>$$(id+' button').forEach(b=>b.classList.toggle('on',b.dataset.v===v)));$('#nav').value=num(S.nav,0)}
+async function load(fresh){
+  setStatus('busy');
+  const r=await keel('api_fxfactors',{years:24},{fresh});
+  if(r.ok&&r.data&&r.data.spot&&r.data.months){DATA=r.data;LIVE=true;setStatus('live')}
+  else{DATA=SAMPLE;LIVE=false;setStatus(r.code==='no_mcp'?'sample':'err',r.code,r.message)}
+  sync();render();
+}
+const SAMPLE=/*SAMPLE*/;
+$('#how').innerHTML=howHtml();
+$$('#uSeg button').forEach(b=>b.onclick=()=>{S.u=b.dataset.v;save();sync();render()});
+$$('#xSeg button').forEach(b=>b.onclick=()=>{S.x=b.dataset.v;save();sync();render()});
+$$('#mSeg button').forEach(b=>b.onclick=()=>{S.m=b.dataset.v;save();sync();render()});
+$$('#vSeg button').forEach(b=>b.onclick=()=>{S.vol=+b.dataset.v;save();sync();render()});
+$('#nav').onchange=e=>{const v=+String(e.target.value).replace(/[^\d.]/g,'');S.nav=v>0?v:100e6;save();sync();render()};
+$('#copy').onclick=async()=>{try{await navigator.clipboard.writeText($('#ticket').textContent);$('#copy').textContent=T('Copied','コピーしました')}catch(e){const s=getSelection(),g2=document.createRange();g2.selectNodeContents($('#ticket'));s.removeAllRanges();s.addRange(g2);$('#copy').textContent=T('Selected: copy it','選択済み：コピーしてください')}setTimeout(()=>$('#copy').textContent=T('Copy ticket','チケットをコピー'),2000)};
+$$('#langSeg button').forEach(b=>b.onclick=()=>{setLang(b.dataset.l);$('#how').innerHTML=howHtml();restatus();render()});
+$('#refresh').onclick=()=>load(true);
+setLang(LANG);sync();load(false);
+</script>
