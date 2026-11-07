@@ -764,6 +764,105 @@ def fx_carry(years: int = Query(22, ge=5, le=25)):
 
 
 # --------------------------------------------------------------------------- #
+# Rates carry: receive the 10-year, pay the 3-month, per currency
+# --------------------------------------------------------------------------- #
+
+# Currency -> (OECD area for the 3-month rate, OECD area for the 10-year yield, BIS area for a policy-rate proxy)
+RATES_CARRY = {
+    "USD": ("USA", "USA", "US"), "EUR": ("EA20", "DEU", "XM"), "JPY": ("JPN", "JPN", "JP"),
+    "GBP": ("GBR", "GBR", "GB"), "CHF": ("CHE", "CHE", "CH"), "CAD": ("CAN", "CAN", "CA"),
+    "AUD": ("AUS", "AUS", "AU"), "SEK": ("SWE", "SWE", "SE"), "NOK": ("NOR", "NOR", "NO"),
+    "NZD": ("NZL", "NZL", "NZ"), "PLN": ("POL", "POL", "PL"), "HUF": ("HUN", "HUN", "HU"),
+    "CZK": ("CZE", "CZE", "CZ"), "MXN": ("MEX", "MEX", "MX"), "ZAR": ("ZAF", "ZAF", "ZA"),
+}
+RATES_GROUPS = {"G5": ["USD", "EUR", "JPY", "GBP", "CHF"],
+                "G10": ["USD", "EUR", "JPY", "GBP", "CHF", "CAD", "AUD", "SEK", "NOK", "NZD"],
+                "EM": ["PLN", "HUF", "CZK", "MXN", "ZAR"]}
+
+
+def _trend_filter(y: pd.Series, trend: int = 160, avg: int = 5) -> pd.DataFrame:
+    """Daily 10-year yield against its moving average: 'gap' = average of the last `avg` days
+    minus the `trend`-day average, in bp. A positive gap means yields are trending up."""
+    y = y.dropna()
+    gap = (y.rolling(avg).mean() - y.rolling(trend).mean()) * 100
+    return pd.DataFrame({"y": y, "ma": y.rolling(trend).mean(), "gap": gap}).dropna()
+
+
+@app.get("/api/ratescarry", operation_id="rates_carry_data", dependencies=[Depends(check_token)])
+def rates_carry(years: int = Query(25, ge=5, le=35)):
+    """Month-end 3-month rates and 10-year government yields (% p.a.) for G10 and main EM currencies,
+    for rates carry strategies (receive the 10-year, pay the 3-month, FX hedged). Also the US 10-year
+    trend filter: the 5-day average yield minus its 160-day average, in bp, at each month end and today.
+
+    Sources: OECD 3-month interbank (BIS policy rate as a proxy where missing or stale) and OECD
+    long-term interest rates (10-year government bonds; EUR uses Germany). US filter: Fed H.15 daily."""
+    start = f"{date.today().year - years}-01"
+    errors: list[str] = []
+    s_areas = tuple(sorted({a for a, _, _ in RATES_CARRY.values()} | {FX_EURO_ALT[0]}))
+    l_areas = tuple(sorted({b for _, b, _ in RATES_CARRY.values()}))
+    b_areas = tuple(sorted({c for _, _, c in RATES_CARRY.values()}))
+    def safe(fn, *a):
+        try:
+            return fn(*a)
+        except Exception as e:  # noqa: BLE001
+            errors.append(f"{fn.__name__}: {e}")
+            return pd.DataFrame()
+    st3, lt, bis = safe(D.oecd_3m_rates, s_areas, start), safe(D.oecd_lt_rates, l_areas, start), safe(D.bis_policy_rates, b_areas, start)
+    if lt.empty:
+        raise HTTPException(503, "OECD long-term rates did not answer; try again in a minute")
+    stale = pd.Timestamp(date.today()) - pd.DateOffset(months=4)
+    short, long_, src, asof = {}, {}, {}, {}
+    for c, (sa, la, ba) in RATES_CARRY.items():
+        o = st3[sa].dropna() if sa in st3 and st3[sa].notna().any() else (
+            st3[FX_EURO_ALT[0]].dropna() if c == "EUR" and FX_EURO_ALT[0] in st3 else None)
+        b = bis[ba].dropna() if ba in bis and bis[ba].notna().any() else None
+        if o is not None and len(o) and b is not None and o.index[-1] < stale:
+            r, how = pd.concat([o, b[b.index > o.index[-1]]]).sort_index(), "oecd+bis"
+        elif o is not None and len(o):
+            r, how = o, "oecd"
+        elif b is not None:
+            r, how = b, "bis"
+        else:
+            r, how = None, None
+        y = lt[la].dropna() if la in lt and lt[la].notna().any() else None
+        if r is None or y is None:
+            errors.append(f"{c}: {'3M' if r is None else '10Y'} rate missing")
+            continue
+        short[c], long_[c], src[c] = r, y, how
+        asof[c] = str(min(r.index[-1], y.index[-1]).date())
+    if not long_:
+        raise HTTPException(503, "No rates came back; try again in a minute")
+    end = max(s.index[-1] for s in long_.values())
+    grid = pd.date_range(pd.Timestamp(start + "-01") + pd.offsets.MonthEnd(0), end, freq="ME")
+
+    def aligned(s, ffill):
+        x = s.reindex(s.index.union(grid)).sort_index()
+        x = x.ffill(limit=ffill) if ffill else x
+        return [None if pd.isna(v) else round(float(v), 4) for v in x.reindex(grid).values]
+
+    filt, today = None, None
+    try:
+        f = _trend_filter(_yield_series("UST10Y", years + 1))
+        fm = f["gap"].resample("ME").last()
+        filt = aligned(fm, 0)
+        last = f.iloc[-1]
+        today = {"date": str(f.index[-1].date()), "y10": round(float(last.y), 3), "ma160": round(float(last.ma), 3),
+                 "gap_bp": round(float(last.gap), 1),
+                 "recent": [{"d": str(i.date()), "y": round(float(r.y), 3), "ma": round(float(r.ma), 3)}
+                            for i, r in f.iloc[-260:].iterrows()]}
+    except Exception as e:  # noqa: BLE001
+        errors.append(f"US 10Y trend filter: {e}")
+    return _safe({
+        "asof": str(grid[-1].date()), "months": [str(d.date()) for d in grid],
+        "ccys": [c for c in RATES_CARRY if c in long_], "groups": RATES_GROUPS,
+        "short": {c: aligned(s, 3) for c, s in short.items()}, "long": {c: aligned(s, 1) for c, s in long_.items()},
+        "short_src": src, "asof_by_ccy": asof, "usd_filter_gap_bp": filt, "usd_filter_today": today, "errors": errors,
+        "note": "3M: OECD 3-month interbank (bis = BIS policy rate proxy). 10Y: OECD long-term government bond yields, "
+                "monthly averages (EUR = Germany). Filter: Fed H.15 daily 10-year; gap = 5-day average minus 160-day average, bp.",
+    })
+
+
+# --------------------------------------------------------------------------- #
 # Macro regimes (growth x inflation)
 # --------------------------------------------------------------------------- #
 

@@ -650,3 +650,22 @@ def test_cache_is_bounded(monkeypatch):
         f(i)
     assert len(D._cache) == 5
     assert ("f", (11,), ()) in D._cache and ("f", (0,), ()) not in D._cache
+
+
+def test_ratescarry(client, monkeypatch):
+    idx = pd.date_range("2005-01-31", "2026-09-30", freq="ME")
+    lt = pd.DataFrame({b: np.linspace(4.0, 3.0, len(idx)) + i * 0.1 for i, (_, b, _) in enumerate(M.RATES_CARRY.values())}, index=idx)
+    st = pd.DataFrame({a: np.linspace(3.0, 1.0, len(idx)) for a, _, _ in M.RATES_CARRY.values()}, index=idx)
+    monkeypatch.setattr(D, "oecd_lt_rates", lambda areas, start="2000-01": lt)
+    monkeypatch.setattr(D, "oecd_3m_rates", lambda areas, start="2000-01": st)
+    monkeypatch.setattr(D, "bis_policy_rates", lambda areas, start="2000-01": pd.DataFrame())
+    j = client.get("/api/ratescarry", params={"years": 20}).json()
+    assert "USD" in j["ccys"] and "EUR" in j["ccys"] and len(j["months"]) == len(j["long"]["USD"])
+    assert j["long"]["USD"][-1] > j["short"]["USD"][-1]
+    assert j["usd_filter_today"] is not None and "gap_bp" in j["usd_filter_today"]
+
+
+def test_trend_filter_sign():
+    up = pd.Series(np.linspace(3, 5, 400), index=pd.bdate_range("2024-01-01", periods=400))
+    f = M._trend_filter(up)
+    assert (f["gap"] > 0).all()

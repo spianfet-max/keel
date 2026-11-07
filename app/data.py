@@ -761,6 +761,8 @@ OECD_FINMARK_URLS = (
     "https://sdmx.oecd.org/public/rest/data/OECD.SDD.STES,DSD_STES@DF_FINMARK,4.0/"
     "{areas}.M.IR3TIB......?startPeriod={start}&dimensionAtObservation=AllDimensions",
 )
+# Same dataflow, IRLT = long-term (10-year government bond) interest rate, % p.a., monthly.
+OECD_FINMARK_LT_URLS = tuple(u.replace("IR3TIB", "IRLT") for u in OECD_FINMARK_URLS)
 # BIS central-bank policy rates: a proxy where the OECD has no 3-month rate.
 BIS_CBPOL_URLS = (
     "https://stats.bis.org/api/v1/data/BIS,WS_CBPOL,1.0/M.{areas}/all?startPeriod={start}&format=csv",
@@ -768,7 +770,7 @@ BIS_CBPOL_URLS = (
 )
 
 
-def _parse_rate_csv(text: str, area_col_hint: str = "REF_AREA") -> pd.DataFrame:
+def _parse_rate_csv(text: str, area_col_hint: str = "REF_AREA", measure: str = "IR3TIB") -> pd.DataFrame:
     """SDMX-CSV (OECD or BIS) -> month-end rates in %, one column per area code."""
     df = pd.read_csv(io.StringIO(text))
     cols = {c.split(":")[0].strip(): c for c in df.columns}
@@ -777,7 +779,7 @@ def _parse_rate_csv(text: str, area_col_hint: str = "REF_AREA") -> pd.DataFrame:
     if not (t and v and a):
         return pd.DataFrame()
     if "MEASURE" in cols:
-        df = df[df[cols["MEASURE"]].astype(str).str.split(":").str[0].str.strip() == "IR3TIB"]
+        df = df[df[cols["MEASURE"]].astype(str).str.split(":").str[0].str.strip() == measure]
     if "FREQ" in cols:
         df = df[df[cols["FREQ"]].astype(str).str.split(":").str[0].str.strip() == "M"]
     df = df[[a, t, v]].dropna()
@@ -819,6 +821,13 @@ def oecd_3m_rates(areas: tuple[str, ...], start: str = "2000-01") -> pd.DataFram
     """Monthly 3-month interbank rates (% p.a.) from the OECD, ISO3 area codes (euro area = EA20)."""
     t = _get_csv(OECD_FINMARK_URLS, areas, start, "application/vnd.sdmx.data+csv; charset=utf-8")
     return _parse_rate_csv(t) if t else pd.DataFrame()
+
+
+@cached(ttl=12 * 3600)
+def oecd_lt_rates(areas: tuple[str, ...], start: str = "2000-01") -> pd.DataFrame:
+    """Monthly long-term (10-year government bond) yields (% p.a.) from the OECD, ISO3 area codes."""
+    t = _get_csv(OECD_FINMARK_LT_URLS, areas, start, "application/vnd.sdmx.data+csv; charset=utf-8")
+    return _parse_rate_csv(t, measure="IRLT") if t else pd.DataFrame()
 
 
 @cached(ttl=12 * 3600)
