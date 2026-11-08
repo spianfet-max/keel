@@ -1,0 +1,349 @@
+<title>Dimensions</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@300;400;500;600&family=Noto+Sans+JP:wght@300;400&display=swap">
+<style>
+/*CORE_CSS*/
+/* Dimensions: how many independent drivers of risk a universe or a portfolio really has, and what adds the most.
+   Red marks the answer (the portfolio or candidate you would pick); steel the comparison. */
+.app{padding-left:max(20px,env(safe-area-inset-left,0px));padding-right:max(20px,env(safe-area-inset-right,0px))}
+@media (max-width:480px){.app{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}}
+.views{display:flex;margin-top:14px;border-bottom:1px solid var(--line);overflow-x:auto}
+.views button{border:0;border-bottom:2px solid transparent;background:none;color:var(--mute);padding:10px 0 9px;margin-right:22px;font-size:15px;min-height:40px;white-space:nowrap}
+.views button.on{color:var(--ink);border-bottom-color:var(--red)}
+.ctl{display:flex;flex-direction:column;gap:5px;min-width:0}
+.verdict{font-size:17px;line-height:1.55;max-width:80ch;margin:0;text-wrap:pretty}
+.verdict b{font-weight:500}.verdict .r{color:var(--red)}.verdict .s{color:var(--steel)}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{border:1px solid var(--line);background:var(--card);padding:4px 10px;font-size:12.5px;min-height:30px;color:var(--mute)}
+.chip.on{border-color:var(--ink);color:var(--ink);background:var(--sel)}
+.chip.st{border-style:dashed}
+.grp{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--mute);margin:10px 0 5px}
+table.mt{font-size:13px}table.mt td,table.mt th{padding:6px 7px;text-align:right;white-space:nowrap}
+table.mt td:first-child,table.mt th:first-child{text-align:left}
+table.mt td.neg{color:var(--neg)}table.mt td.pos{color:var(--pos)}
+table.mt tr.hl td{background:var(--sel)}
+.hm{border-collapse:separate;border-spacing:2px;width:auto;font-size:11.5px}
+.hm th{border:0;padding:2px 4px;font-size:11px;font-weight:400;color:var(--mute)}
+.hm td{border:0;min-width:34px;height:26px;text-align:center;font-variant-numeric:tabular-nums}
+.bar1{display:inline-block;height:9px;background:var(--steel);vertical-align:middle}
+.bar1.r{background:var(--red)}
+.wbars{display:flex;height:12px;width:160px;vertical-align:middle}
+.wbars i{display:block;height:100%}
+input.w{width:64px;text-align:right;font-variant-numeric:tabular-nums}
+.stat{font-size:12.5px;line-height:1.5;color:var(--mute);margin-top:8px;max-width:78ch}.stat b{color:var(--ink);font-weight:500}
+.say{font-size:14px;line-height:1.55;max-width:80ch;margin:12px 0 0}
+.big{font-size:44px;font-weight:300;line-height:1}
+.minor{font-size:12px;color:var(--mute)}
+</style>
+
+<div class="app">
+  <header class="top">
+    <div class="brand"><h1 data-ja="ディメンション">Dimensions</h1><span data-ja="分散の数え方：ユニバースとポートフォリオに独立したリスク要因が実際にいくつあるか、そして何を加えると最も増えるか">Counting diversification: how many independent drivers of risk a universe or a portfolio really has, and what adds the most</span></div>
+    <div class="tright">
+      <span class="pill busy" id="status"><i></i></span>
+      <button class="btn q" id="refresh" data-ja="更新">Refresh</button>
+      <button class="btn q" id="themeBtn">Dark</button>
+      <div class="seg" id="langSeg"><button data-l="en">EN</button><button data-l="ja">日本語</button></div>
+    </div>
+  </header>
+  <div class="banner" id="banner" hidden></div>
+  <div class="help" id="how" hidden></div>
+  <div class="bar">
+    <div class="ctl"><span class="lbl" data-ja="推定期間">Window</span><div class="seg" id="wSeg"><button data-v="36" data-ja="3年">3Y</button><button data-v="60" data-ja="5年">5Y</button><button data-v="120" data-ja="10年">10Y</button><button data-v="0" data-ja="全期間">Full</button></div></div>
+  </div>
+  <nav class="views" id="tabs"><button data-v="port" data-ja="ポートフォリオ">Portfolio</button><button data-v="add" data-ja="何を加えるか">What to add</button><button data-v="univ" data-ja="ユニバース">Universe</button></nav>
+
+  <!-- PORTFOLIO -->
+  <div id="v-port">
+    <section class="sec"><p class="verdict" id="pVerdict"></p></section>
+    <section class="sec two">
+      <div style="min-width:0">
+        <div class="sh"><h2 data-ja="ウェイト">Weights</h2><p data-ja="プリセットを選ぶか、ウェイトを直接入力（%、合計は自動で100に）。">Pick a preset or type weights (%, rescaled to 100).</p></div>
+        <div class="chips" id="presets"></div>
+        <div class="tw" style="margin-top:10px"><table class="mt" id="wT"></table></div>
+        <div style="margin-top:8px"><select id="addSel" aria-label="Add an asset"></select></div>
+      </div>
+      <div style="min-width:0">
+        <div class="sh"><h2 data-ja="実質的なリスク要因の数">Effective number of independent drivers</h2><p id="epdSub"></p></div>
+        <div class="big" id="epdBig"></div>
+        <div class="minor" id="epdMinor"></div>
+        <svg class="ch" id="dovC" height="220" style="margin-top:12px"></svg>
+      </div>
+    </section>
+    <section class="sec">
+      <div class="sh"><h2 data-ja="配分方法の比較">Allocation methods compared</h2><p id="mSub"></p></div>
+      <div class="tw"><table class="mt" id="mT"></table></div>
+      <div class="leg" id="mLeg"></div>
+      <p class="say" id="mSay"></p>
+    </section>
+    <section class="sec two even">
+      <div style="min-width:0">
+        <div class="sh"><h2 data-ja="重複問題：リスクパリティの弱点">The duplication problem</h2><p id="dupSub"></p></div>
+        <div class="tw"><table class="mt" id="dupT"></table></div>
+      </div>
+      <div style="min-width:0">
+        <div class="sh"><h2 data-ja="相関">Correlations</h2><p id="cSub"></p></div>
+        <div class="tw" id="corr"></div>
+      </div>
+    </section>
+  </div>
+
+  <!-- ADD -->
+  <div id="v-add" hidden>
+    <section class="sec"><p class="verdict" id="aVerdict"></p></section>
+    <section class="sec">
+      <div class="sh"><h2 data-ja="候補ごとの効果">What each candidate adds</h2><p id="aSub"></p></div>
+      <div class="bar" style="border:0;padding-top:0">
+        <div class="ctl"><span class="lbl" data-ja="追加の大きさ">Size of the addition</span><div class="seg" id="awSeg"><button data-v="5">5%</button><button data-v="10">10%</button><button data-v="20">20%</button></div></div>
+        <div class="ctl"><span class="lbl" data-ja="基準">Measured as</span><div class="seg" id="amSeg"><button data-v="risk" data-ja="リスク">Risk</button><button data-v="cap" data-ja="資金">Capital</button></div></div>
+      </div>
+      <div class="tw"><table class="mt" id="aT"></table></div>
+    </section>
+    <section class="sec">
+      <div class="sh"><h2 data-ja="時間を通じた効果">Does it hold over time?</h2><p id="arSub"></p></div>
+      <div class="chips" id="arPick"></div>
+      <svg class="ch" id="arC" height="260" style="margin-top:10px"></svg><div class="leg" id="arLeg"></div>
+    </section>
+  </div>
+
+  <!-- UNIVERSE -->
+  <div id="v-univ" hidden>
+    <section class="sec"><p class="verdict" id="uVerdict"></p></section>
+    <section class="sec two">
+      <div style="min-width:0">
+        <div class="sh"><h2 data-ja="ユニバース（クリックで出し入れ）">The universe (click to add or remove)</h2><p data-ja="点線は体系的戦略。">Dashed chips are systematic strategies.</p></div>
+        <div id="uPick"></div>
+        <div class="tw" style="margin-top:14px"><table class="mt" id="uT"></table></div>
+      </div>
+      <div style="min-width:0">
+        <div class="sh"><h2 data-ja="ユニバースの次元">Dimensions of the universe</h2><p id="uSub"></p></div>
+        <div class="big" id="uBig"></div><div class="minor" id="uMinor"></div>
+        <svg class="ch" id="eigC" height="200" style="margin-top:12px"></svg>
+      </div>
+    </section>
+    <section class="sec">
+      <div class="sh"><h2 data-ja="次元の推移（3年ローリング）">Dimensions through time (rolling 3 years)</h2><p id="urSub"></p></div>
+      <svg class="ch" id="urC" height="260"></svg><div class="leg" id="urLeg"></div>
+    </section>
+  </div>
+  <p class="note" id="method"></p>
+</div>
+
+<script>
+/*CORE_JS*/
+let DATA=null,LIVE=false;
+const PRESETS={
+  '6040':{en:'60/40',ja:'60/40',w:{SPY:60,IEF:40}},
+  'glob':{en:'Global 60/40',ja:'グローバル60/40',w:{SPY:35,EFA:15,EEM:10,IEF:25,LQD:15}},
+  'pb':{en:'Typical PB book',ja:'典型的なPBポートフォリオ',w:{SPY:30,EFA:10,EWJ:10,IEF:15,LQD:15,HYG:5,GLD:5,EMB:10}},
+  'aw':{en:'All weather',ja:'オールウェザー',w:{SPY:30,TLT:40,IEF:15,GLD:7.5,DBC:7.5}},
+  'alt':{en:'60/40 + strategies',ja:'60/40＋戦略',w:{SPY:40,IEF:30,GLD:5,TREND:10,FXCARRY:5,RATESCARRY:5,SHORTVOL:5}},
+};
+let S={tab:'port',win:60,preset:'pb',w:null,aw:10,am:'risk',univ:['SPY','EEM','IEF','LQD','GLD','DBC'],ar:null};
+try{Object.assign(S,JSON.parse(localStorage.getItem('keel-dimensions')||'{}'))}catch(e){}
+const save=()=>{try{localStorage.setItem('keel-dimensions',JSON.stringify(S))}catch(e){}};
+if(!S.w)S.w={...PRESETS[S.preset].w};
+const nm=k=>DATA.series[k]?DATA.series[k].name:k;
+const mean=a=>a.reduce((s,x)=>s+x,0)/(a.length||1);
+const pc=(v,d=1)=>v==null||!isFinite(v)?'—':pct(v*100,d);
+const vf=(v,d=1)=>v==null||!isFinite(v)?'—':num(v*100,d)+'%';
+const heat=(v,scale)=>{if(v==null||!isFinite(v))return'transparent';const a=Math.min(1,Math.abs(v)/scale)*.55+.04;return v>=0?`color-mix(in srgb, var(--neg) ${(a*100).toFixed(0)}%, transparent)`:`color-mix(in srgb, var(--steel) ${(a*100).toFixed(0)}%, transparent)`};
+const PAL=()=>['--a1','--a2','--a3','--a7','--a8','--a6','--a5','--a4','--gold','--pos'].map(cssv);
+
+/* ---------------- maths ---------------- */
+function rows(keys,win,end){ /* complete monthly rows for these keys in the window ending at index end (inclusive) */
+  const n=DATA.months.length,e=end==null?n-1:end,s=win?Math.max(0,e-win+1):0,out=[];
+  for(let t=s;t<=e;t++){const r=keys.map(k=>DATA.series[k]?DATA.series[k].vals[t]:null);if(r.every(v=>v!=null&&isFinite(v)))out.push(r)}return out}
+function covm(R){const n=R[0].length,T=R.length,m=Array(n).fill(0);R.forEach(r=>r.forEach((v,i)=>m[i]+=v/T));
+  const C=[...Array(n)].map(()=>Array(n).fill(0));R.forEach(r=>{for(let i=0;i<n;i++)for(let j=i;j<n;j++)C[i][j]+=(r[i]-m[i])*(r[j]-m[j])/(T-1)});
+  for(let i=0;i<n;i++)for(let j=0;j<i;j++)C[i][j]=C[j][i];return C.map(r=>r.map(v=>v*12))}
+const corrOf=C=>C.map((r,i)=>r.map((v,j)=>v/Math.sqrt(C[i][i]*C[j][j])));
+function eig(A){ /* Jacobi eigenvalues of a symmetric matrix */
+  const n=A.length,a=A.map(r=>[...r]);for(let sweep=0;sweep<60;sweep++){let off=0;for(let i=0;i<n;i++)for(let j=i+1;j<n;j++)off+=a[i][j]**2;if(off<1e-14)break;
+    for(let p=0;p<n;p++)for(let q=p+1;q<n;q++){if(Math.abs(a[p][q])<1e-15)continue;const th=(a[q][q]-a[p][p])/(2*a[p][q]),t=Math.sign(th||1)/(Math.abs(th)+Math.sqrt(th*th+1)),c=1/Math.sqrt(t*t+1),s=t*c;
+      for(let k=0;k<n;k++){const akp=a[k][p],akq=a[k][q];a[k][p]=c*akp-s*akq;a[k][q]=s*akp+c*akq}
+      for(let k=0;k<n;k++){const apk=a[p][k],aqk=a[q][k];a[p][k]=c*apk-s*aqk;a[q][k]=s*apk+c*aqk}}}
+  return a.map((r,i)=>r[i]).sort((x,y)=>y-x)}
+const EN=p=>{const s=p.reduce((a,b)=>a+Math.max(b,0),0);let h=0;p.forEach(x=>{const q=Math.max(x,0)/s;if(q>1e-12)h-=q*Math.log(q)});return Math.exp(h)};
+/* universe dimensionality: PCA on correlations, each series scaled by 1/sqrt(sum of its squared positive correlations),
+   so that k copies of one asset count as one and do not dilute the others (our version of the "fair PCA" adjustment) */
+function eud(keys,win,end,plain){const R=rows(keys,win,end);if(R.length<24||keys.length<1)return null;if(keys.length===1)return {d:1,ev:[1]};
+  const C=corrOf(covm(R)),sc=C.map(r=>1/Math.sqrt(r.reduce((s,v)=>s+Math.max(v,0)**2,0)));
+  const M=plain?C:C.map((r,i)=>r.map((v,j)=>v*sc[i]*sc[j]));const ev=eig(M);return {d:EN(ev),ev:ev.map(v=>v/ev.reduce((a,b)=>a+b,0))}}
+function chol(A){const n=A.length,L=[...Array(n)].map(()=>Array(n).fill(0));for(let i=0;i<n;i++)for(let j=0;j<=i;j++){let s=A[i][j];for(let k=0;k<j;k++)s-=L[i][k]*L[j][k];
+  if(i===j)L[i][i]=Math.sqrt(Math.max(s,1e-18));else L[i][j]=s/L[j][j]}return L}
+/* portfolio dimensionality: stepwise (Gram-Schmidt) attribution of portfolio variance to the assets in a given order;
+   the effective number of that distribution, minimised over all orderings (sampled beyond 9 assets) */
+function epd(w,C,maxPerm){const idx=w.map((x,i)=>i).filter(i=>Math.abs(w[i])>1e-9),n=idx.length;if(!n)return null;if(n===1)return {d:1,dov:idx.map(()=>1),idx};
+  const X=idx.map(i=>idx.map(j=>w[i]*w[j]*C[i][j]));let best={d:Infinity};
+  const evalP=perm=>{const A=perm.map(i=>perm.map(j=>X[i][j])),L=chol(A),c=Array(n).fill(0);for(let i=0;i<n;i++)for(let j=0;j<=i;j++)c[j]+=L[i][j];
+    const v=c.map(x=>x*x),d=EN(v);if(d<best.d){const tot=v.reduce((a,b)=>a+b,0),dov=Array(n).fill(0);perm.forEach((p,k)=>dov[p]=v[k]/tot);best={d,dov}}};
+  const lim=maxPerm||(n<=8?1e9:30000);let count=0;
+  if(n<=8&&!maxPerm){const a=[...Array(n).keys()],c=Array(n).fill(0);evalP([...a]);let i=0;while(i<n){if(c[i]<i){const k=i%2?c[i]:0;[a[k],a[i]]=[a[i],a[k]];evalP([...a]);c[i]++;i=0}else{c[i]=0;i++}}}
+  else{const a=[...Array(n).keys()];for(let t=0;t<lim;t++){for(let i=n-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}evalP([...a]);count++}}
+  return {d:best.d,dov:best.dov,idx,sampled:n>8||!!maxPerm}}
+const pvol=(w,C)=>{let v=0;for(let i=0;i<w.length;i++)for(let j=0;j<w.length;j++)v+=w[i]*C[i][j]*w[j];return Math.sqrt(Math.max(v,0))};
+const dratio=(w,C)=>w.reduce((s,x,i)=>s+x*Math.sqrt(C[i][i]),0)/pvol(w,C);
+function solve(A,b){const n=b.length,M=A.map((r,i)=>[...r,b[i]]);for(let i=0;i<n;i++){let p=i;for(let k=i+1;k<n;k++)if(Math.abs(M[k][i])>Math.abs(M[p][i]))p=k;[M[i],M[p]]=[M[p],M[i]];const d=M[i][i];if(Math.abs(d)<1e-14)return null;for(let k=i+1;k<n;k++){const f=M[k][i]/d;for(let j=i;j<=n;j++)M[k][j]-=f*M[i][j]}}
+  const x=Array(n).fill(0);for(let i=n-1;i>=0;i--){let s=M[i][n];for(let j=i+1;j<n;j++)s-=M[i][j]*x[j];x[i]=s/M[i][i]}return x}
+function minvar(C){let act=C.map((_,i)=>i);for(let it=0;it<C.length;it++){const x=solve(act.map(i=>act.map(j=>C[i][j]+(i===j?1e-10:0))),act.map(()=>1));if(!x)return null;
+  if(x.every(v=>v>=0)){const w=Array(C.length).fill(0),s=x.reduce((a,b)=>a+b,0);act.forEach((i,k)=>w[i]=x[k]/s);return w}let k=0;x.forEach((v,j)=>{if(v<x[k])k=j});act.splice(k,1)}return null}
+function riskParity(C){const n=C.length;let w=C.map((r,i)=>1/Math.sqrt(r[i]));for(let it=0;it<500;it++){const m=C.map(r=>r.reduce((s,v,j)=>s+v*w[j],0)),rc=w.map((x,i)=>x*m[i]),t=mean(rc);
+  w=w.map((x,i)=>x*Math.pow(t/rc[i],.5));const s=w.reduce((a,b)=>a+b,0);w=w.map(x=>x/s)}return w}
+function hrp(C){const n=C.length,R=corrOf(C),D=R.map(r=>r.map(v=>Math.sqrt(Math.max(0,.5*(1-v)))));
+  /* single-linkage ordering */
+  let cl=[...Array(n).keys()].map(i=>[i]);while(cl.length>1){let bi=0,bj=1,bd=Infinity;for(let i=0;i<cl.length;i++)for(let j=i+1;j<cl.length;j++){let d=Infinity;cl[i].forEach(a=>cl[j].forEach(b=>d=Math.min(d,D[a][b])));if(d<bd){bd=d;bi=i;bj=j}}
+    const m=[...cl[bi],...cl[bj]];cl=cl.filter((_,k)=>k!==bi&&k!==bj);cl.push(m)}const order=cl[0],w=Array(n).fill(1);
+  const ivar=items=>{const iv=items.map(i=>1/C[i][i]),s=iv.reduce((a,b)=>a+b,0),ww=iv.map(x=>x/s);let v=0;items.forEach((a,i)=>items.forEach((b,j)=>v+=ww[i]*ww[j]*C[a][b]));return v};
+  const rec=items=>{if(items.length<2)return;const h=Math.floor(items.length/2),L=items.slice(0,h),Rr=items.slice(h),vl=ivar(L),vr=ivar(Rr),a=1-vl/(vl+vr);L.forEach(i=>w[i]*=a);Rr.forEach(i=>w[i]*=1-a);rec(L);rec(Rr)};
+  rec(order);const s=w.reduce((a,b)=>a+b,0);return w.map(x=>x/s)}
+function maxDiv(C){const R=corrOf(C),x=minvar(R);if(!x)return null;const w=x.map((v,i)=>v/Math.sqrt(C[i][i])),s=w.reduce((a,b)=>a+b,0);return w.map(v=>v/s)}
+function maxEPD(C,start){const n=C.length;let w=[...start],best=epd(w,C,n<=6?0:400).d;
+  let rng=12345;const rnd=()=>{rng=(rng*1103515245+12345)%2147483648;return rng/2147483648};
+  for(let it=0;it<400;it++){const i=Math.floor(rnd()*n),j=Math.floor(rnd()*n);if(i===j)continue;const step=(.02+.08*rnd())*Math.min(1,w[i]*3+.05);if(w[i]-step<0)continue;
+    const v=[...w];v[i]-=step;v[j]+=step;const d=epd(v,C,n<=6?0:400).d;if(d>best){best=d;w=v}}return w}
+
+/* ---------------- shared ---------------- */
+const keysAll=()=>Object.keys(DATA.series);
+function portKeys(){return Object.keys(S.w).filter(k=>DATA.series[k]&&S.w[k]>0)}
+function wvec(keys){const s=keys.reduce((a,k)=>a+(S.w[k]||0),0);return keys.map(k=>(S.w[k]||0)/s)}
+const winLbl=()=>S.win?T(`last ${S.win/12} years`,`直近${S.win/12}年`):T('full history','全期間');
+
+/* ---------------- PORTFOLIO ---------------- */
+function renderPort(){
+  $('#presets').innerHTML=Object.entries(PRESETS).map(([k,p])=>`<button class="chip ${k===S.preset?'on':''}" data-k="${k}">${JA()?p.ja:p.en}</button>`).join('');
+  $$('#presets button').forEach(b=>b.onclick=()=>{S.preset=b.dataset.k;S.w={...PRESETS[S.preset].w};save();renderPort()});
+  const keys=portKeys();
+  $('#wT').innerHTML=`<tr><th>${T('Asset','資産')}</th><th>${T('Weight %','ウェイト%')}</th><th>${T('Vol','ボラ')}</th><th>${T('Share of risk','リスク寄与')}</th><th></th></tr>`;
+  const R=rows(keys,S.win);if(R.length<24){$('#pVerdict').textContent=T('Not enough common history for these assets in this window.','この期間では共通の履歴が足りません。');return}
+  const C=covm(R),w=wvec(keys),E=epd(w,C),vol=pvol(w,C),m=C.map(r=>r.reduce((s,v,j)=>s+v*w[j],0)),rc=w.map((x,i)=>x*m[i]/vol/vol);
+  let h=$('#wT').innerHTML;keys.forEach((k,i)=>{const di=E.idx.indexOf(i),dv=di>=0?E.dov[di]:0;
+    h+=`<tr><td>${esc(nm(k))}</td><td><input class="w" data-k="${k}" type="number" min="0" step="1" value="${+(S.w[k]).toFixed(1)}" aria-label="${esc(nm(k))} weight"></td><td>${vf(Math.sqrt(C[i][i]))}</td><td><span class="bar1" style="width:${Math.max(0,rc[i])*120}px"></span> ${num(rc[i]*100,0)}%</td><td><button class="lnk" data-x="${k}">×</button></td></tr>`});
+  $('#wT').innerHTML=h;
+  $$('#wT input.w').forEach(el=>el.onchange=()=>{const v=+el.value;S.w[el.dataset.k]=v>0?v:0;S.preset='';save();renderPort()});
+  $$('#wT button[data-x]').forEach(b=>b.onclick=()=>{delete S.w[b.dataset.x];S.preset='';save();renderPort()});
+  $('#addSel').innerHTML=`<option value="">${T('+ Add an asset or strategy','＋資産・戦略を追加')}</option>`+keysAll().filter(k=>!keys.includes(k)).map(k=>`<option value="${k}">${esc(nm(k))}</option>`).join('');
+  $('#addSel').onchange=e=>{const k=e.target.value;if(!k)return;S.w[k]=10;S.preset='';save();renderPort()};
+  $('#epdBig').textContent=num(E.d,2);
+  $('#epdMinor').innerHTML=T(`out of ${keys.length} holdings · volatility ${vf(vol)} · diversification ratio ${num(dratio(w,C),2)}${E.sampled?' · orderings sampled':''}`,`保有${keys.length}資産中 · ボラ${vf(vol)} · 分散比率${num(dratio(w,C),2)}${E.sampled?' · 順列はサンプリング':''}`);
+  $('#epdSub').innerHTML=T(`How many uncorrelated, equally important positions this portfolio is equivalent to, ${winLbl()}: 1 means everything moves as one; ${keys.length} would mean every holding is an independent bet of equal size. The bars split portfolio variance into independent drivers, each named after the holding it starts from (the ordering that gives the count): the first bar is the common driver, usually equities.`,`このポートフォリオが、無相関で同じ大きさのポジションいくつ分に相当するか（${winLbl()}）。1はすべてが一体で動く状態、${keys.length}はすべてが同じ大きさの独立した賭け。棒はポートフォリオ分散を独立した要因に分けたもので、各要因は起点となる保有資産名で表示（数を決める順序）：最初の棒は共通要因で、通常は株式。`);
+  const ord=E.idx.map((i,k)=>[keys[i],E.dov[k]]).sort((a,b)=>b[1]-a[1]);
+  barChart($('#dovC'),ord.map((x,i)=>(i+1)+'. '+nm(x[0]).split(' (')[0]),ord.map(x=>x[1]*100),cssv('--red'),'%');
+  /* methods */
+  const meth=[['you',T('Your weights','入力ウェイト'),w],['ew',T('Equal weight','均等'),keys.map(()=>1/keys.length)],['mv',T('Minimum variance','最小分散'),minvar(C)],
+    ['rp',T('Risk parity','リスクパリティ'),riskParity(C)],['hrp',T('Hierarchical risk parity','階層的リスクパリティ'),hrp(C)],['mdr',T('Max diversification ratio','最大分散比率'),maxDiv(C)]];
+  /* start the search from whichever method already scores best, so the result is never worse than the others */
+  const st=meth.filter(m=>m[2]).map(m=>[m[2],epd(m[2],C).d]).sort((a,b)=>b[1]-a[1])[0][0];meth.push(['max',T('Max dimensions','次元の最大化'),maxEPD(C,st)]);
+  const col=PAL();let mt=`<tr><th>${T('Method','方法')}</th><th>${T('Weights','ウェイト')}</th><th>${T('Volatility','ボラ')}</th><th>${T('Div. ratio','分散比率')}</th><th>${T('Dimensions','次元')}</th></tr>`;
+  const res=meth.filter(m=>m[2]).map(([k,n,ww])=>({k,n,w:ww,v:pvol(ww,C),dr:dratio(ww,C),d:epd(ww,C).d}));const bestD=Math.max(...res.map(r=>r.d));
+  res.forEach(r=>{mt+=`<tr class="${r.k==='you'?'hl':''}"><td>${r.k==='you'?'<b style="font-weight:500">':''}${r.n}${r.k==='you'?'</b>':''}</td><td><span class="wbars">${r.w.map((x,i)=>`<i style="width:${x*100}%;background:${col[i%col.length]}" title="${esc(nm(keys[i]))} ${num(x*100,0)}%"></i>`).join('')}</span></td><td>${vf(r.v)}</td><td>${num(r.dr,2)}</td><td><b style="font-weight:500;${r.d===bestD?'color:var(--red)':''}">${num(r.d,2)}</b></td></tr>`});
+  $('#mT').innerHTML=mt;$('#mLeg').innerHTML=keys.map((k,i)=>`<span><i style="background:${col[i%col.length]};height:8px"></i>${esc(nm(k))}</span>`).join('');
+  $('#mSub').innerHTML=T(`The same holdings allocated six ways, ${winLbl()}. Dimensions do not change if you lever up or add cash, so portfolios of different risk compare fairly.`,`同じ保有資産を6通りで配分（${winLbl()}）。次元はレバレッジや現金で変わらないため、リスク水準の異なるポートフォリオを公平に比較できる。`);
+  const you=res[0],mx=res.find(r=>r.k==='max'),mv=res.find(r=>r.k==='mv'),rpR=res.find(r=>r.k==='rp');
+  $('#mSay').innerHTML=T(`Minimum variance is the most concentrated (${num(mv?mv.d:NaN,2)}): it hides in the least volatile assets. Risk parity spreads risk (${num(rpR.d,2)}) but over-allocates to near-duplicates. Maximising dimensions directly reaches <b>${num(mx.d,2)}</b>, against <b>${num(you.d,2)}</b> for your weights. Many different portfolios score about the same, which leaves room for views and constraints.`,`最小分散は最も集中（${num(mv?mv.d:NaN,2)}）：ボラの低い資産に偏る。リスクパリティはリスクを分散する（${num(rpR.d,2)}）が、似た資産に過大配分しがち。次元を直接最大化すると<b>${num(mx.d,2)}</b>、入力ウェイトは<b>${num(you.d,2)}</b>。似た次元の異なるポートフォリオが多くあり、見通しや制約を反映する余地がある。`);
+  const big=[...ord].slice(0,2).map(x=>esc(nm(x[0])));
+  $('#pVerdict').innerHTML=T(`This portfolio holds <b>${keys.length}</b> positions but behaves like <b class="r">${num(E.d,1)}</b> independent bets (${winLbl()}); ${big.length?`<b>${big[0]}</b>${big[1]?` and <b>${big[1]}</b>`:''} drive most of its risk`:''}. ${mx.d-E.d>.3?`Re-weighting the same holdings could take it to <b>${num(mx.d,1)}</b>; see <i>What to add</i> for new sources.`:'The weights already use most of what these holdings offer; more dimensions have to come from new sources (see <i>What to add</i>).'}`,
+    `このポートフォリオは<b>${keys.length}</b>資産を保有するが、実質的には<b class="r">${num(E.d,1)}</b>個の独立した賭けに相当（${winLbl()}）。${big.length?`リスクの大半は<b>${big[0]}</b>${big[1]?`と<b>${big[1]}</b>`:''}`:''}。${mx.d-E.d>.3?`同じ資産の配分変更で<b>${num(mx.d,1)}</b>まで上げられる。新たな源泉は「何を加えるか」へ。`:'現在の資産からはほぼ最大限の分散を得ている。さらに増やすには新しい源泉が必要（「何を加えるか」）。'}`);
+  /* duplication demo, on real data */
+  dupDemo();corrMap(keys,C);
+}
+function dupDemo(){
+  const a=['SPY','IEF'],b=['SPY','IEF','LQD'];const Ra=rows(a,S.win),Rb=rows(b,S.win);if(Ra.length<24||Rb.length<24){$('#dupT').innerHTML='';return}
+  const Ca=covm(Ra),Cb=covm(Rb),wa=riskParity(Ca),wb=riskParity(Cb),ma=maxEPD(Cb,wb);const rho=corrOf(Cb)[1][2];
+  const row=(n,w,C,k)=>`<tr><td>${n}</td><td>${num(w[0]*100,0)}%</td><td>${num((w[1]+(w[2]||0))*100,0)}%</td><td>${num(epd(w,C).d,2)}</td></tr>`;
+  $('#dupT').innerHTML=`<tr><th></th><th>${T('Equities','株式')}</th><th>${T('Bonds','債券')}</th><th>${T('Dimensions','次元')}</th></tr>`+row(T('Risk parity: SPY + Treasuries','RP：株式＋国債'),wa,Ca)+row(T('Risk parity: + IG credit','RP：＋IG社債'),wb,Cb)+row(T('Max dimensions: + IG credit','次元最大化：＋IG社債'),ma,Cb);
+  $('#dupSub').innerHTML=T(`IG credit and Treasuries correlate at ${num(rho,2)} here. Adding credit to a risk-parity book pushes the bond total up and equities down, though no new driver arrived; maximising dimensions does not fall for it.`,`ここではIG社債と国債の相関は${num(rho,2)}。リスクパリティに社債を加えると、新しい要因はないのに債券合計が増え株式が減る。次元の最大化はこの罠に陥らない。`);
+}
+function corrMap(keys,C){const R=corrOf(C);let h=`<table class="hm"><tr><th></th>${keys.map(k=>`<th>${k}</th>`).join('')}</tr>`;keys.forEach((k,i)=>{h+=`<tr><th style="text-align:right">${k}</th>`+keys.map((_,j)=>i===j?'<td style="background:var(--track)"></td>':`<td style="background:${heat(R[i][j],1)}">${num(R[i][j]*100,0)}</td>`).join('')+'</tr>'});
+  $('#corr').innerHTML=h+'</table>';$('#cSub').textContent=T(`Monthly returns, ${winLbl()}, in %. Red positive, blue negative.`,`月次リターン、${winLbl()}、%。赤は正、青は負。`)}
+function barChart(svg,labels,vals,color,unit){const W=svg.clientWidth||600,H=+svg.getAttribute('height'),ml=34,mb=46,bw=(W-ml)/Math.max(1,vals.length),mx=Math.max(1e-9,...vals);
+  let g=`<line class="ax" x1="${ml}" x2="${W}" y1="${H-mb}" y2="${H-mb}"/>`;vals.forEach((v,i)=>{const h=(H-mb-10)*v/mx,x=ml+i*bw+bw*.15;g+=`<rect x="${x}" y="${H-mb-h}" width="${bw*.7}" height="${h}" fill="${color}"><title>${esc(labels[i])}: ${num(v,1)}${unit}</title></rect><text x="${x+bw*.35}" y="${H-mb-h-4}" text-anchor="middle">${num(v,0)}</text><text x="${x+bw*.35}" y="${H-mb+14}" text-anchor="middle">${esc(labels[i].length>12?labels[i].slice(0,11)+'…':labels[i])}</text>`});
+  svg.innerHTML=g}
+
+/* ---------------- ADD ---------------- */
+function renderAdd(){
+  $$('#awSeg button').forEach(b=>b.classList.toggle('on',+b.dataset.v===S.aw));$$('#amSeg button').forEach(b=>b.classList.toggle('on',b.dataset.v===S.am));
+  const keys=portKeys(),w0=wvec(keys),cand=keysAll().filter(k=>!keys.includes(k)),add=S.aw/100;
+  const R0=rows(keys,S.win);if(R0.length<24)return;const C0=covm(R0),E0=epd(w0,C0),v0=pvol(w0,C0),U0=eud(keys,S.win);
+  /* risk sizing: the candidate's stand-alone volatility times its weight equals the chosen share of portfolio volatility */
+  const addW=(C,c)=>S.am==='risk'?add*v0/Math.sqrt(C[c][c]):add;
+  const wNew=(C)=>{const a=addW(C,keys.length),s=1+(S.am==='risk'?a:0);return S.am==='risk'?[...w0,a].map(x=>x/s):[...w0.map(x=>x*(1-add)),add]};
+  const res=[];cand.forEach(c=>{const ks=[...keys,c],R=rows(ks,S.win);if(R.length<24)return;const C=covm(R),w=wNew(C);
+    const e=epd(w,C),u=eud(ks,S.win),cr=corrOf(C);/* correlation of the candidate with the current portfolio */
+    let cp=0;for(let j=0;j<keys.length;j++)cp+=w0[j]*C[keys.length][j];const rho=cp/(Math.sqrt(C[keys.length][keys.length])*pvol(w0,C.slice(0,keys.length).map(r=>r.slice(0,keys.length))));
+    const rr=R.map(r=>r[keys.length]),sh=mean(rr)*12/(Math.sqrt(C[keys.length][keys.length]));
+    res.push({c,d:e.d,dd:e.d-E0.d,u:u?u.d-U0.d:null,v:pvol(w,C),rho,sh,n:R.length,cw:w[keys.length]})});
+  res.sort((a,b)=>b.dd-a.dd);
+  let h=`<tr><th>${T('Candidate','候補')}</th><th>${T('Dimensions after','追加後の次元')}</th><th>${T('Change','変化')}</th><th>${T('Adds to the universe (0–1)','ユニバースへの追加（0〜1）')}</th><th>${T('Correlation to portfolio','ポートフォリオとの相関')}</th><th>${T('Capital weight','資金ウェイト')}</th><th>${T('Portfolio vol after','追加後のボラ')}</th><th>${T('Sharpe (window)','Sharpe（期間）')}</th><th>${T('Months','月数')}</th></tr>`;
+  const mx=Math.max(.01,...res.map(r=>Math.abs(r.dd)));
+  res.forEach((r,i)=>h+=`<tr class="${i===0?'hl':''}"><td>${DATA.series[r.c].group==='Strategies'?'◆ ':''}${esc(nm(r.c))}</td><td><b style="font-weight:500">${num(r.d,2)}</b></td><td class="${r.dd>=0?'pos':'neg'}"><span class="bar1 ${r.dd>0?'r':''}" style="width:${Math.abs(r.dd)/mx*80}px"></span> ${(r.dd>=0?'+':'')+num(r.dd,2)}</td><td>${r.u==null?'—':num(Math.max(0,r.u),2)}</td><td>${num(r.rho,2)}</td><td>${num(r.cw*100,0)}%</td><td>${vf(r.v)}</td><td class="${r.sh<0?'neg':''}">${num(r.sh,2)}</td><td>${r.n}</td></tr>`);
+  $('#aT').innerHTML=h;
+  $('#aSub').innerHTML=T(`Each candidate added ${S.am==='risk'?`at a size whose stand-alone risk is ${S.aw}% of the portfolio’s (so low-volatility strategies get a fair hearing), then the whole rescaled to 100% of capital`:`at ${S.aw}% of capital, the rest scaled down pro rata`}, ${winLbl()} (◆ = systematic strategy). “Adds to the universe” is how much new, independent risk it brings regardless of weights: 0 for a copy of something already held, 1 for a wholly new driver. A candidate with few months of history is measured on that shorter window.`,`各候補を${S.am==='risk'?`単独リスクがポートフォリオの${S.aw}%となる大きさで追加し（低ボラ戦略も公平に評価）、全体を資金100%に調整`:`資金の${S.aw}%で追加し、残りを比例縮小`}（${winLbl()}、◆＝体系的戦略）。「ユニバースへの追加」はウェイトに関係なく新しい独立したリスクをどれだけもたらすか：既存の複製なら0、全く新しい要因なら1。履歴の短い候補はその期間で測定。`);
+  const top=res.slice(0,3);
+  $('#aVerdict').innerHTML=T(`Your portfolio behaves like <b>${num(E0.d,1)}</b> independent bets. Adding <b class="r">${esc(nm(top[0].c))}</b> (${num(top[0].cw*100,0)}% of capital) takes it to <b class="r">${num(top[0].d,1)}</b>${top[1]?`; next best ${esc(nm(top[1].c))} (${num(top[1].d,1)})${top[2]?` and ${esc(nm(top[2].c))} (${num(top[2].d,1)})`:''}`:''}. Volatility goes from ${vf(v0)} to ${vf(top[0].v)}.`,
+    `このポートフォリオは実質<b>${num(E0.d,1)}</b>個の独立した賭け。<b class="r">${esc(nm(top[0].c))}</b>（資金の${num(top[0].cw*100,0)}%）を加えると<b class="r">${num(top[0].d,1)}</b>${top[1]?`。次点は${esc(nm(top[1].c))}（${num(top[1].d,1)}）${top[2]?`、${esc(nm(top[2].c))}（${num(top[2].d,1)}）`:''}`:''}。ボラは${vf(v0)}→${vf(top[0].v)}。`);
+  /* rolling: dimensions over time with the top candidates */
+  const picks=(S.ar&&S.ar.filter(k=>cand.includes(k)).length?S.ar.filter(k=>cand.includes(k)):top.map(r=>r.c)).slice(0,3);
+  $('#arPick').innerHTML=cand.map(k=>`<button class="chip ${picks.includes(k)?'on':''} ${DATA.series[k].group==='Strategies'?'st':''}" data-k="${k}">${esc(nm(k))}</button>`).join('');
+  $$('#arPick button').forEach(b=>b.onclick=()=>{let p=[...picks];p=p.includes(b.dataset.k)?p.filter(x=>x!==b.dataset.k):[...p,b.dataset.k].slice(-3);S.ar=p;save();renderAdd()});
+  const n=DATA.months.length,col=PAL(),ser=[{key:null,name:T('Your portfolio','現在のポートフォリオ'),color:cssv('--ink'),width:2}].concat(picks.map((k,i)=>({key:k,name:'+ '+nm(k),color:[cssv('--red'),cssv('--a1'),cssv('--a3')][i]})));
+  ser.forEach(s=>{s.pts=[];for(let t=35;t<n;t+=1){const ks=s.key?[...keys,s.key]:keys,R=rows(ks,36,t);if(R.length<30)continue;const C=covm(R),w=s.key?wNew(C):w0;s.pts.push({x:+new Date(DATA.months[t]+'T00:00:00'),y:epd(w,C,keys.length+1>7?300:0).d})}});
+  lineChart($('#arC'),ser,{xType:'date',h:260,yFmt:v=>num(v,1),tipFmt:v=>num(v,2)});legend($('#arLeg'),ser);
+  $('#arSub').innerHTML=T('Dimensions of the portfolio over rolling 3-year windows, alone and with each candidate. A diversifier that only works in some years shows up as lines that converge in the bad ones.','3年ローリングでのポートフォリオの次元（単独と、各候補を加えた場合）。一部の年しか効かない分散要因は、悪い年に線が収束する。');
+}
+
+/* ---------------- UNIVERSE ---------------- */
+function renderUniv(){
+  const groups={};keysAll().forEach(k=>{const g=DATA.series[k].group;(groups[g]=groups[g]||[]).push(k)});
+  const GN={Equities:['Equities','株式'],Bonds:['Bonds','債券'],'Real assets':['Real assets','実物資産'],FX:['FX','為替'],Strategies:['Systematic strategies','体系的戦略']};
+  $('#uPick').innerHTML=Object.entries(groups).map(([g,ks])=>`<div class="grp">${GN[g]?GN[g][JA()?1:0]:g}</div><div class="chips">${ks.map(k=>`<button class="chip ${S.univ.includes(k)?'on':''} ${g==='Strategies'?'st':''}" data-k="${k}">${esc(nm(k))}</button>`).join('')}</div>`).join('');
+  $$('#uPick button').forEach(b=>b.onclick=()=>{const k=b.dataset.k;S.univ=S.univ.includes(k)?S.univ.filter(x=>x!==k):[...S.univ,k];save();renderUniv()});
+  const U=S.univ.filter(k=>DATA.series[k]);if(U.length<2){$('#uVerdict').textContent=T('Pick at least two.','2つ以上選んでください。');return}
+  const E=eud(U,S.win),P=eud(U,S.win,null,true);if(!E){$('#uVerdict').textContent=T('Not enough common history in this window.','この期間では共通の履歴が足りません。');return}
+  $('#uBig').textContent=num(E.d,2);$('#uMinor').innerHTML=T(`out of ${U.length} · ordinary PCA would say ${num(P.d,2)}`,`${U.length}中 · 通常のPCAでは${num(P.d,2)}`);
+  barChart($('#eigC'),E.ev.map((_,i)=>'PC'+(i+1)),E.ev.map(v=>v*100),cssv('--steel'),'%');
+  $('#uSub').innerHTML=T(`The effective number of independent drivers in the universe, before choosing any weights, ${winLbl()}. Bars: share of variance by principal component. Each series is first scaled so that near-copies count once, which stops a crowd of similar assets from drowning out the one that is different.`,`ウェイトを決める前の、ユニバース内の独立した要因の実効数（${winLbl()}）。棒は主成分ごとの分散の割合。似た資産の群れが異なる1つをかき消さないよう、まず各系列を調整して複製を1つと数える。`);
+  /* marginal: what each member adds (drop it) and what each outsider would add */
+  let h=`<tr><th>${T('Series','系列')}</th><th>${T('In universe','ユニバース内')}</th><th>${T('Adds (0–1)','追加分（0〜1）')}</th><th>${T('Months','月数')}</th></tr>`;
+  const all=keysAll().map(k=>{const inU=U.includes(k);let add=null;if(inU){const rest=U.filter(x=>x!==k),e=rest.length>1?eud(rest,S.win):{d:1};add=e?E.d-e.d:null}else{const e=eud([...U,k],S.win);add=e?e.d-E.d:null}
+    return {k,inU,add,n:DATA.series[k].vals.filter(v=>v!=null).length}}).sort((a,b)=>(b.inU-a.inU)||((b.add??-9)-(a.add??-9)));
+  all.forEach(r=>h+=`<tr class="${r.inU?'hl':''}"><td>${DATA.series[r.k].group==='Strategies'?'◆ ':''}${esc(nm(r.k))}</td><td>${r.inU?'✓':''}</td><td><span class="bar1 ${r.inU?'':'r'}" style="width:${Math.max(0,r.add||0)*90}px"></span> ${r.add==null?'—':num(Math.max(0,r.add),2)}</td><td>${r.n}</td></tr>`);
+  $('#uT').innerHTML=h;
+  const best=all.filter(r=>!r.inU&&r.add!=null).sort((a,b)=>b.add-a.add).slice(0,3);
+  $('#uVerdict').innerHTML=T(`This universe of ${U.length} offers <b class="r">${num(E.d,1)}</b> independent drivers (${winLbl()}). The biggest additions available: ${best.map(r=>`<b>${esc(nm(r.k))}</b> (+${num(r.add,2)})`).join(', ')}.`,`この${U.length}系列のユニバースには<b class="r">${num(E.d,1)}</b>個の独立した要因（${winLbl()}）。追加効果が最も大きい候補：${best.map(r=>`<b>${esc(nm(r.k))}</b>（+${num(r.add,2)}）`).join('、')}。`);
+  /* rolling */
+  const n=DATA.months.length,add3=best.map(r=>r.k);
+  const ser=[{name:T('This universe','このユニバース'),color:cssv('--ink'),width:2,ks:U},{name:T('+ the three best additions','＋上位3候補'),color:cssv('--red'),ks:[...U,...add3]},{name:T('Ordinary PCA (no adjustment)','通常のPCA（調整なし）'),color:cssv('--steel'),dash:1,ks:U,plain:1}];
+  ser.forEach(s=>{s.pts=[];for(let t=35;t<n;t++){const e=eud(s.ks,36,t,s.plain);if(e)s.pts.push({x:+new Date(DATA.months[t]+'T00:00:00'),y:e.d})}});
+  lineChart($('#urC'),ser,{xType:'date',h:260,yFmt:v=>num(v,1),tipFmt:v=>num(v,2)});legend($('#urLeg'),ser);
+  $('#urSub').innerHTML=T('Rolling 3-year windows. Diversification is not constant: correlations rise in sell-offs and when inflation drives both stocks and bonds (2022), and the count falls just when it is needed.','3年ローリング。分散は一定ではない：売り局面やインフレが株と債券を同時に動かす時（2022年）に相関が上がり、必要な時に数が減る。');
+}
+
+function method(){
+  $('#method').innerHTML=T(`<b>Method.</b> Monthly total returns in dollars (${DATA.months[0].slice(0,4)} onward; the last month is month to date). Portfolio dimensions: portfolio variance is attributed to the holdings by stepwise regression in a given order (each asset’s new, uncorrelated part), the spread of that split is measured as an effective number (exponential of its entropy), and the smallest value over all orderings is kept (sampled above eight holdings). It runs from 1 (one driver) to the number of holdings (independent, equal-risk bets), and does not change with leverage or cash. Universe dimensions: principal components of the correlation matrix, effective number of the variance shares, with each series first scaled by one over the root of the sum of its squared positive correlations so that near-copies count once (our approximation of the published adjustment). Strategies: trend = sign of each market’s 12-month return at equal volatility; FX carry = top 3 minus bottom 3 three-month rates among 11 currencies; rates carry = G10 10-year receivers, standing aside when US yields trend up; short vol = S&amp;P 1-month straddles hedged weekly. Risk from the sample covariance of the window. Data: Yahoo, OECD, Fed (via Keel), to ${fdate(DATA.asof)}${(DATA.errors||[]).length?'; missing: '+esc(DATA.errors.join('; ')):''}. Not advice.`,
+    `<b>算出方法。</b>ドル建ての月次トータル・リターン（${DATA.months[0].slice(0,4)}年以降、最終月は月初来）。ポートフォリオの次元：所与の順序の段階的回帰（各資産の新しい無相関部分）でポートフォリオ分散を保有資産に配分し、その広がりを実効数（エントロピーの指数）で測り、全順序の最小値をとる（9資産以上はサンプリング）。1（要因1つ）から保有数（独立・等リスク）まで、レバレッジや現金で変わらない。ユニバースの次元：相関行列の主成分の分散割合の実効数。各系列はまず正の相関の二乗和の平方根の逆数で調整し、複製を1つと数える（公表手法の近似）。戦略：トレンド＝各市場の12か月リターンの符号・等ボラ、為替キャリー＝11通貨の3か月金利の上位3−下位3、金利キャリー＝G10の10年レシーバー（米金利上昇トレンド時は休む）、ショートボラ＝S&amp;P 1か月ストラドル・週次ヘッジ。リスクは期間の標本共分散。データ：Yahoo、OECD、FRB（Keel経由）、${fdate(DATA.asof)}まで${(DATA.errors||[]).length?'。欠損：'+esc(DATA.errors.join('; ')):''}。助言ではありません。`);
+}
+
+/* ---------------- wiring ---------------- */
+function render(){if(!DATA)return;$$('#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.v===S.tab));$$('#wSeg button').forEach(b=>b.classList.toggle('on',+b.dataset.v===S.win));
+  ['port','add','univ'].forEach(v=>$('#v-'+v).hidden=v!==S.tab);({port:renderPort,add:renderAdd,univ:renderUniv})[S.tab]();method()}
+window.redraw=render;
+async function load(fresh){
+  setStatus('busy');let r;
+  for(let a=0;a<4;a++){r=await keel('api_dimensions',{years:20},{fresh:fresh&&a===0});if((r.ok&&r.data&&r.data.series)||r.code==='no_mcp'||!MCP)break;
+    if(a<3){$('#banner').hidden=false;$('#banner').innerHTML=T(`<b>Keel is preparing the data.</b> The first load after the server wakes takes a minute or two; trying again (${a+2} of 4)…`,`<b>Keelがデータを準備中です。</b>サーバー起動後の初回は1〜2分かかります。再試行中（${a+2}/4）…`);await new Promise(res=>setTimeout(res,20000))}}
+  if(r.ok&&r.data&&r.data.series){DATA=r.data;LIVE=true;setStatus('live')}else{DATA=SAMPLE;LIVE=false;setStatus(r.code==='no_mcp'?'sample':'err',r.code,r.message)}
+  render();
+}
+const SAMPLE=/*SAMPLE*/;
+$('#how').innerHTML=howHtml();
+$$('#tabs button').forEach(b=>b.onclick=()=>{S.tab=b.dataset.v;save();render()});
+$$('#wSeg button').forEach(b=>b.onclick=()=>{S.win=+b.dataset.v;save();render()});
+$$('#awSeg button').forEach(b=>b.onclick=()=>{S.aw=+b.dataset.v;save();renderAdd()});
+$$('#amSeg button').forEach(b=>b.onclick=()=>{S.am=b.dataset.v;save();renderAdd()});
+$$('#langSeg button').forEach(b=>b.onclick=()=>{setLang(b.dataset.l);$('#how').innerHTML=howHtml();restatus();render()});
+$('#refresh').onclick=()=>load(true);
+setLang(LANG);load(false);
+</script>

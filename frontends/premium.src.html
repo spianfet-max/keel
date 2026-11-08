@@ -392,7 +392,7 @@ async function load(fresh){
   setStatus('busy');
   /* a cold server computes for a minute or two after waking; it caches the result, so ask again */
   let r;for(let a=0;a<4;a++){r=await keel('api_volpremium',{years:22},{fresh:fresh&&a===0});
-    if((r.ok&&r.data&&r.data.markets)||r.code==='no_mcp')break;
+    if((r.ok&&r.data&&r.data.markets)||r.code==='no_mcp'||!MCP)break;
     if(a<3){$('#banner').hidden=false;$('#banner').innerHTML=T(`<b>Keel is preparing the data.</b> The first load after the server wakes takes a minute or two; trying again (${a+2} of 4)…`,`<b>Keelがデータを準備中です。</b>サーバー起動後の初回は1〜2分かかります。再試行中（${a+2}/4）…`);
       await new Promise(res=>setTimeout(res,20000))}}
   if(r.ok&&r.data&&r.data.markets){DATA=r.data;LIVE=true;setStatus('live')}
