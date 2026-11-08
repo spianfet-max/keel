@@ -1159,6 +1159,10 @@ def _warm_volpremium():
             _volpremium(float(D.year_bucket(22)))
     except Exception as e:  # noqa: BLE001
         log.warning("volpremium warm-up failed: %s", e)
+    try:
+        _dimensions(20.0)
+    except Exception as e:  # noqa: BLE001
+        log.warning("dimensions warm-up failed: %s", e)
 
 
 if os.environ.get("KEEL_WARM", "1") == "1" and not os.environ.get("PYTEST_CURRENT_TEST"):
@@ -1176,6 +1180,136 @@ def vol_premium(years: int = Query(22, ge=8, le=26)):
             return _safe(_volpremium(float(D.year_bucket(years))))
     except Exception as e:  # noqa: BLE001
         raise HTTPException(503, f"Option premium data did not load: {e}") from e
+
+
+# --------------------------------------------------------------------------- #
+# Dimensions: monthly returns of assets and systematic strategies, for diversification counting
+# --------------------------------------------------------------------------- #
+
+DIM_ASSETS = {  # key -> (Yahoo symbol, name, group)
+    "SPY": ("SPY", "US equities", "Equities"), "EFA": ("EFA", "Developed ex-US equities", "Equities"),
+    "EEM": ("EEM", "EM equities", "Equities"), "EWJ": ("EWJ", "Japan equities (USD)", "Equities"),
+    "IEF": ("IEF", "US Treasuries 7-10Y", "Bonds"), "TLT": ("TLT", "US Treasuries 20Y+", "Bonds"),
+    "LQD": ("LQD", "US IG credit", "Bonds"), "HYG": ("HYG", "US high yield", "Bonds"),
+    "EMB": ("EMB", "EM USD bonds", "Bonds"), "GLD": ("GLD", "Gold", "Real assets"),
+    "DBC": ("DBC", "Commodities", "Real assets"), "VNQ": ("VNQ", "US REITs", "Real assets"),
+    "BTC": ("BTC-USD", "Bitcoin", "Real assets"), "JPY": ("JPY=X", "Yen vs USD", "FX"),
+    "EUR": ("EUR=X", "Euro vs USD", "FX"),
+}
+DIM_TREND = ("SPY", "EFA", "EEM", "IEF", "TLT", "GLD", "DBC", "JPY", "EUR")
+
+
+def _trend_returns(r: pd.DataFrame) -> pd.Series:
+    """Multi-asset time-series momentum: each market long or short by the sign of its 12-month return,
+    sized to equal volatility (trailing 12 months), equal risk across markets, monthly."""
+    cols = [c for c in DIM_TREND if c in r]
+    x = r[cols]
+    sig = np.sign((1 + x).rolling(12).apply(np.prod, raw=True) - 1)
+    vol = x.rolling(12, min_periods=10).std() * math.sqrt(12)
+    pos = (sig * (0.10 / vol)).clip(-3, 3)
+    out = (pos.shift(1) * x).mean(axis=1, skipna=True)
+    out[pos.shift(1).notna().sum(axis=1) < 4] = np.nan
+    return out
+
+
+def _fx_carry_returns(d: dict) -> pd.Series:
+    """Long the three highest and short the three lowest 3-month rates among USD and ten liquid currencies,
+    funded in dollars (spot move plus rate gap), monthly."""
+    univ = ["USD", "EUR", "JPY", "GBP", "CAD", "AUD", "MXN", "ZAR", "PLN", "HUF", "CZK"]
+    idx = pd.to_datetime(d["months"])
+    sp = pd.DataFrame({c: d["spot"].get(c) for c in univ if c in d["spot"]}, index=idx).astype(float)
+    rt = pd.DataFrame({c: d["rate"].get(c) for c in univ if c in d["rate"]}, index=idx).astype(float)
+    xr = (sp.shift(1) / sp) * (1 + rt.shift(1) / 1200)
+    xr = xr.sub(1 + rt["USD"].shift(1) / 1200, axis=0)
+    xr["USD"] = 0.0
+    out = pd.Series(np.nan, index=idx)
+    for i in range(1, len(idx)):
+        rr = rt.iloc[i - 1].dropna()
+        ok = [c for c in rr.index if pd.notna(xr.iloc[i].get(c))]
+        if len(ok) < 8:
+            continue
+        o = rr[ok].sort_values()
+        out.iloc[i] = xr.iloc[i][o.index[-3:]].mean() - xr.iloc[i][o.index[:3]].mean()
+    return out
+
+
+def _rates_carry_returns(d: dict) -> pd.Series:
+    """Receive the 10-year and pay the 3-month in G10 markets, equal weight, FX hedged, standing aside
+    for the month when the US 10-year is above its 160-day trend (5-day average) at the month end."""
+    idx = pd.to_datetime(d["months"])
+    g10 = [c for c in d["groups"]["G10"] if c in d["long"]]
+    rets = []
+    for c in g10:
+        y = pd.Series(d["long"][c], index=idx, dtype=float)
+        s3 = pd.Series(d["short"][c], index=idx, dtype=float)
+        dur = (1 - (1 + y.clip(lower=0.05) / 100) ** -10) / (y.clip(lower=0.05) / 100)
+        rets.append(((y.shift(1) - s3.shift(1)) / 1200 - dur.shift(1) * y.diff() / 100).rename(c))
+    r = pd.concat(rets, axis=1).mean(axis=1, skipna=True)
+    gap = pd.Series(d.get("usd_filter_gap_bp") or [None] * len(idx), index=idx, dtype=float)
+    on = (gap.shift(1) <= 0) | gap.shift(1).isna()
+    return r.where(on, 0.0)
+
+
+@D.cached(ttl=6 * 3600)
+def _dimensions(years: float):
+    errors: list[str] = []
+    px = D.monthly_closes(tuple(v[0] for v in DIM_ASSETS.values()), years + 1, True)
+    r = {}
+    for k, (sym, _, _) in DIM_ASSETS.items():
+        s = px.get(sym)
+        if s is None or len(s) < 24:
+            errors.append(f"{k} prices")
+            continue
+        s = s.resample("ME").last()
+        r[k] = (s.shift(1) / s - 1) if k in ("JPY", "EUR") else s.pct_change()   # FX: units per USD -> long the currency
+    R = pd.DataFrame(r)
+    strat, names = {}, {}
+    try:
+        strat["TREND"] = _trend_returns(R)
+        names["TREND"] = "Trend (12-month, multi-asset)"
+    except Exception as e:  # noqa: BLE001
+        errors.append(f"trend: {e}")
+    for key, name, fn in (("FXCARRY", "FX carry (top 3 vs bottom 3)", lambda: _fx_carry_returns(fx_carry(22))),
+                          ("RATESCARRY", "Rates carry (G10, trend-filtered)", lambda: _rates_carry_returns(rates_carry(25))),
+                          ("SHORTVOL", "Short vol (S&P straddles, weekly hedge)", None)):
+        try:
+            if key == "SHORTVOL":
+                with VP_LOCK:
+                    m = _volpremium(float(D.year_bucket(22)))["markets"]["SPX"]
+                ser = pd.Series(m["ret"]["5"], index=pd.to_datetime(m["months"]), dtype=float)
+            else:
+                ser = fn()
+            strat[key] = ser
+            names[key] = name
+        except Exception as e:  # noqa: BLE001
+            errors.append(f"{key}: {e}")
+    all_ = pd.concat([R] + [s.rename(k) for k, s in strat.items()], axis=1)
+    all_.index = all_.index + pd.offsets.MonthEnd(0)
+    all_ = all_.groupby(level=0).last()
+    start = pd.Timestamp(date.today()) - pd.DateOffset(years=int(years))
+    all_ = all_[all_.index >= start]
+    series = {}
+    for k in all_.columns:
+        meta = DIM_ASSETS.get(k)
+        series[k] = {"name": meta[1] if meta else names.get(k, k), "group": meta[2] if meta else "Strategies",
+                     "vals": [None if pd.isna(v) else round(float(v), 5) for v in all_[k].values]}
+    return {"asof": str(all_.index[-1].date()), "months": [str(d.date()) for d in all_.index],
+            "series": series, "errors": errors,
+            "note": "Monthly total returns in USD (ETFs, dividends included); FX = holding the currency against USD, "
+                    "spot only. Strategies: trend = sign of 12-month return, equal vol; FX carry = top 3 minus bottom 3 "
+                    "3-month rates among 11 currencies; rates carry = G10 receivers, US trend filter; short vol = S&P "
+                    "1-month straddles, hedged weekly (as in Premium). The last month is month to date."}
+
+
+@app.get("/api/dimensions", operation_id="dimensions_returns", dependencies=[Depends(check_token)])
+def dimensions(years: int = Query(20, ge=5, le=22)):
+    """Monthly returns of a multi-asset universe (equities, bonds, credit, gold, commodities, REITs, bitcoin,
+    yen, euro) and four systematic strategies (trend, FX carry, rates carry, short volatility), aligned on one
+    grid, for counting diversification: effective number of independent drivers in a universe or portfolio."""
+    try:
+        return _safe(_dimensions(float(years)))
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(503, f"Dimensions data did not load: {e}") from e
 
 
 # --------------------------------------------------------------------------- #

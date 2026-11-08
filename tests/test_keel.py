@@ -740,3 +740,27 @@ def test_volpremium_route(client, monkeypatch):
     m = j["markets"]["SPX"]
     assert len(m["ret"]["budget"]) == len(m["months"]) and len(m["season"]) == 12
     assert "rv1m" in j["fx"]["EURUSD"]["today"]
+
+
+def test_dimensions_route(client, monkeypatch):
+    idx = pd.date_range("2005-01-31", "2026-10-31", freq="ME")
+    rng = np.random.default_rng(4)
+    px = {sym: pd.Series(100 * np.exp(np.cumsum(rng.normal(0.004, 0.04, len(idx)))), index=idx)
+          for sym, _, _ in M.DIM_ASSETS.values()}
+    monkeypatch.setattr(D, "monthly_closes", lambda syms, years=22, dividends=False: {s: px[s] for s in syms})
+    months = [str(d.date()) for d in idx]
+    ccys = ["USD", "EUR", "JPY", "GBP", "CAD", "AUD", "MXN", "ZAR", "PLN", "HUF", "CZK"]
+    fx = {"months": months, "spot": {c: list(np.linspace(1, 1.1, len(idx)) * (i + 1)) for i, c in enumerate(ccys) if c != "USD"},
+          "rate": {c: [float(i)] * len(idx) for i, c in enumerate(ccys)}}
+    fx["spot"]["USD"] = [1.0] * len(idx)
+    rc = {"months": months, "groups": {"G10": ["USD", "EUR"]}, "long": {"USD": [4.0] * len(idx), "EUR": [3.0] * len(idx)},
+          "short": {"USD": [2.0] * len(idx), "EUR": [1.0] * len(idx)}, "usd_filter_gap_bp": [-5.0] * len(idx)}
+    monkeypatch.setattr(M, "fx_carry", lambda years=22: fx)
+    monkeypatch.setattr(M, "rates_carry", lambda years=25: rc)
+    monkeypatch.setattr(M, "_volpremium", lambda years: {"markets": {"SPX": {"months": months, "ret": {"5": [0.01] * len(idx)}}}})
+    j = client.get("/api/dimensions", params={"years": 15}).json()
+    assert {"SPY", "TREND", "FXCARRY", "RATESCARRY", "SHORTVOL"} <= set(j["series"])
+    assert j["series"]["TREND"]["group"] == "Strategies"
+    rc_vals = [v for v in j["series"]["RATESCARRY"]["vals"] if v is not None]
+    assert abs(rc_vals[-1] - 0.00167) < 1e-4     # flat curve, no yield change: (4-2 and 3-1)/12 = 0.17%
+    assert all(len(s["vals"]) == len(j["months"]) for s in j["series"].values())
