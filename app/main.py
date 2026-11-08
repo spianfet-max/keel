@@ -1000,12 +1000,13 @@ from . import volprem as VP  # noqa: E402
 VP_MKTS = {
     "SPX": ("^GSPC", "^VIX", "ln", 0.003, 1e-4, "S&P 500"),
     "NDX": ("^NDX", "^VXN", "ln", 0.004, 1e-4, "Nasdaq 100"),
-    "RUT": ("^RUT", "^RVX", "ln", 0.005, 1.5e-4, "Russell 2000"),
-    "EEM": ("EEM", "^VXEEM", "ln", 0.006, 2e-4, "Emerging equities"),
     "OIL": ("USO", "^OVX", "ln", 0.008, 2e-4, "Oil (USO)"),
     "GOLD": ("GLD", "^GVZ", "ln", 0.005, 1e-4, "Gold (GLD)"),
     "UST": ("UST10Y", "^MOVE", "n", 2.0, 0.25, "US Treasuries"),
 }
+# VIX-style indices price a variance swap, which sits above at-the-money vol because of the skew.
+# Straddles are priced at index / ratio (typical index-to-ATM ratios); MOVE is already an ATM normal vol.
+VP_ATM_RATIO = {"SPX": 1.10, "NDX": 1.08, "OIL": 1.05, "GOLD": 1.04, "UST": 1.0}
 VP_UST_DUR = 8.0          # P&L per bp of yield, as a fraction of bond notional: duration / 10,000
 VP_FX = {"EURUSD": "EURUSD=X", "USDJPY": "JPY=X", "GBPUSD": "GBPUSD=X", "AUDUSD": "AUDUSD=X", "USDCAD": "CAD=X",
          "USDCHF": "CHF=X", "NZDUSD": "NZDUSD=X", "USDNOK": "NOK=X", "USDSEK": "SEK=X"}
@@ -1066,7 +1067,7 @@ def _volpremium(years: float):
         if len(df) < 600:
             errors.append(f"{key}: short history")
             continue
-        iv = (df.v / 100.0 if model == "ln" else df.v).values        # MOVE is already bp a year
+        iv = ((df.v / 100.0 if model == "ln" else df.v) / VP_ATM_RATIO.get(key, 1.0)).values   # MOVE: bp a year
         sv = df.s.values
         opt, dlt, prem = VP.option_book(sv, iv, model, oc)
         scale = VP_UST_DUR / 1e4 if model == "n" else 1.0
@@ -1146,7 +1147,9 @@ def _volpremium(years: float):
     return {"asof": str(date.today()), "markets": mk, "fx": fx, "term": term, "vix_vix3m": ratio,
             "spy_skew": {k: _r4(spy.get(k)) if isinstance(spy.get(k), (int, float)) else spy.get(k) for k in ("atm_iv", "put90_iv", "skew_90", "days")},
             "modes": list(VP_MODES), "errors": errors,
+            "atm_ratio": VP_ATM_RATIO,
             "note": "Short 1-month ATM straddles sold weekly (1/4 notional each), priced Black-Scholes off the vol index "
+                    "divided by a typical index-to-ATM ratio (atm_ratio) "
                     "(Bachelier off MOVE for the 10-year yield, P&L x duration 8), marked daily, costs included. "
                     "Returns are fractions of notional per month. Regimes: 4-state HMM on weekly log vol, fitted on the "
                     "early sample, filtered forward. FX: realised vol (Yahoo), today's implied from currency ETF options."}

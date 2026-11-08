@@ -1,0 +1,406 @@
+<title>Premium</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@300;400;500;600&family=Noto+Sans+JP:wght@300;400&display=swap">
+<style>
+/*CORE_CSS*/
+/* Premium: is selling options paying, how to harvest it, when to stand aside, and what to hold today.
+   Red marks the answer (the strategy you would run); steel the alternatives; regimes run cool to hot. */
+.app{padding-left:max(20px,env(safe-area-inset-left,0px));padding-right:max(20px,env(safe-area-inset-right,0px))}
+@media (max-width:480px){.app{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}}
+.views{display:flex;gap:0;margin-top:14px;border-bottom:1px solid var(--line);overflow-x:auto}
+.views button{border:0;border-bottom:2px solid transparent;background:none;color:var(--mute);padding:10px 0 9px;margin-right:22px;font-size:15px;min-height:40px;white-space:nowrap}
+.views button.on{color:var(--ink);border-bottom-color:var(--red)}
+.ctl{display:flex;flex-direction:column;gap:5px;min-width:0}
+.amt{width:130px;text-align:right;font-variant-numeric:tabular-nums}
+.verdict{font-size:17px;line-height:1.55;max-width:80ch;margin:0;text-wrap:pretty}
+.verdict b{font-weight:500}.verdict .r{color:var(--red)}.verdict .s{color:var(--steel)}
+table.mt{font-size:13px}table.mt td,table.mt th{padding:6px 7px;text-align:right;white-space:nowrap}
+table.mt td:first-child,table.mt th:first-child{text-align:left}
+table.mt td.neg{color:var(--neg)}table.mt td.pos{color:var(--pos)}
+table.mt tr.click{cursor:pointer}table.mt tr.click:hover td{background:var(--sel)}table.mt tr.on td{background:var(--sel)}
+.tag{display:inline-block;font-size:11.5px;padding:1px 7px;border:1px solid var(--line)}
+.tag.rich{border-color:var(--red);color:var(--red)}.tag.fair{border-color:var(--gold);color:var(--gold)}.tag.thin{color:var(--mute)}.tag.avoid{border-color:var(--steel);color:var(--steel)}
+.hm{border-collapse:separate;border-spacing:2px;width:auto;font-size:12px}
+.hm th{border:0;padding:2px 6px;font-size:11.5px;font-weight:400;color:var(--mute)}
+.hm td{border:0;min-width:44px;height:28px;text-align:center;font-variant-numeric:tabular-nums;padding:0 4px}
+.hm th.cur{color:var(--red);font-weight:500}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.chip{border:1px solid var(--line);background:var(--card);padding:4px 10px;font-size:12.5px;min-height:30px;color:var(--mute)}
+.chip.on{border-color:var(--ink);color:var(--ink)}
+.stat{font-size:12.5px;line-height:1.5;color:var(--mute);margin-top:8px;max-width:78ch}.stat b{color:var(--ink);font-weight:500}
+.ticket{font:12px/1.55 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:var(--track);padding:12px;white-space:pre-wrap;word-break:break-word;margin:0 0 10px;max-height:300px;overflow:auto}
+.routine{margin-top:18px;font-size:13px;line-height:1.5}.routine h3{font-size:14px;font-weight:500;margin:0 0 6px}
+.routine ol{margin:0;padding-left:18px;color:var(--mute)}.routine li{margin-bottom:4px}
+.meter{display:inline-block;width:80px;height:8px;background:var(--track);vertical-align:middle;position:relative}
+.meter b{position:absolute;left:0;top:0;bottom:0}
+.rbar{display:flex;height:10px;width:120px;vertical-align:middle}
+.rbar i{display:block;height:100%}
+.strip{display:flex;height:10px;margin-top:4px}
+.strip i{flex:1 1 0;display:block}
+.say{font-size:14px;line-height:1.55;max-width:80ch;margin:12px 0 0}
+</style>
+
+<div class="app">
+  <header class="top">
+    <div class="brand"><h1 data-ja="プレミアム">Premium</h1><span data-ja="オプション・プレミアム：売りが報われているか、どう取るか、いつ休むか、今日何を持つか">The option premium: is selling options paying, how to harvest it, when to stand aside, and what to hold today</span></div>
+    <div class="tright">
+      <span class="pill busy" id="status"><i></i></span>
+      <button class="btn q" id="refresh" data-ja="更新">Refresh</button>
+      <button class="btn q" id="themeBtn">Dark</button>
+      <div class="seg" id="langSeg"><button data-l="en">EN</button><button data-l="ja">日本語</button></div>
+    </div>
+  </header>
+  <div class="banner" id="banner" hidden></div>
+  <div class="help" id="how" hidden></div>
+  <nav class="views" id="tabs"><button data-v="map" data-ja="マップ">Map</button><button data-v="lab" data-ja="戦略ラボ">Strategy lab</button><button data-v="timing" data-ja="タイミング">Timing</button><button data-v="book" data-ja="ブック">Book</button></nav>
+
+  <!-- MAP -->
+  <div id="v-map">
+    <section class="sec"><p class="verdict" id="verdict"></p></section>
+    <section class="kpis" id="kpis"></section>
+    <section class="sec">
+      <div class="sh"><h2 data-ja="市場別のプレミアム">Premium by market</h2><p id="mapSub"></p></div>
+      <div class="tw"><table class="mt" id="mapT"></table></div>
+    </section>
+    <section class="sec two even">
+      <div style="min-width:0">
+        <div class="sh"><h2 id="ivH"></h2><p data-ja="インプライド（オプション価格）と、その後の1か月の実現ボラ。">Implied vol (what options charge) and the realised vol that followed, last year, daily.</p></div>
+        <svg class="ch" id="ivC" height="240"></svg><div class="leg" id="ivLeg"></div>
+      </div>
+      <div style="min-width:0">
+        <div class="sh"><h2 data-ja="プレミアムの推移（インプライド−その後の実現）">The premium over time: implied minus what followed</h2><p id="vrpSub"></p></div>
+        <svg class="ch" id="vrpC" height="240"></svg>
+      </div>
+    </section>
+    <section class="sec two even">
+      <div style="min-width:0">
+        <div class="sh"><h2 data-ja="通貨：インプライドと実現">Currencies: implied against realised</h2><p data-ja="インプライドは通貨ETFのオプション（約1か月）、実現は直近1か月・3か月。評価は2007〜2021年の通貨オプション研究による。">Implied from currency ETF options (about one month); realised over one and three months. The structural column is what fifteen years of systematic FX option selling found.</p></div>
+        <div class="tw"><table class="mt" id="fxT"></table></div>
+      </div>
+      <div style="min-width:0">
+        <div class="sh"><h2 data-ja="VIXの期間構造">VIX term structure</h2><p id="tsSub"></p></div>
+        <svg class="ch" id="tsC" height="200"></svg>
+        <svg class="ch" id="rtC" height="160" style="margin-top:6px"></svg>
+      </div>
+    </section>
+  </div>
+
+  <!-- LAB -->
+  <div id="v-lab" hidden>
+    <section class="sec">
+      <div class="sh"><h2 data-ja="1か月ストラドルの売り：ヘッジの方法">Selling 1-month straddles: how to hedge</h2><p id="labSub"></p></div>
+      <div class="chips" id="labPick"></div>
+      <svg class="ch" id="labC" height="300"></svg><div class="leg" id="labLeg"></div>
+      <div class="tw" style="margin-top:14px"><table class="mt" id="labT"></table></div>
+      <p class="say" id="labSay"></p>
+    </section>
+    <section class="sec two even">
+      <div style="min-width:0">
+        <div class="sh"><h2 data-ja="市場×ヘッジ方法のSharpe">Sharpe by market and hedging rule</h2><p data-ja="コスト控除後。">After costs.</p></div>
+        <div class="tw" id="labHm"></div>
+      </div>
+      <div style="min-width:0">
+        <div class="sh"><h2 data-ja="行使価格と満期の選び方">Strikes and expiries</h2></div>
+        <div class="stat" id="strikes"></div>
+      </div>
+    </section>
+  </div>
+
+  <!-- TIMING -->
+  <div id="v-timing" hidden>
+    <section class="sec">
+      <div class="sh"><h2 data-ja="ボラティリティ・レジーム">Volatility regimes</h2><p id="rgSub"></p></div>
+      <div class="tw"><table class="mt" id="rgT"></table></div>
+    </section>
+    <section class="sec two even">
+      <div style="min-width:0">
+        <div class="sh"><h2 id="rgH"></h2><p data-ja="インプライド・ボラと、その時点で推定されたレジーム（帯）。">Implied vol and the regime the model saw at the time (strip below).</p></div>
+        <div class="chips" id="rgPick"></div>
+        <svg class="ch" id="rgC" height="220"></svg><div class="strip" id="rgStrip"></div><div class="leg" id="rgLeg"></div>
+      </div>
+      <div style="min-width:0">
+        <div class="sh"><h2 data-ja="レジーム別の成績（翌月）">What selling earned in each regime (next month)</h2><p id="rpSub"></p></div>
+        <div class="tw"><table class="mt" id="rpT"></table></div>
+      </div>
+    </section>
+    <section class="sec">
+      <div class="sh"><h2 data-ja="季節性：月ごとのボラの変化">Seasonality: how vol moves through the year</h2><p id="ssSub"></p></div>
+      <div class="tw" id="ssHm"></div>
+      <p class="say" id="ssSay"></p>
+    </section>
+  </div>
+
+  <!-- BOOK -->
+  <div id="v-book" hidden>
+    <div class="bar">
+      <div class="ctl"><span class="lbl" data-ja="ヘッジ方法">Hedging rule</span><div class="seg" id="hSeg"></div></div>
+      <div class="ctl"><span class="lbl" data-ja="プレミアムで傾斜">Tilt to premium</span><div class="seg" id="tSeg"><button data-v="1" data-ja="あり">On</button><button data-v="0" data-ja="なし">Off</button></div></div>
+      <div class="ctl"><span class="lbl" data-ja="危機レジームで休む">Stand aside when distressed</span><div class="seg" id="dSeg"><button data-v="1" data-ja="あり">On</button><button data-v="0" data-ja="なし">Off</button></div></div>
+      <div class="ctl"><span class="lbl" data-ja="目標ボラ">Target vol</span><div class="seg" id="vSeg"><button data-v="3">3%</button><button data-v="5">5%</button><button data-v="8">8%</button><button data-v="10">10%</button></div></div>
+      <div class="ctl"><span class="lbl" data-ja="NAV（米ドル）">NAV (USD)</span><input type="text" id="nav" class="amt" inputmode="numeric" aria-label="Fund NAV in dollars"></div>
+    </div>
+    <section class="sec"><p class="verdict" id="bVerdict"></p></section>
+    <section class="kpis" id="bKpis"></section>
+    <section class="sec two">
+      <div style="min-width:0">
+        <div class="sh"><h2 data-ja="今日のブック">Today’s book</h2><p id="bkSub"></p></div>
+        <div class="tw"><table class="mt" id="bkT"></table></div>
+      </div>
+      <div style="min-width:0">
+        <div class="sh"><h2 data-ja="チケット">Ticket</h2><p data-ja="毎週、各市場で1か月ATMストラドルを想定元本の1/4ずつ売る。">Each week, sell a quarter of each market’s notional in 1-month at-the-money straddles.</p></div>
+        <pre class="ticket" id="ticket"></pre>
+        <button class="btn" id="copy" data-ja="チケットをコピー">Copy ticket</button>
+        <div class="routine">
+          <h3 data-ja="毎日の使い方">Daily routine</h3>
+          <ol>
+            <li data-ja="ヘッジ予算の使用率を確認。100%に達した市場はデルタをゼロに戻す。">Check the hedge budget: any market at 100% gets its delta reset to zero.</li>
+            <li data-ja="レジームを確認。危機レジームに入った市場は新規の売りを止め、既存は満期まで持つ。">Read the regimes: a market that turns distressed gets no new sales; existing straddles run to expiry.</li>
+            <li data-ja="VIXの期間構造が逆転（VIX/VIX3M>1）したら、株式の売りを半分に。">If the VIX curve inverts (VIX/VIX3M above 1), halve new equity sales.</li>
+            <li data-ja="週に一度（金曜）：チケットどおり新規の1か月ストラドルを売る。季節（ボラ上昇月）を確認。">Once a week (Friday): sell the new 1-month straddles on the ticket, minding the season (vol tends to rise in May, August, November).</li>
+            <li data-ja="月末：ウェイトとサイズを見直す（ロバストなリスク推定で）。">Month end: re-size with the robust risk measure.</li>
+          </ol>
+        </div>
+      </div>
+    </section>
+    <section class="sec">
+      <div class="sh"><h2 data-ja="バスケットのバックテスト">The basket, back-tested</h2><p id="btSub"></p></div>
+      <svg class="ch" id="btC" height="280"></svg><div class="leg" id="btLeg"></div>
+      <div class="tw" style="margin-top:14px"><table class="mt" id="btT"></table></div>
+    </section>
+  </div>
+  <p class="note" id="method"></p>
+</div>
+
+<script>
+/*CORE_JS*/
+let DATA=null,LIVE=false;
+let S={tab:'map',mk:'SPX',lab:'SPX',rg:'SPX',hedge:'budget',tilt:1,dist:1,vol:5,nav:100e6};
+try{Object.assign(S,JSON.parse(localStorage.getItem('keel-premium')||'{}'))}catch(e){}
+const save=()=>{try{localStorage.setItem('keel-premium',JSON.stringify(S))}catch(e){}};
+const MODES=[['none','Unhedged','ヘッジなし'],['1','Daily','毎日'],['5','Weekly','毎週'],['10','Every 2 weeks','2週ごと'],['budget','Variance budget','分散予算']];
+const mname=k=>{const m=MODES.find(x=>x[0]===k);return m?m[JA()?2:1]:k};
+const RG=[['Low','低'],['Medium','中'],['High','高'],['Distressed','危機']];
+const rname=i=>i==null?'—':RG[i][JA()?1:0];
+const rcol=i=>['var(--a5)','var(--a1)','var(--a3)','var(--red)'][i]||'var(--track)';
+const FXV={EURUSD:['seller rewarded','売り手が報われる','rich'],USDJPY:['seller rewarded','売り手が報われる','rich'],GBPUSD:['mixed','まちまち','fair'],USDCAD:['mixed','まちまち','fair'],USDCHF:['mixed (peg history)','まちまち（ペッグ歴）','fair'],AUDUSD:['hazardous: structured-product supply','危険：仕組債の売り供給','avoid'],NZDUSD:['hazardous: risk beta','危険：リスク感応度','avoid'],USDNOK:['hazardous: illiquid, risk beta','危険：流動性・リスク感応度','avoid'],USDSEK:['hazardous: illiquid, risk beta','危険：流動性・リスク感応度','avoid']};
+const mean=a=>a.reduce((s,x)=>s+x,0)/(a.length||1);
+const sd=a=>{if(a.length<2)return NaN;const m=mean(a);return Math.sqrt(a.reduce((s,x)=>s+(x-m)**2,0)/(a.length-1))};
+const pc=(v,d=1)=>v==null||!isFinite(v)?'—':pct(v*100,d);
+const ratio=v=>v==null||!isFinite(v)?'—':num(v,2);
+const usd=v=>v==null||!isFinite(v)?'—':(v<0?'−':'')+'$'+(Math.abs(v)>=1e6?num(Math.abs(v)/1e6,2)+'m':Math.abs(v)>=1e3?num(Math.abs(v)/1e3,0)+'k':num(Math.abs(v),0));
+const heat=(v,scale)=>{if(v==null||!isFinite(v))return'transparent';const a=Math.min(1,Math.abs(v)/scale)*.55+.04;return v>=0?`color-mix(in srgb, var(--pos) ${(a*100).toFixed(0)}%, transparent)`:`color-mix(in srgb, var(--neg) ${(a*100).toFixed(0)}%, transparent)`};
+const dt=s=>+new Date(s+'T00:00:00');
+const MK=()=>Object.keys(DATA.markets);
+const u=k=>DATA.markets[k].unit==='bp'?'bp':'%';
+const vfmt=(k,v)=>v==null?'—':num(v,DATA.markets[k].unit==='bp'?0:1)+(DATA.markets[k].unit==='bp'?'bp':'');
+
+function stats(r,from=0){const x=r.slice(from).filter(v=>v!=null&&isFinite(v));if(x.length<12)return null;
+  let v=1,pk=1,mdd=0;x.forEach(y=>{v*=1+y;pk=Math.max(pk,v);mdd=Math.min(mdd,v/pk-1)});const m=mean(x),s=sd(x);
+  return {ret:m*12,vol:s*Math.sqrt(12),sh:m/s*Math.sqrt(12),mdd,worst:Math.min(...x),n:x.length}}
+const win=(M,r,a,b)=>{let v=1,any=false;M.months.forEach((d,i)=>{const y=d.slice(0,7);if(y>=a&&y<=b&&r[i]!=null){v*=1+r[i];any=true}});return any?v-1:null};
+/* score today: implied vs horizon-adjusted realised */
+function score(k){const t=DATA.markets[k].today;if(!t.iv||!t.hv)return {lab:'thin',x:null};const x=(t.iv-t.hv)/t.hv;const reg=DATA.markets[k].reg_model.today;const dist=reg[3]>.5;
+  return {x,dist,lab:dist?'avoid':x>.15?'rich':x>0?'fair':'thin'}}
+const SL={rich:['Rich to sell','売り妙味大'],fair:['Fair','適正'],thin:['Too thin','薄い'],avoid:['Stand aside','休む']};
+const slab=l=>SL[l][JA()?1:0];
+
+/* ---------------- MAP ---------------- */
+function renderMap(){
+  const ks=MK(),sc={};ks.forEach(k=>sc[k]=score(k));
+  const rich=ks.filter(k=>sc[k].lab==='rich').sort((a,b)=>sc[b].x-sc[a].x),avoid=ks.filter(k=>sc[k].lab==='avoid'||sc[k].lab==='thin');
+  const T0=DATA.term,inv=T0['^VIX']&&T0['^VIX3M']?T0['^VIX']/T0['^VIX3M']:null;
+  $('#verdict').innerHTML=T(`${rich.length?`<b class="r">Premium is richest in ${rich.map(k=>esc(DATA.markets[k].name)).join(', ')}</b>: implied vol is well above what these markets have actually moved, measured at the option’s own horizon.`:'<b>No market offers a wide premium today.</b>'} ${avoid.length?`<b class="s">Thin or stand aside: ${avoid.map(k=>esc(DATA.markets[k].name)).join(', ')}.</b>`:''} ${inv!=null?(inv>1?' The VIX curve is <b>inverted</b>: stress is priced in the front, a bad time to add equity shorts.':` The VIX curve is in contango (${num(inv,2)}), the normal state for sellers.`):''}`,
+    `${rich.length?`<b class="r">プレミアムが最も厚いのは${rich.map(k=>esc(DATA.markets[k].name)).join('、')}</b>：オプションの満期に合わせて測った実際の値動きを、インプライドが大きく上回っています。`:'<b>今日はプレミアムが厚い市場はありません。</b>'}${avoid.length?`<b class="s">薄い／休む：${avoid.map(k=>esc(DATA.markets[k].name)).join('、')}。</b>`:''}${inv!=null?(inv>1?'VIXカーブは<b>逆転</b>：期近にストレスが織り込まれ、株式の売り増しには不向き。':`VIXカーブは順ザヤ（${num(inv,2)}）で、売り手には通常の状態。`):''}`);
+  const sp=DATA.term,sk=DATA.spy_skew||{};
+  const K=[[T('VIX','VIX'),T0['^VIX']!=null?num(T0['^VIX'],1):'—',DATA.markets.SPX?T(`${num(DATA.markets.SPX.today.iv_pct*100,0)}th percentile, 10 years`,`過去10年の${num(DATA.markets.SPX.today.iv_pct*100,0)}パーセンタイル`):''],
+    [T('VIX ÷ VIX3M','VIX÷VIX3M'),inv!=null?num(inv,2):'—',inv>1?T('Inverted: stress','逆転：ストレス'):T('Contango: normal','順ザヤ：通常')],
+    [T('Vol of VIX (VVIX)','VVIX'),T0['^VVIX']!=null?num(T0['^VVIX'],0):'—',T('Above 100: the vol market is nervous','100超：ボラ市場が神経質')],
+    [T('SPY 90% put skew','SPY 90%プット・スキュー'),sk.skew_90!=null?'+'+num(sk.skew_90,1)+T(' pts',' pt'):'—',sk.atm_iv!=null?T(`ATM ${num(sk.atm_iv,1)}%, ${sk.days} days`,`ATM ${num(sk.atm_iv,1)}%、${sk.days}日`):''],
+    [T('CBOE SKEW','CBOE SKEW'),T0['^SKEW']!=null?num(T0['^SKEW'],0):'—',T('Price of S&P tail risk','S&Pテールリスクの価格')],
+    [T('Markets rich to sell','売り妙味のある市場'),`${rich.length} / ${ks.length}`,T('Implied > adjusted realised by 15%+','インプライドが調整後実現を15%以上上回る')]];
+  $('#kpis').innerHTML=K.map(([a,v,s])=>`<div class="kpi"><span class="lbl">${a}</span><span class="v" style="font-size:24px">${v}</span><span class="s">${s}</span></div>`).join('');
+  let h=`<tr><th>${T('Market','市場')}</th><th>${T('Implied','インプライド')}</th><th>${T('Realised 1M','実現1か月')}</th><th>${T('Realised 3M','実現3か月')}</th><th>${T('Adjusted, at horizon','調整後（満期ベース）')}</th><th>${T('Premium','プレミアム')}</th><th>${T('Implied pctile','IVパーセンタイル')}</th><th>${T('Regime','レジーム')}</th><th>${T('Avg premium','平均プレミアム')}</th><th>${T('Hedged Sharpe','ヘッジ後Sharpe')}</th><th></th></tr>`;
+  ks.forEach(k=>{const M=DATA.markets[k],t=M.today,s=sc[k];const vr=M.iv.map((v,i)=>v!=null&&M.rv_fwd[i]!=null?v-M.rv_fwd[i]:null).filter(v=>v!=null);const st=stats(M.ret.budget);const rg=M.reg_model.today.indexOf(Math.max(...M.reg_model.today));
+    h+=`<tr class="click ${k===S.mk?'on':''}" data-k="${k}"><td><b style="font-weight:500">${esc(M.name)}</b></td><td>${vfmt(k,t.iv)}</td><td>${vfmt(k,t.rv1m)}</td><td>${vfmt(k,t.rv3m)}</td><td>${vfmt(k,t.hv)}</td><td class="${s.x>0?'pos':'neg'}">${s.x==null?'—':(s.x>0?'+':'')+num(s.x*100,0)+'%'}</td><td>${num(t.iv_pct*100,0)}</td><td><span style="color:${rcol(rg)}">●</span> ${rname(rg)}</td><td>${vfmt(k,mean(vr))}</td><td>${st?ratio(st.sh):'—'}</td><td><span class="tag ${s.lab}">${slab(s.lab)}</span></td></tr>`});
+  $('#mapT').innerHTML=h;$$('#mapT tr.click').forEach(r=>r.onclick=()=>{S.mk=r.dataset.k;save();renderMap()});
+  $('#mapSub').innerHTML=T('Premium = implied vol against realised vol measured on monthly moves over two years and adjusted for the volatility of volatility: the measure that explains most of what straddle sellers actually earned (daily vol alone explains about half). Click a row for its charts.','プレミアム＝インプライドと、2年間の月次変動で測りボラのボラで調整した実現ボラの差。ストラドル売りの実際の損益を最もよく説明する指標（日次ボラだけでは約半分）。行をクリックでチャート表示。');
+  /* charts for the selected market */
+  const k=DATA.markets[S.mk]?S.mk:ks[0],M=DATA.markets[k],col={iv:cssv('--red'),rv:cssv('--steel')};
+  $('#ivH').textContent=T(`${M.name}: implied and realised`,`${M.name}：インプライドと実現`);
+  const S1=[{name:T('Implied','インプライド'),color:col.iv,pts:M.daily.d.map((d,i)=>({x:dt(d),y:M.daily.iv[i]})).filter(p=>p.y!=null),width:1.6},{name:T('Realised, 1 month','実現（1か月）'),color:col.rv,pts:M.daily.d.map((d,i)=>({x:dt(d),y:M.daily.rv[i]})).filter(p=>p.y!=null)}];
+  lineChart($('#ivC'),S1,{xType:'date',h:240,yFmt:v=>num(v,0),tipFmt:v=>vfmt(k,v)});legend($('#ivLeg'),S1);
+  const vp=M.months.map((d,i)=>M.iv[i]!=null&&M.rv_fwd[i]!=null?{x:dt(d),y:M.iv[i]-M.rv_fwd[i]}:null).filter(Boolean);
+  lineChart($('#vrpC'),[{name:T('Implied − realised over the next month','インプライド−翌月の実現'),color:cssv('--red'),pts:vp,area:1}],{xType:'date',h:240,zero:1,yFmt:v=>num(v,0),tipFmt:v=>vfmt(k,v)});
+  const pos=vp.filter(p=>p.y>0).length/Math.max(1,vp.length);
+  $('#vrpSub').innerHTML=T(`Positive in <b>${num(pos*100,0)}%</b> of months since ${M.start.slice(0,4)}, averaging <b>${vfmt(k,mean(vp.map(p=>p.y)))}</b> vol points. Sellers earn this in calm months and give much of it back in a few shocks.`,`${M.start.slice(0,4)}年以降、<b>${num(pos*100,0)}%</b>の月でプラス、平均<b>${vfmt(k,mean(vp.map(p=>p.y)))}</b>ポイント。平穏な月に稼ぎ、少数のショックで大きく返す。`);
+  /* FX */
+  let f=`<tr><th>${T('Pair','通貨ペア')}</th><th>${T('Implied (ETF)','インプライド（ETF）')}</th><th>${T('Realised 1M','実現1か月')}</th><th>${T('Realised 3M','実現3か月')}</th><th>${T('Implied − 3M','IV−3か月')}</th><th>${T('Regime','レジーム')}</th><th>${T('Structural','構造的')}</th></tr>`;
+  Object.entries(DATA.fx||{}).forEach(([p,F])=>{const t=F.today,v=FXV[p]||['—','—','thin'];const g=F.reg_model.today.indexOf(Math.max(...F.reg_model.today));const d=t.iv!=null&&t.rv3m!=null?t.iv-t.rv3m:null;
+    f+=`<tr><td>${p}</td><td>${t.iv!=null?num(t.iv,1):'—'}</td><td>${num(t.rv1m,1)}</td><td>${num(t.rv3m,1)}</td><td class="${d==null?'':d>0?'pos':'neg'}">${d==null?'—':(d>0?'+':'')+num(d,1)}</td><td><span style="color:${rcol(g)}">●</span> ${rname(g)}</td><td><span class="tag ${v[2]}">${JA()?v[1]:v[0]}</span></td></tr>`});
+  $('#fxT').innerHTML=f;
+  /* term structure */
+  const ts=[['^VIX9D','9D'],['^VIX','1M'],['^VIX3M','3M'],['^VIX6M','6M']].filter(([s])=>T0[s]!=null);
+  lineChart($('#tsC'),[{name:'VIX',color:cssv('--red'),pts:ts.map(([s],i)=>({x:i,y:T0[s]})),width:2}],{h:200,xFmt:i=>ts[i]?ts[i][1]:'',yFmt:v=>num(v,0),tipFmt:v=>num(v,2)});
+  const rt=(DATA.vix_vix3m||[]).map(p=>({x:dt(p.d),y:p.v}));
+  lineChart($('#rtC'),[{name:'VIX ÷ VIX3M',color:cssv('--steel'),pts:rt}],{xType:'date',h:160,yFmt:v=>num(v,2),ref:1});
+  $('#tsSub').innerHTML=T('Implied vol by expiry today, and the 1-month over 3-month ratio at each month end. Above 1 (inverted) has marked the worst times to sell; it also makes long-dated vol the cheap way to buy protection.','今日の満期別インプライドと、月末ごとの1か月÷3か月。1超（逆転）は売りに最悪の局面。長期ボラが安く保護を買える局面でもある。');
+}
+
+/* ---------------- LAB ---------------- */
+function renderLab(){
+  const ks=MK(),k=DATA.markets[S.lab]?S.lab:ks[0],M=DATA.markets[k];
+  $('#labPick').innerHTML=ks.map(x=>`<button class="chip ${x===k?'on':''}" data-k="${x}">${esc(DATA.markets[x].name)}</button>`).join('');
+  $$('#labPick button').forEach(b=>b.onclick=()=>{S.lab=b.dataset.k;save();renderLab()});
+  const cols={none:cssv('--mute'),'1':cssv('--steel'),'5':cssv('--a7'),'10':cssv('--gold'),budget:cssv('--red')};
+  /* scale every rule to 10% full-sample vol so the paths compare (Sharpe is unchanged by scale) */
+  const Sx=MODES.map(([m])=>{const st=stats(M.ret[m]);const sc=st?.1/st.vol:1;let v=1;return {name:mname(m),color:cols[m],width:m==='budget'?2.2:1.2,dash:m==='none'?1:0,
+    pts:M.months.map((d,i)=>M.ret[m][i]==null?null:{x:dt(d),y:((v*=1+M.ret[m][i]*sc)-1)*100}).filter(Boolean)}});
+  lineChart($('#labC'),Sx,{xType:'date',h:300,yFmt:v=>num(v,0)+'%',tipFmt:v=>pct(v,0)});legend($('#labLeg'),Sx);
+  let h=`<tr><th>${T('Hedging','ヘッジ')}</th><th>${T('Return/yr','年率')}</th><th>${T('Vol','ボラ')}</th><th>Sharpe</th><th>${T('Max DD','最大DD')}</th><th>${T('Worst month','最悪月')}</th><th>${T('Lehman, Sep–Dec 08','リーマン 08/9〜12')}</th><th>${T('Covid, Feb–Mar 20','コロナ 20/2〜3')}</th><th>${T('Since 2021','2021年以降')}</th></tr>`;
+  const i21=M.months.findIndex(d=>d>='2021-01');const best=MODES.map(([m])=>[m,stats(M.ret[m])]).filter(x=>x[1]).sort((a,b)=>b[1].sh-a[1].sh)[0];
+  MODES.forEach(([m])=>{const a=stats(M.ret[m]);if(!a)return;const p=stats(M.ret[m],i21);const l=win(M,M.ret[m],'2008-09','2008-12'),c=win(M,M.ret[m],'2020-02','2020-03');
+    h+=`<tr${m===best[0]?' style="background:var(--sel)"':''}><td><span style="color:${cols[m]}">■</span> ${mname(m)}</td><td class="${a.ret<0?'neg':''}">${pc(a.ret)}</td><td>${pc(a.vol).replace('+','')}</td><td><b>${ratio(a.sh)}</b></td><td class="neg">${pc(a.mdd)}</td><td class="neg">${pc(a.worst)}</td><td class="${l==null?'':l<0?'neg':'pos'}">${l==null?'—':pc(l)}</td><td class="${c==null?'':c<0?'neg':'pos'}">${c==null?'—':pc(c)}</td><td>${p?ratio(p.sh):'—'}</td></tr>`});
+  $('#labT').innerHTML=h;
+  $('#labSub').innerHTML=T(`Sell a 1-month at-the-money straddle every week (a quarter of the notional each), hold to expiry, priced off the ${M.unit==='bp'?'MOVE index (normal vol, P&L × duration 8)':'volatility index'}, after option bid/ask and hedging costs. Returns per unit of notional; the chart scales each rule to 10% volatility so the paths compare.`,
+    `毎週1か月ATMストラドルを想定元本の1/4ずつ売り、満期まで保有。${M.unit==='bp'?'MOVE指数（ノーマル・ボラ、損益×デュレーション8）':'ボラティリティ指数'}で価格付け、オプションのビッド・アスクとヘッジコスト控除後。リターンは想定元本当たり。チャートは比較のため各ルールをボラ10%に調整。`);
+  const b=stats(M.ret.budget),d1=stats(M.ret['1']),n0=stats(M.ret.none);
+  $('#labSay').innerHTML=T(`Best rule here: <b>${mname(best[0])}</b> (Sharpe ${ratio(best[1].sh)}). Unhedged straddles earn both the volatility premium and mean reversion but carry the full crash risk; hedging daily removes the direction but also the mean-reversion gain and pays more in costs. The variance budget hedges rarely when markets are calm and often when they are stressed: ${b&&d1?`Sharpe ${ratio(b.sh)} against ${ratio(d1.sh)} for daily`:''}${b&&n0?`, worst drawdown ${pc(b.mdd)} against ${pc(n0.mdd)} unhedged`:''}.`,
+    `この市場で最良のルール：<b>${mname(best[0])}</b>（Sharpe ${ratio(best[1].sh)}）。ヘッジなしはボラ・プレミアムと平均回帰の両方を得るがクラッシュ・リスクをすべて負う。毎日ヘッジは方向性を消すが平均回帰の利益も消え、コストも増える。分散予算は平穏時はまれに、ストレス時は頻繁にヘッジ：${b&&d1?`Sharpe ${ratio(b.sh)}（毎日は${ratio(d1.sh)}）`:''}${b&&n0?`、最大DD ${pc(b.mdd)}（ヘッジなし${pc(n0.mdd)}）`:''}。`);
+  let hm=`<table class="hm"><tr><th></th>${MODES.map(([m])=>`<th>${mname(m)}</th>`).join('')}</tr>`;
+  ks.forEach(x=>{hm+=`<tr><th style="text-align:right">${esc(DATA.markets[x].name)}</th>`+MODES.map(([m])=>{const s=stats(DATA.markets[x].ret[m]);return `<td style="background:${heat(s&&s.sh,1)}">${s?ratio(s.sh):'—'}</td>`}).join('')+'</tr>'});
+  $('#labHm').innerHTML=hm+'</table>';
+  $('#strikes').innerHTML=T(`<p><b>Strike matters less than hedging and expiry.</b> Over a full cycle the choice of strike changes the result much less than how often you hedge. Out-of-the-money options carry an extra premium (hedgers buy cheap wings), so <b>strangles</b> collect a vol-of-vol premium on top of the straddle’s.</p><p><b>One trade, three premia.</b> In EUR/USD, selling an out-of-the-money call and put in a 2:3 ratio collects the volatility, skew and vol-of-vol premia together; it lifted the return-to-risk of plain straddles by about 0.14. In currencies, the skew premium follows risk beta: sell puts and buy calls on pairs like AUD/USD, and the reverse on USD/NOK.</p><p><b>Expiry.</b> Very short options cost too much to trade; beyond six months the premium flattens. So a gamma-weighted <b>calendar</b> (long 2-year, short 1-year straddles) is long vega at little cost: a cheap way to own volatility.</p><p class="minor">Strangle and skew results need historical smiles, which free data does not have, so these are not back-tested here.</p>`,
+    `<p><b>行使価格より、ヘッジと満期が重要。</b>サイクル全体では、行使価格の選択より、ヘッジ頻度の方が結果を大きく左右する。OTMオプションには追加のプレミアム（ヘッジャーが安いウィングを買う）があり、<b>ストラングル</b>はストラドルに加えてボラのボラのプレミアムも得る。</p><p><b>1つの取引で3つのプレミアム。</b>EUR/USDではOTMのコールとプットを2:3で売ると、ボラ・スキュー・ボラのボラの3つを同時に得て、ストラドル比でリターン/リスクが約0.14改善。通貨ではスキュー・プレミアムはリスク感応度に従う：AUD/USDはプット売り・コール買い、USD/NOKは逆。</p><p><b>満期。</b>超短期は取引コストが高すぎ、6か月超ではプレミアムが横ばい。ガンマで加重した<b>カレンダー</b>（2年買い・1年売りストラドル）は低コストでベガ・ロング：安くボラを持つ方法。</p><p class="minor">ストラングルとスキューの結果には過去のスマイルが必要で、無料データにはないため、ここではバックテストしていない。</p>`);
+}
+
+/* ---------------- TIMING ---------------- */
+function renderTiming(){
+  const ks=MK();
+  let h=`<tr><th>${T('Market','市場')}</th><th>${T('Today','今日')}</th><th>${T('Probabilities: low · medium · high · distressed','確率：低・中・高・危機')}</th><th>${T('Regime levels','各レジームの水準')}</th><th>${T('Typical stay','平均滞在')}</th></tr>`;
+  const row=(name,R,unit)=>{const p=R.today,g=p.indexOf(Math.max(...p));const stay=R.stay.map(a=>a<1?Math.round(1/(1-a)):null);
+    return `<tr><td>${esc(name)}</td><td><span style="color:${rcol(g)}">●</span> <b style="font-weight:500">${rname(g)}</b> ${num(p[g]*100,0)}%</td><td><span class="rbar">${p.map((v,i)=>`<i style="width:${v*100}%;background:${rcol(i)}"></i>`).join('')}</span></td><td>${R.levels.map(v=>num(unit==='bp'?v:v*100,unit==='bp'?0:1)).join(' · ')}</td><td>${stay.map(s=>s?s+T('w','週'):'—').join(' · ')}</td></tr>`};
+  ks.forEach(k=>h+=row(DATA.markets[k].name,DATA.markets[k].reg_model,DATA.markets[k].unit));
+  Object.entries(DATA.fx||{}).forEach(([p,F])=>h+=row(p+T(' (realised)','（実現）'),F.reg_model,'%'));
+  $('#rgT').innerHTML=h;
+  const tr=DATA.markets.SPX?DATA.markets.SPX.reg_model.train_end:'';
+  $('#rgSub').innerHTML=T(`Four regimes found by a hidden Markov model on weekly volatility, fitted on data to ${tr.slice(0,4)} and run forward since without refitting (each week uses only what was known then). Volatility mean-reverts to a different level in each regime, and regimes persist for weeks to months. Currencies use realised vol (no free implied history).`,`週次ボラに隠れマルコフ・モデルを当てはめた4つのレジーム。${tr.slice(0,4)}年までで推定し、以降は再推定せず前進的に適用（各週はその時点の情報のみ）。レジームごとに異なる水準へ平均回帰し、数週〜数か月続く。通貨は実現ボラ（インプライドの無料履歴がないため）。`);
+  const k=DATA.markets[S.rg]?S.rg:ks[0],M=DATA.markets[k];
+  $('#rgPick').innerHTML=ks.map(x=>`<button class="chip ${x===k?'on':''}" data-k="${x}">${esc(DATA.markets[x].name)}</button>`).join('');
+  $$('#rgPick button').forEach(b=>b.onclick=()=>{S.rg=b.dataset.k;save();renderTiming()});
+  $('#rgH').textContent=T(`${M.name}: vol and regime`,`${M.name}：ボラとレジーム`);
+  const S1=[{name:T('Implied, month end','インプライド（月末）'),color:cssv('--ink'),pts:M.months.map((d,i)=>M.iv[i]==null?null:{x:dt(d),y:M.iv[i]}).filter(Boolean)}];
+  lineChart($('#rgC'),S1,{xType:'date',h:220,yFmt:v=>num(v,0),tipFmt:v=>vfmt(k,v)});
+  $('#rgStrip').innerHTML=M.regime.map(g=>`<i style="background:${rcol(g)}"></i>`).join('');
+  $('#rgLeg').innerHTML=RG.map((r,i)=>`<span><i style="background:${rcol(i)};height:8px"></i>${JA()?r[1]:r[0]}</span>`).join('');
+  /* next-month return of the budget-hedged straddle by regime at month end */
+  let rp=`<tr><th>${T('Regime at month end','月末のレジーム')}</th><th>${T('Months','月数')}</th>${MODES.filter(([m])=>m!=='5'&&m!=='10').map(([m])=>`<th>${mname(m)}</th>`).join('')}<th>${T('Hit rate','勝率')}</th></tr>`;
+  for(let g=0;g<4;g++){const idx=M.regime.map((r,i)=>r===g&&i+1<M.months.length?i+1:-1).filter(i=>i>0);
+    const cells=MODES.filter(([m])=>m!=='5'&&m!=='10').map(([m])=>{const x=idx.map(i=>M.ret[m][i]).filter(v=>v!=null);const s=sd(x);return x.length>=6?`<td class="${mean(x)<0?'neg':'pos'}">${num(mean(x)/s*Math.sqrt(12),2)}</td>`:'<td>—</td>'});
+    const xb=idx.map(i=>M.ret.budget[i]).filter(v=>v!=null);
+    rp+=`<tr><td><span style="color:${rcol(g)}">●</span> ${rname(g)}</td><td>${idx.length}</td>${cells.join('')}<td>${xb.length?num(xb.filter(v=>v>0).length/xb.length*100,0)+'%':'—'}</td></tr>`}
+  $('#rpT').innerHTML=rp;
+  $('#rpSub').innerHTML=T('Annualised Sharpe of the following month’s return, grouped by the regime the model saw at the end of the month before. The book can stand aside from a market in the distressed regime.','前月末にモデルが判定したレジーム別の、翌月リターンの年率Sharpe。ブックでは危機レジームの市場を休むことができる。');
+  /* seasonality heatmap */
+  const now=new Date().getMonth()+1;const mn=JA()?['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月']:['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  let s=`<table class="hm"><tr><th></th>${mn.map((m,i)=>`<th class="${i+1===now?'cur':''}">${m}</th>`).join('')}</tr>`;
+  const rowS=(name,se,unit,ret)=>`<tr><th style="text-align:right">${esc(name)}</th>`+se.map(c=>{const v=c.avg==null?null:-c.avg/(unit==='bp'?10:1);return `<td style="background:${heat(v,1.2)}" title="${c.n} yrs, up ${num((c.up||0)*100,0)}%">${c.avg==null?'—':(c.avg>0?'+':'')+num(c.avg,unit==='bp'?0:1)}</td>`}).join('')+'</tr>';
+  ks.forEach(k2=>s+=rowS(DATA.markets[k2].name,DATA.markets[k2].season,DATA.markets[k2].unit));
+  Object.entries(DATA.fx||{}).forEach(([p,F])=>s+=rowS(p,F.season,'%'));
+  /* straddle seller's average return by calendar month, all markets (budget hedge) */
+  const bym=Array(12).fill(0).map(()=>[]);ks.forEach(k2=>{const M2=DATA.markets[k2],st=stats(M2.ret.budget);if(!st)return;M2.months.forEach((d,i)=>{const v=M2.ret.budget[i];if(v!=null)bym[+d.slice(5,7)-1].push(v/st.vol*.1)})});
+  s+=`<tr><th style="text-align:right"><b>${T('Seller’s return, all markets','売り手のリターン（全市場）')}</b></th>`+bym.map(a=>{const m=mean(a)*100;return `<td style="background:${heat(m,1)}">${a.length?(m>0?'+':'')+num(m,1):'—'}</td>`}).join('')+'</tr>';
+  $('#ssHm').innerHTML=s+'</table>';
+  $('#ssSub').innerHTML=T('Average change in vol from the end of the previous month (vol points; bp for Treasuries). Green = vol tends to fall (good for sellers), red = it tends to rise. The last row is the variance-budget straddle seller’s average monthly return at 10% volatility.','前月末からのボラの平均変化（ポイント、米国債はbp）。緑＝低下しやすい（売り手に有利）、赤＝上昇しやすい。最終行は分散予算ヘッジのストラドル売りの月平均リターン（ボラ10%換算）。');
+  const cur=bym[now-1],nxt=bym[now%12];
+  $('#ssSay').innerHTML=T(`Across G10 currencies the research finds a hot season (May, August, November: vol rises) and a cold season (January, February, April, July), shared across pairs and years, and holiday months trading at a discount in the term structure. Sellers earn most in the cold months. This month the seller’s average has been <b>${num(mean(cur)*100,1)}%</b>, next month <b>${num(mean(nxt)*100,1)}%</b>.`,`G10通貨ではボラが上がる「暑い季節」（5月・8月・11月）と下がる「寒い季節」（1月・2月・4月・7月）があり、通貨・年をまたいで共通。休暇月は期間構造で割安。売り手は寒い月に最も稼ぐ。今月の売り手の平均は<b>${num(mean(cur)*100,1)}%</b>、来月は<b>${num(mean(nxt)*100,1)}%</b>。`);
+}
+
+/* ---------------- BOOK ---------------- */
+function basket(){
+  const ks=MK(),grid=[...new Set(ks.flatMap(k=>DATA.markets[k].months))].sort();
+  const R={};ks.forEach(k=>{const M=DATA.markets[k],ix={};M.months.forEach((d,i)=>ix[d]=i);R[k]=grid.map(d=>ix[d]==null?null:M.ret[S.hedge][ix[d]])});
+  const REG={},SC={};ks.forEach(k=>{const M=DATA.markets[k],ix={};M.months.forEach((d,i)=>ix[d]=i);REG[k]=grid.map(d=>ix[d]==null?null:M.regime[ix[d]]);
+    SC[k]=grid.map(d=>{const i=ix[d];if(i==null||M.iv[i]==null||M.hv[i]==null||!M.hv[i])return null;return (M.iv[i]-M.hv[i])/M.hv[i]})});
+  /* robust risk: the larger of 12 and 36-month vol, so it is cautious before a shock and stable after it */
+  const rob=(a,t)=>{const x12=a.slice(Math.max(0,t-11),t+1).filter(v=>v!=null),x36=a.slice(Math.max(0,t-35),t+1).filter(v=>v!=null);if(x12.length<9)return null;return Math.max(sd(x12),x36.length>=24?sd(x36):0)*Math.sqrt(12)};
+  const W=[],out=Array(grid.length).fill(null),raw=Array(grid.length).fill(null);
+  for(let t=0;t<grid.length;t++){
+    if(t>0&&W[t-1]){let r=0;for(const k in W[t-1].w){const v=R[k][t];if(v!=null)r+=W[t-1].w[k]*v}out[t]=r*W[t-1].k}
+    const w={};ks.forEach(k=>{const s=rob(R[k],t);if(!s)return;let x=1/s;if(S.tilt&&SC[k][t]!=null)x*=Math.max(.25,Math.min(2,1+2*SC[k][t]));if(S.dist&&REG[k][t]===3)x=0;w[k]=x});
+    const tot=Object.values(w).reduce((a,b)=>a+b,0);if(!tot){W[t]=null;continue}for(const k in w)w[k]/=tot;
+    /* basket raw return series so far, to scale to the target vol robustly */
+    let r0=null;if(t>0&&W[t-1]){r0=0;for(const k in W[t-1].w){const v=R[k][t];if(v!=null)r0+=W[t-1].w[k]*v}}raw[t]=r0;
+    const sb=rob(raw,t);W[t]={w,k:sb?S.vol/100/sb:0}}
+  return {grid,W,out,R}}
+function renderBook(){
+  $('#hSeg').innerHTML=MODES.map(([m])=>`<button data-v="${m}" class="${m===S.hedge?'on':''}">${mname(m)}</button>`).join('');
+  $$('#hSeg button').forEach(b=>b.onclick=()=>{S.hedge=b.dataset.v;save();renderBook()});
+  [['#tSeg',String(S.tilt)],['#dSeg',String(S.dist)],['#vSeg',String(S.vol)]].forEach(([id,v])=>$$(id+' button').forEach(b=>b.classList.toggle('on',b.dataset.v===v)));
+  $('#nav').value=num(S.nav,0);
+  const B=basket(),n=B.grid.length,last=B.W[n-1],N=S.nav;
+  if(!last){$('#bkT').innerHTML='';return}
+  const ks=MK();let h=`<tr><th>${T('Market','市場')}</th><th>${T('Weight','ウェイト')}</th><th>${T('Notional','想定元本')}</th><th>${T('Sell this week','今週の売り')}</th><th>${T('Premium a month','月プレミアム')}</th><th>${T('Hedge budget used','ヘッジ予算使用率')}</th><th>${T('Regime','レジーム')}</th></tr>`;
+  const tick=[],act=[];let premT=0;
+  ks.forEach(k=>{const M=DATA.markets[k],w=last.w[k]||0,no=w*last.k*N;const pm=M.prem.filter(v=>v!=null).slice(-12),ret=M.ret.none.filter(v=>v!=null);
+    /* premium collected per unit of notional per month, recent year */
+    const pr=mean(pm);premT+=pr*no;const bud=M.today.budget||{};const used=bud.budget_used;const g=M.reg_model.today.indexOf(Math.max(...M.reg_model.today));
+    const bc=used==null?'var(--track)':used>=1?'var(--red)':used>.7?'var(--gold)':'var(--pos)';
+    h+=`<tr><td>${esc(M.name)}</td><td>${num(w*100,0)}%</td><td>${no>0?usd(no):'—'}</td><td>${no>0?usd(no/4):'—'}</td><td>${no>0?usd(pr*no):'—'}</td><td>${S.hedge==='budget'?`<span class="meter"><b style="width:${Math.min(100,(used||0)*100)}%;background:${bc}"></b></span> ${used==null?'—':num(used*100,0)+'%'}`:'—'}</td><td><span style="color:${rcol(g)}">●</span> ${rname(g)}</td></tr>`;
+    if(no>0)tick.push(`SELL  ${M.name.padEnd(18)} 1M ATM straddle  ${usd(no/4).padStart(8)} notional (weekly 1/4 of ${usd(no)})`);
+    if(S.hedge==='budget'&&used!=null&&used>=1&&no>0)act.push(`HEDGE ${M.name.padEnd(18)} reset delta to zero (budget ${num(used*100,0)}% used, ${bud.days_since_hedge}d since last)`);
+    if(S.dist&&g===3)act.push(`SKIP  ${M.name.padEnd(18)} distressed regime: no new sales`)});
+  $('#bkT').innerHTML=h;
+  $('#ticket').textContent=`KEEL PREMIUM · ${mname(S.hedge)} hedge · vol ${S.vol}% · NAV ${usd(N)} · ${DATA.asof}\n`+[...act,...tick].join('\n');
+  const st=stats(B.out),s21=stats(B.out,B.grid.findIndex(d=>d>='2021-01'));
+  const used=ks.map(k=>DATA.markets[k].today.budget&&DATA.markets[k].today.budget.budget_used).filter(v=>v!=null);
+  const due=ks.filter(k=>{const b=DATA.markets[k].today.budget;return S.hedge==='budget'&&b&&b.budget_used>=1&&last.w[k]>0});
+  $('#bVerdict').innerHTML=T(`Sell <b class="r">${usd(premT)}</b> of premium a month across ${Object.values(last.w).filter(v=>v>0).length} markets at ${S.vol}% target volatility. ${due.length?`<b class="r">Re-hedge now: ${due.map(k=>esc(DATA.markets[k].name)).join(', ')}</b> (hedge budget used up).`:'No hedge is due today.'} ${ks.filter(k=>last.w[k]===0).length?`Standing aside: ${ks.filter(k=>last.w[k]===0).map(k=>esc(DATA.markets[k].name)).join(', ')}.`:''}`,
+    `目標ボラ${S.vol}%で${Object.values(last.w).filter(v=>v>0).length}市場、月<b class="r">${usd(premT)}</b>のプレミアムを売る。${due.length?`<b class="r">今すぐ再ヘッジ：${due.map(k=>esc(DATA.markets[k].name)).join('、')}</b>（ヘッジ予算を使い切り）。`:'今日必要なヘッジはなし。'}${ks.filter(k=>last.w[k]===0).length?`休む市場：${ks.filter(k=>last.w[k]===0).map(k=>esc(DATA.markets[k].name)).join('、')}。`:''}`);
+  const K=[[T('Basket Sharpe','バスケットSharpe'),st?ratio(st.sh):'—',s21?T(`Since 2021: ${ratio(s21.sh)}`,`2021年以降：${ratio(s21.sh)}`):''],
+    [T('Max drawdown','最大DD'),st?pc(st.mdd):'—',st?T(`Worst month ${pc(st.worst)}`,`最悪月 ${pc(st.worst)}`):''],
+    [T('1-month VaR 95%','1か月VaR95%'),usd(1.645*S.vol/100/Math.sqrt(12)*N),T('Normal approx.; short vol has fat left tails','正規近似。売りは左裾が厚い')],
+    [T('Gross notional','グロス想定元本'),usd(Object.values(last.w).reduce((a,b)=>a+b,0)*last.k*N),T('Sum of straddle notionals','ストラドル想定元本の合計')],
+    [T('Next sale','次回の売り'),(()=>{const d=new Date();d.setDate(d.getDate()+((5-d.getDay()+7)%7||7));return d.toLocaleDateString(JA()?'ja-JP':'en-GB',{weekday:'short',day:'numeric',month:'short'})})(),T('Weekly, a quarter of each notional','毎週、各想定元本の1/4')]];
+  $('#bKpis').innerHTML=K.map(([a,v,s])=>`<div class="kpi"><span class="lbl">${a}</span><span class="v" style="font-size:24px">${v}</span><span class="s">${s}</span></div>`).join('');
+  $('#bkSub').innerHTML=T(`Weights from a robust risk measure (the larger of 1 and 3-year volatility of each market’s straddle strategy)${S.tilt?', tilted towards markets where implied is furthest above adjusted realised':''}${S.dist?', zero in the distressed regime':''}; scaled so the basket targets ${S.vol}% volatility.`,`ロバストなリスク指標（各市場のストラドル戦略の1年・3年ボラの大きい方）でウェイト付け${S.tilt?'、インプライドが調整後実現を最も上回る市場に傾斜':''}${S.dist?'、危機レジームではゼロ':''}。バスケットで目標ボラ${S.vol}%に調整。`);
+  /* back-test chart: chosen settings vs simple equal-notional basket */
+  const eq=B.grid.map((d,t)=>{const v=MK().map(k=>B.R[k][t]).filter(x=>x!=null);return v.length?mean(v):null});const se=stats(eq);const ke=se?S.vol/100/se.vol:1;
+  const cum=(a,k=1)=>{let v=1;return a.map((x,i)=>x==null?null:{x:dt(B.grid[i]),y:((v*=1+x*k)-1)*100}).filter(Boolean)};
+  const SS=[{name:T('Equal notional, same rule (scaled after the fact)','均等想定元本・同ルール（事後調整）'),color:cssv('--steel'),pts:cum(eq,ke),dash:1},{name:T('Robust risk parity, as set','ロバスト・リスクパリティ（設定どおり）'),color:cssv('--red'),pts:cum(B.out),width:2.2}];
+  lineChart($('#btC'),SS,{xType:'date',h:280,yFmt:v=>num(v,0)+'%',tipFmt:v=>pct(v,1)});legend($('#btLeg'),SS);
+  let t2=`<tr><th></th><th>${T('Return/yr','年率')}</th><th>${T('Vol','ボラ')}</th><th>Sharpe</th><th>${T('Max DD','最大DD')}</th><th>${T('Worst month','最悪月')}</th></tr>`;
+  [[T('Robust risk parity, as set','ロバスト・リスクパリティ'),st],[T('Equal notional','均等想定元本'),se&&{...se,ret:se.ret*ke,vol:se.vol*ke,mdd:stats(eq.map(x=>x==null?null:x*ke)).mdd,worst:se.worst*ke}]].forEach(([n,s])=>{if(s)t2+=`<tr><td>${n}</td><td>${pc(s.ret)}</td><td>${pc(s.vol).replace('+','')}</td><td><b>${ratio(s.sh)}</b></td><td class="neg">${pc(s.mdd)}</td><td class="neg">${pc(s.worst)}</td></tr>`});
+  $('#btT').innerHTML=t2;
+  $('#btSub').innerHTML=T('Monthly, weights and scale known at the start of each month. The robust measure is cautious before a shock (the short window jumps first) and stable afterwards (the long window remembers), so it cuts exposure into crises without abandoning the premium after them.','月次、ウェイトとスケールは各月初に既知の情報のみ。ロバスト指標はショック前に慎重（短期の窓が先に上昇）、ショック後は安定（長期の窓が記憶）なので、危機前に露出を減らし、その後もプレミアムを放棄しない。');
+}
+
+function method(){
+  $('#method').innerHTML=T(`<b>Method.</b> Straddles: 1-month at the money, one sold every week for a quarter of the notional, held to expiry, Black-Scholes off the market’s volatility index divided by a typical index-to-at-the-money ratio (VIX ÷ 1.10, VXN ÷ 1.08, OVX on USO ÷ 1.05, GVZ on GLD ÷ 1.04: these indices price variance swaps, which sit above at-the-money vol because of the skew), and Bachelier off MOVE for the US 10-year yield (P&amp;L × duration 8). Marked daily at the index level, so smile and term-structure effects are left out. Costs: half bid/ask of 0.3–0.8 vol points (2bp for MOVE) on entry, 1–2bp on every hedge trade. Hedging: none, every 1, 5 or 10 trading days, or a variance budget (re-hedge once squared moves since the last hedge add up to ten days of implied variance). Adjusted realised vol: monthly moves over two years, scaled up by the volatility of volatility. Regimes: four-state Gaussian hidden Markov model on weekly log vol. Currencies: realised vol from Yahoo; implied from currency ETF options (FXE, FXY, FXB, FXA, FXC, FXF). Data to ${fdate(DATA.asof)}${(DATA.errors||[]).length?'; missing: '+esc(DATA.errors.join('; ')):''}. Back-tests on free public data describe the past; short volatility has fat left tails that a short history can understate. Not advice.`,
+    `<b>算出方法。</b>ストラドル：1か月ATM、毎週想定元本の1/4ずつ売り満期まで保有。各市場のボラ指数を典型的な指数/ATM比で割った値（VIX÷1.10、VXN÷1.08、USOのOVX÷1.05、GLDのGVZ÷1.04：これらは分散スワップの価格でスキューの分ATMより高い）でブラック・ショールズ、米10年金利はMOVEでバシュリエ（損益×デュレーション8）。日次で指数水準で評価するため、スマイルと期間構造の効果は含まない。コスト：エントリー時にビッド・アスクの半分0.3〜0.8ポイント（MOVEは2bp）、ヘッジ取引ごとに1〜2bp。ヘッジ：なし、1・5・10営業日ごと、または分散予算（前回ヘッジ以降の二乗変動がインプライド分散の10日分に達したら再ヘッジ）。調整後実現ボラ：2年間の月次変動をボラのボラで上方調整。レジーム：週次対数ボラの4状態ガウス隠れマルコフ・モデル。通貨：実現はYahoo、インプライドは通貨ETF（FXE、FXY、FXB、FXA、FXC、FXF）のオプション。データは${fdate(DATA.asof)}まで${(DATA.errors||[]).length?'。欠損：'+esc(DATA.errors.join('; ')):''}。無料の公開データによるバックテストは過去の記述。ボラ売りは左裾が厚く、短い履歴では過小評価されうる。助言ではありません。`);
+}
+
+/* ---------------- wiring ---------------- */
+function render(){if(!DATA)return;$$('#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.v===S.tab));['map','lab','timing','book'].forEach(v=>$('#v-'+v).hidden=v!==S.tab);
+  ({map:renderMap,lab:renderLab,timing:renderTiming,book:renderBook})[S.tab]();method()}
+window.redraw=render;
+async function load(fresh){
+  setStatus('busy');
+  const r=await keel('api_volpremium',{years:22},{fresh});
+  if(r.ok&&r.data&&r.data.markets){DATA=r.data;LIVE=true;setStatus('live')}
+  else{DATA=SAMPLE;LIVE=false;setStatus(r.code==='no_mcp'?'sample':'err',r.code,r.message)}
+  render();
+}
+const SAMPLE=/*SAMPLE*/;
+$('#how').innerHTML=howHtml();
+$$('#tabs button').forEach(b=>b.onclick=()=>{S.tab=b.dataset.v;save();render()});
+$$('#tSeg button').forEach(b=>b.onclick=()=>{S.tilt=+b.dataset.v;save();renderBook()});
+$$('#dSeg button').forEach(b=>b.onclick=()=>{S.dist=+b.dataset.v;save();renderBook()});
+$$('#vSeg button').forEach(b=>b.onclick=()=>{S.vol=+b.dataset.v;save();renderBook()});
+$('#nav').onchange=e=>{const v=+String(e.target.value).replace(/[^\d.]/g,'');S.nav=v>0?v:100e6;save();renderBook()};
+$('#copy').onclick=async()=>{try{await navigator.clipboard.writeText($('#ticket').textContent);$('#copy').textContent=T('Copied','コピーしました')}catch(e){const s=getSelection(),g=document.createRange();g.selectNodeContents($('#ticket'));s.removeAllRanges();s.addRange(g);$('#copy').textContent=T('Selected: copy it','選択済み：コピーしてください')}setTimeout(()=>$('#copy').textContent=T('Copy ticket','チケットをコピー'),2000)};
+$$('#langSeg button').forEach(b=>b.onclick=()=>{setLang(b.dataset.l);$('#how').innerHTML=howHtml();restatus();render()});
+$('#refresh').onclick=()=>load(true);
+setLang(LANG);load(false);
+</script>
