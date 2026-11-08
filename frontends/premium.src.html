@@ -33,7 +33,7 @@ table.mt tr.click{cursor:pointer}table.mt tr.click:hover td{background:var(--sel
 .ticket{font:12px/1.55 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:var(--track);padding:12px;white-space:pre-wrap;word-break:break-word;margin:0 0 10px;max-height:300px;overflow:auto}
 .routine{margin-top:18px;font-size:13px;line-height:1.5}.routine h3{font-size:14px;font-weight:500;margin:0 0 6px}
 .routine ol{margin:0;padding-left:18px;color:var(--mute)}.routine li{margin-bottom:4px}
-.meter{display:inline-block;width:80px;height:8px;background:var(--track);vertical-align:middle;position:relative}
+.meter{display:inline-block;width:44px;height:8px;background:var(--track);vertical-align:middle;position:relative}
 .meter b{position:absolute;left:0;top:0;bottom:0}
 .rbar{display:flex;height:10px;width:120px;vertical-align:middle}
 .rbar i{display:block;height:100%}
@@ -77,7 +77,7 @@ table.mt tr.click{cursor:pointer}table.mt tr.click:hover td{background:var(--sel
     <section class="sec two even">
       <div style="min-width:0">
         <div class="sh"><h2 data-ja="通貨：インプライドと実現">Currencies: implied against realised</h2><p data-ja="インプライドは通貨ETFのオプション（約1か月）、実現は直近1か月・3か月。評価は2007〜2021年の通貨オプション研究による。">Implied from currency ETF options (about one month); realised over one and three months. The structural column is what fifteen years of systematic FX option selling found.</p></div>
-        <div class="tw"><table class="mt" id="fxT"></table></div>
+        <div class="tw"><table class="mt" id="fxT"></table></div><p class="stat" id="fxNote"></p>
       </div>
       <div style="min-width:0">
         <div class="sh"><h2 data-ja="VIXの期間構造">VIX term structure</h2><p id="tsSub"></p></div>
@@ -184,7 +184,7 @@ const mname=k=>{const m=MODES.find(x=>x[0]===k);return m?m[JA()?2:1]:k};
 const RG=[['Low','低'],['Medium','中'],['High','高'],['Distressed','危機']];
 const rname=i=>i==null?'—':RG[i][JA()?1:0];
 const rcol=i=>['var(--a5)','var(--a1)','var(--a3)','var(--red)'][i]||'var(--track)';
-const FXV={EURUSD:['seller rewarded','売り手が報われる','rich'],USDJPY:['seller rewarded','売り手が報われる','rich'],GBPUSD:['mixed','まちまち','fair'],USDCAD:['mixed','まちまち','fair'],USDCHF:['mixed (peg history)','まちまち（ペッグ歴）','fair'],AUDUSD:['hazardous: structured-product supply','危険：仕組債の売り供給','avoid'],NZDUSD:['hazardous: risk beta','危険：リスク感応度','avoid'],USDNOK:['hazardous: illiquid, risk beta','危険：流動性・リスク感応度','avoid'],USDSEK:['hazardous: illiquid, risk beta','危険：流動性・リスク感応度','avoid']};
+const FXV={EURUSD:['Rewarded','報われる','rich','Sellers rewarded in every tenor and regime'],USDJPY:['Rewarded','報われる','rich','Sellers rewarded across tenors; distressed regimes hurt'],GBPUSD:['Mixed','まちまち','fair',''],USDCAD:['Mixed','まちまち','fair',''],USDCHF:['Mixed','まちまち','fair','Peg history (2011-15)'],AUDUSD:['Hazardous','危険','avoid','Dual-currency deposit supply keeps vol low; high risk beta'],NZDUSD:['Hazardous','危険','avoid','High risk beta'],USDNOK:['Hazardous','危険','avoid','Illiquid, risk beta'],USDSEK:['Hazardous','危険','avoid','Illiquid, risk beta']};
 const mean=a=>a.reduce((s,x)=>s+x,0)/(a.length||1);
 const sd=a=>{if(a.length<2)return NaN;const m=mean(a);return Math.sqrt(a.reduce((s,x)=>s+(x-m)**2,0)/(a.length-1))};
 const pc=(v,d=1)=>v==null||!isFinite(v)?'—':pct(v*100,d);
@@ -238,8 +238,9 @@ function renderMap(){
   /* FX */
   let f=`<tr><th>${T('Pair','通貨ペア')}</th><th>${T('Implied (ETF)','インプライド（ETF）')}</th><th>${T('Realised 1M','実現1か月')}</th><th>${T('Realised 3M','実現3か月')}</th><th>${T('Implied − 3M','IV−3か月')}</th><th>${T('Regime','レジーム')}</th><th>${T('Structural','構造的')}</th></tr>`;
   Object.entries(DATA.fx||{}).forEach(([p,F])=>{const t=F.today,v=FXV[p]||['—','—','thin'];const g=F.reg_model.today.indexOf(Math.max(...F.reg_model.today));const d=t.iv!=null&&t.rv3m!=null?t.iv-t.rv3m:null;
-    f+=`<tr><td>${p}</td><td>${t.iv!=null?num(t.iv,1):'—'}</td><td>${num(t.rv1m,1)}</td><td>${num(t.rv3m,1)}</td><td class="${d==null?'':d>0?'pos':'neg'}">${d==null?'—':(d>0?'+':'')+num(d,1)}</td><td><span style="color:${rcol(g)}">●</span> ${rname(g)}</td><td><span class="tag ${v[2]}">${JA()?v[1]:v[0]}</span></td></tr>`});
+    f+=`<tr><td>${p}</td><td>${t.iv!=null?num(t.iv,1):'—'}</td><td>${num(t.rv1m,1)}</td><td>${num(t.rv3m,1)}</td><td class="${d==null?'':d>0?'pos':'neg'}">${d==null?'—':(d>0?'+':'')+num(d,1)}</td><td><span style="color:${rcol(g)}">●</span> ${rname(g)}</td><td><span class="tag ${v[2]}" title="${esc(v[3]||'')}">${JA()?v[1]:v[0]}</span></td></tr>`});
   $('#fxT').innerHTML=f;
+  $('#fxNote').textContent=Object.values(DATA.fx||{}).some(F=>F.today.iv!=null)?'':T('Currency ETF option prices did not load this time, so implied is blank; realised, regimes and the structural view still apply.','通貨ETFのオプション価格を今回取得できなかったため、インプライドは空欄。実現・レジーム・構造的評価は有効。');
   /* term structure */
   const ts=[['^VIX9D','9D'],['^VIX','1M'],['^VIX3M','3M'],['^VIX6M','6M']].filter(([s])=>T0[s]!=null);
   lineChart($('#tsC'),[{name:'VIX',color:cssv('--red'),pts:ts.map(([s],i)=>({x:i,y:T0[s]})),width:2}],{h:200,xFmt:i=>ts[i]?ts[i][1]:'',yFmt:v=>num(v,0),tipFmt:v=>num(v,2)});
@@ -256,15 +257,15 @@ function renderLab(){
   const cols={none:cssv('--mute'),'1':cssv('--steel'),'5':cssv('--a7'),'10':cssv('--gold'),budget:cssv('--red')};
   /* scale every rule to 10% full-sample vol so the paths compare (Sharpe is unchanged by scale) */
   const Sx=MODES.map(([m])=>{const st=stats(M.ret[m]);const sc=st?.1/st.vol:1;let v=1;return {name:mname(m),color:cols[m],width:m==='budget'?2.2:1.2,dash:m==='none'?1:0,
-    pts:M.months.map((d,i)=>M.ret[m][i]==null?null:{x:dt(d),y:((v*=1+M.ret[m][i]*sc)-1)*100}).filter(Boolean)}});
+    pts:M.months.map((d,i)=>M.ret[m][i]==null?null:{x:dt(d),y:(v+=M.ret[m][i]*sc*100)-1}).filter(Boolean)}});
   lineChart($('#labC'),Sx,{xType:'date',h:300,yFmt:v=>num(v,0)+'%',tipFmt:v=>pct(v,0)});legend($('#labLeg'),Sx);
   let h=`<tr><th>${T('Hedging','ヘッジ')}</th><th>${T('Return/yr','年率')}</th><th>${T('Vol','ボラ')}</th><th>Sharpe</th><th>${T('Max DD','最大DD')}</th><th>${T('Worst month','最悪月')}</th><th>${T('Lehman, Sep–Dec 08','リーマン 08/9〜12')}</th><th>${T('Covid, Feb–Mar 20','コロナ 20/2〜3')}</th><th>${T('Since 2021','2021年以降')}</th></tr>`;
   const i21=M.months.findIndex(d=>d>='2021-01');const best=MODES.map(([m])=>[m,stats(M.ret[m])]).filter(x=>x[1]).sort((a,b)=>b[1].sh-a[1].sh)[0];
   MODES.forEach(([m])=>{const a=stats(M.ret[m]);if(!a)return;const p=stats(M.ret[m],i21);const l=win(M,M.ret[m],'2008-09','2008-12'),c=win(M,M.ret[m],'2020-02','2020-03');
     h+=`<tr${m===best[0]?' style="background:var(--sel)"':''}><td><span style="color:${cols[m]}">■</span> ${mname(m)}</td><td class="${a.ret<0?'neg':''}">${pc(a.ret)}</td><td>${pc(a.vol).replace('+','')}</td><td><b>${ratio(a.sh)}</b></td><td class="neg">${pc(a.mdd)}</td><td class="neg">${pc(a.worst)}</td><td class="${l==null?'':l<0?'neg':'pos'}">${l==null?'—':pc(l)}</td><td class="${c==null?'':c<0?'neg':'pos'}">${c==null?'—':pc(c)}</td><td>${p?ratio(p.sh):'—'}</td></tr>`});
   $('#labT').innerHTML=h;
-  $('#labSub').innerHTML=T(`Sell a 1-month at-the-money straddle every week (a quarter of the notional each), hold to expiry, priced off the ${M.unit==='bp'?'MOVE index (normal vol, P&L × duration 8)':'volatility index'}, after option bid/ask and hedging costs. Returns per unit of notional; the chart scales each rule to 10% volatility so the paths compare.`,
-    `毎週1か月ATMストラドルを想定元本の1/4ずつ売り、満期まで保有。${M.unit==='bp'?'MOVE指数（ノーマル・ボラ、損益×デュレーション8）':'ボラティリティ指数'}で価格付け、オプションのビッド・アスクとヘッジコスト控除後。リターンは想定元本当たり。チャートは比較のため各ルールをボラ10%に調整。`);
+  $('#labSub').innerHTML=T(`Sell a 1-month at-the-money straddle every week (a quarter of the notional each), hold to expiry, priced off the ${M.unit==='bp'?'MOVE index (normal vol, P&L × duration 8)':'volatility index'}, after option bid/ask and hedging costs. Returns per unit of notional; the chart adds up monthly returns with each rule scaled to 10% volatility, so the paths compare.`,
+    `毎週1か月ATMストラドルを想定元本の1/4ずつ売り、満期まで保有。${M.unit==='bp'?'MOVE指数（ノーマル・ボラ、損益×デュレーション8）':'ボラティリティ指数'}で価格付け、オプションのビッド・アスクとヘッジコスト控除後。リターンは想定元本当たり。チャートは比較のため各ルールをボラ10%に調整し、月次リターンを累積（単利）。`);
   const b=stats(M.ret.budget),d1=stats(M.ret['1']),n0=stats(M.ret.none);
   $('#labSay').innerHTML=T(`Best rule here: <b>${mname(best[0])}</b> (Sharpe ${ratio(best[1].sh)}). Unhedged straddles earn both the volatility premium and mean reversion but carry the full crash risk; hedging daily removes the direction but also the mean-reversion gain and pays more in costs. The variance budget hedges rarely when markets are calm and often when they are stressed: ${b&&d1?`Sharpe ${ratio(b.sh)} against ${ratio(d1.sh)} for daily`:''}${b&&n0?`, worst drawdown ${pc(b.mdd)} against ${pc(n0.mdd)} unhedged`:''}.`,
     `この市場で最良のルール：<b>${mname(best[0])}</b>（Sharpe ${ratio(best[1].sh)}）。ヘッジなしはボラ・プレミアムと平均回帰の両方を得るがクラッシュ・リスクをすべて負う。毎日ヘッジは方向性を消すが平均回帰の利益も消え、コストも増える。分散予算は平穏時はまれに、ストレス時は頻繁にヘッジ：${b&&d1?`Sharpe ${ratio(b.sh)}（毎日は${ratio(d1.sh)}）`:''}${b&&n0?`、最大DD ${pc(b.mdd)}（ヘッジなし${pc(n0.mdd)}）`:''}。`);
@@ -329,7 +330,9 @@ function basket(){
   for(let t=0;t<grid.length;t++){
     if(t>0&&W[t-1]){let r=0;for(const k in W[t-1].w){const v=R[k][t];if(v!=null)r+=W[t-1].w[k]*v}out[t]=r*W[t-1].k}
     const w={};ks.forEach(k=>{const s=rob(R[k],t);if(!s)return;let x=1/s;if(S.tilt&&SC[k][t]!=null)x*=Math.max(.25,Math.min(2,1+2*SC[k][t]));if(S.dist&&REG[k][t]===3)x=0;w[k]=x});
-    const tot=Object.values(w).reduce((a,b)=>a+b,0);if(!tot){W[t]=null;continue}for(const k in w)w[k]/=tot;
+    let tot=Object.values(w).reduce((a,b)=>a+b,0);if(!tot){W[t]=null;continue}for(const k in w)w[k]/=tot;
+    /* no market above 35% of the risk budget: one weak premium cannot dominate (redistribute the excess) */
+    for(let it=0;it<5;it++){let ex=0,free=0;for(const k in w){if(w[k]>.35){ex+=w[k]-.35;w[k]=.35}else if(w[k]>0)free+=w[k]}if(ex<1e-9||!free)break;for(const k in w)if(w[k]>0&&w[k]<.35)w[k]+=ex*w[k]/free}
     /* basket raw return series so far, to scale to the target vol robustly */
     let r0=null;if(t>0&&W[t-1]){r0=0;for(const k in W[t-1].w){const v=R[k][t];if(v!=null)r0+=W[t-1].w[k]*v}}raw[t]=r0;
     const sb=rob(raw,t);W[t]={w,k:sb?S.vol/100/sb:0}}
@@ -341,13 +344,13 @@ function renderBook(){
   $('#nav').value=num(S.nav,0);
   const B=basket(),n=B.grid.length,last=B.W[n-1],N=S.nav;
   if(!last){$('#bkT').innerHTML='';return}
-  const ks=MK();let h=`<tr><th>${T('Market','市場')}</th><th>${T('Weight','ウェイト')}</th><th>${T('Notional','想定元本')}</th><th>${T('Sell this week','今週の売り')}</th><th>${T('Premium a month','月プレミアム')}</th><th>${T('Hedge budget used','ヘッジ予算使用率')}</th><th>${T('Regime','レジーム')}</th></tr>`;
+  const ks=MK();let h=`<tr><th>${T('Market','市場')}</th><th>${T('Weight','ウェイト')}</th><th>${T('Notional','想定元本')}</th><th>${T('Sell this week','今週の売り')}</th><th>${T('Premium sold a month','月の売りプレミアム')}</th><th>${T('Expected P&L a month','期待損益（月）')}</th><th>${T('Hedge budget used','ヘッジ予算使用率')}</th><th>${T('Regime','レジーム')}</th></tr>`;
   const tick=[],act=[];let premT=0;
   ks.forEach(k=>{const M=DATA.markets[k],w=last.w[k]||0,no=w*last.k*N;const pm=M.prem.filter(v=>v!=null).slice(-12),ret=M.ret.none.filter(v=>v!=null);
     /* premium collected per unit of notional per month, recent year */
-    const pr=mean(pm);premT+=pr*no;const bud=M.today.budget||{};const used=bud.budget_used;const g=M.reg_model.today.indexOf(Math.max(...M.reg_model.today));
+    const pr=mean(pm);const er=mean(M.ret[S.hedge].filter(v=>v!=null));premT+=er*no;const bud=M.today.budget||{};const used=bud.budget_used;const g=M.reg_model.today.indexOf(Math.max(...M.reg_model.today));
     const bc=used==null?'var(--track)':used>=1?'var(--red)':used>.7?'var(--gold)':'var(--pos)';
-    h+=`<tr><td>${esc(M.name)}</td><td>${num(w*100,0)}%</td><td>${no>0?usd(no):'—'}</td><td>${no>0?usd(no/4):'—'}</td><td>${no>0?usd(pr*no):'—'}</td><td>${S.hedge==='budget'?`<span class="meter"><b style="width:${Math.min(100,(used||0)*100)}%;background:${bc}"></b></span> ${used==null?'—':num(used*100,0)+'%'}`:'—'}</td><td><span style="color:${rcol(g)}">●</span> ${rname(g)}</td></tr>`;
+    h+=`<tr><td>${esc(M.name)}</td><td>${num(w*100,0)}%</td><td>${no>0?usd(no):'—'}</td><td>${no>0?usd(no/4):'—'}</td><td>${no>0?usd(pr*no):'—'}</td><td class="pos">${no>0?usd(er*no):'—'}</td><td>${S.hedge==='budget'?`<span class="meter"><b style="width:${Math.min(100,(used||0)*100)}%;background:${bc}"></b></span> ${used==null?'—':num(used*100,0)+'%'}`:'—'}</td><td><span style="color:${rcol(g)}">●</span> ${rname(g)}</td></tr>`;
     if(no>0)tick.push(`SELL  ${M.name.padEnd(18)} 1M ATM straddle  ${usd(no/4).padStart(8)} notional (weekly 1/4 of ${usd(no)})`);
     if(S.hedge==='budget'&&used!=null&&used>=1&&no>0)act.push(`HEDGE ${M.name.padEnd(18)} reset delta to zero (budget ${num(used*100,0)}% used, ${bud.days_since_hedge}d since last)`);
     if(S.dist&&g===3)act.push(`SKIP  ${M.name.padEnd(18)} distressed regime: no new sales`)});
@@ -356,15 +359,15 @@ function renderBook(){
   const st=stats(B.out),s21=stats(B.out,B.grid.findIndex(d=>d>='2021-01'));
   const used=ks.map(k=>DATA.markets[k].today.budget&&DATA.markets[k].today.budget.budget_used).filter(v=>v!=null);
   const due=ks.filter(k=>{const b=DATA.markets[k].today.budget;return S.hedge==='budget'&&b&&b.budget_used>=1&&last.w[k]>0});
-  $('#bVerdict').innerHTML=T(`Sell <b class="r">${usd(premT)}</b> of premium a month across ${Object.values(last.w).filter(v=>v>0).length} markets at ${S.vol}% target volatility. ${due.length?`<b class="r">Re-hedge now: ${due.map(k=>esc(DATA.markets[k].name)).join(', ')}</b> (hedge budget used up).`:'No hedge is due today.'} ${ks.filter(k=>last.w[k]===0).length?`Standing aside: ${ks.filter(k=>last.w[k]===0).map(k=>esc(DATA.markets[k].name)).join(', ')}.`:''}`,
-    `目標ボラ${S.vol}%で${Object.values(last.w).filter(v=>v>0).length}市場、月<b class="r">${usd(premT)}</b>のプレミアムを売る。${due.length?`<b class="r">今すぐ再ヘッジ：${due.map(k=>esc(DATA.markets[k].name)).join('、')}</b>（ヘッジ予算を使い切り）。`:'今日必要なヘッジはなし。'}${ks.filter(k=>last.w[k]===0).length?`休む市場：${ks.filter(k=>last.w[k]===0).map(k=>esc(DATA.markets[k].name)).join('、')}。`:''}`);
+  $('#bVerdict').innerHTML=T(`Expected P&L about <b class="r">${usd(premT)}</b> a month on the historical average, selling straddles across ${Object.values(last.w).filter(v=>v>0).length} markets at ${S.vol}% target volatility. ${due.length?`<b class="r">Re-hedge now: ${due.map(k=>esc(DATA.markets[k].name)).join(', ')}</b> (hedge budget used up).`:'No hedge is due today.'} ${ks.filter(k=>last.w[k]===0).length?`Standing aside: ${ks.filter(k=>last.w[k]===0).map(k=>esc(DATA.markets[k].name)).join(', ')}.`:''}`,
+    `目標ボラ${S.vol}%で${Object.values(last.w).filter(v=>v>0).length}市場にストラドルを売り、過去平均での期待損益は月約<b class="r">${usd(premT)}</b>。${due.length?`<b class="r">今すぐ再ヘッジ：${due.map(k=>esc(DATA.markets[k].name)).join('、')}</b>（ヘッジ予算を使い切り）。`:'今日必要なヘッジはなし。'}${ks.filter(k=>last.w[k]===0).length?`休む市場：${ks.filter(k=>last.w[k]===0).map(k=>esc(DATA.markets[k].name)).join('、')}。`:''}`);
   const K=[[T('Basket Sharpe','バスケットSharpe'),st?ratio(st.sh):'—',s21?T(`Since 2021: ${ratio(s21.sh)}`,`2021年以降：${ratio(s21.sh)}`):''],
     [T('Max drawdown','最大DD'),st?pc(st.mdd):'—',st?T(`Worst month ${pc(st.worst)}`,`最悪月 ${pc(st.worst)}`):''],
     [T('1-month VaR 95%','1か月VaR95%'),usd(1.645*S.vol/100/Math.sqrt(12)*N),T('Normal approx.; short vol has fat left tails','正規近似。売りは左裾が厚い')],
     [T('Gross notional','グロス想定元本'),usd(Object.values(last.w).reduce((a,b)=>a+b,0)*last.k*N),T('Sum of straddle notionals','ストラドル想定元本の合計')],
     [T('Next sale','次回の売り'),(()=>{const d=new Date();d.setDate(d.getDate()+((5-d.getDay()+7)%7||7));return d.toLocaleDateString(JA()?'ja-JP':'en-GB',{weekday:'short',day:'numeric',month:'short'})})(),T('Weekly, a quarter of each notional','毎週、各想定元本の1/4')]];
   $('#bKpis').innerHTML=K.map(([a,v,s])=>`<div class="kpi"><span class="lbl">${a}</span><span class="v" style="font-size:24px">${v}</span><span class="s">${s}</span></div>`).join('');
-  $('#bkSub').innerHTML=T(`Weights from a robust risk measure (the larger of 1 and 3-year volatility of each market’s straddle strategy)${S.tilt?', tilted towards markets where implied is furthest above adjusted realised':''}${S.dist?', zero in the distressed regime':''}; scaled so the basket targets ${S.vol}% volatility.`,`ロバストなリスク指標（各市場のストラドル戦略の1年・3年ボラの大きい方）でウェイト付け${S.tilt?'、インプライドが調整後実現を最も上回る市場に傾斜':''}${S.dist?'、危機レジームではゼロ':''}。バスケットで目標ボラ${S.vol}%に調整。`);
+  $('#bkSub').innerHTML=T(`Weights from a robust risk measure (the larger of 1 and 3-year volatility of each market’s straddle strategy)${S.tilt?', tilted towards markets where implied is furthest above adjusted realised':''}${S.dist?', zero in the distressed regime':''}, no market above 35%; scaled so the basket targets ${S.vol}% volatility.`,`ロバストなリスク指標（各市場のストラドル戦略の1年・3年ボラの大きい方）でウェイト付け${S.tilt?'、インプライドが調整後実現を最も上回る市場に傾斜':''}${S.dist?'、危機レジームではゼロ':''}、1市場35%まで。バスケットで目標ボラ${S.vol}%に調整。`);
   /* back-test chart: chosen settings vs simple equal-notional basket */
   const eq=B.grid.map((d,t)=>{const v=MK().map(k=>B.R[k][t]).filter(x=>x!=null);return v.length?mean(v):null});const se=stats(eq);const ke=se?S.vol/100/se.vol:1;
   const cum=(a,k=1)=>{let v=1;return a.map((x,i)=>x==null?null:{x:dt(B.grid[i]),y:((v*=1+x*k)-1)*100}).filter(Boolean)};
