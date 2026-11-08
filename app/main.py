@@ -1165,7 +1165,8 @@ def _warm_volpremium():
         log.warning("dimensions warm-up failed: %s", e)
 
 
-if os.environ.get("KEEL_WARM", "1") == "1" and not os.environ.get("PYTEST_CURRENT_TEST"):
+# Off by default: on the 512 MB free instance a start-up warm-up can run out of memory and restart the service.
+if os.environ.get("KEEL_WARM", "0") == "1" and not os.environ.get("PYTEST_CURRENT_TEST"):
     threading.Thread(target=_warm_volpremium, daemon=True).start()
 
 
@@ -1250,6 +1251,18 @@ def _rates_carry_returns(d: dict) -> pd.Series:
     return r.where(on, 0.0)
 
 
+@D.cached(ttl=12 * 3600)
+def _spx_shortvol(years: float) -> pd.Series:
+    """Monthly returns of selling S&P 1-month straddles weekly, hedged weekly (as in Premium), on its own so
+    this route does not need the whole option-premium computation."""
+    got = D.many_closes(["^GSPC", "^VIX"], years + 1)
+    df = pd.concat([got["^GSPC"].rename("s"), got["^VIX"].rename("v")], axis=1).dropna()
+    iv = (df.v / 100.0 / VP_ATM_RATIO["SPX"]).values
+    opt, dlt, _ = VP.option_book(df.s.values, iv, "ln", 0.003)
+    hp, _ = VP.hedge_pnl(df.s.values, iv, dlt, "ln", "5", 1e-4)
+    return pd.Series(opt + hp, index=df.index).resample("ME").sum()
+
+
 @D.cached(ttl=6 * 3600)
 def _dimensions(years: float):
     errors: list[str] = []
@@ -1274,9 +1287,7 @@ def _dimensions(years: float):
                           ("SHORTVOL", "Short vol (S&P straddles, weekly hedge)", None)):
         try:
             if key == "SHORTVOL":
-                with VP_LOCK:
-                    m = _volpremium(float(D.year_bucket(22)))["markets"]["SPX"]
-                ser = pd.Series(m["ret"]["5"], index=pd.to_datetime(m["months"]), dtype=float)
+                ser = _spx_shortvol(years)
             else:
                 ser = fn()
             strat[key] = ser

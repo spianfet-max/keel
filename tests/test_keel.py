@@ -757,7 +757,7 @@ def test_dimensions_route(client, monkeypatch):
           "short": {"USD": [2.0] * len(idx), "EUR": [1.0] * len(idx)}, "usd_filter_gap_bp": [-5.0] * len(idx)}
     monkeypatch.setattr(M, "fx_carry", lambda years=22: fx)
     monkeypatch.setattr(M, "rates_carry", lambda years=25: rc)
-    monkeypatch.setattr(M, "_volpremium", lambda years: {"markets": {"SPX": {"months": months, "ret": {"5": [0.01] * len(idx)}}}})
+    monkeypatch.setattr(M, "_spx_shortvol", lambda years: pd.Series(0.01, index=idx))
     j = client.get("/api/dimensions", params={"years": 15}).json()
     assert {"SPY", "TREND", "FXCARRY", "RATESCARRY", "SHORTVOL"} <= set(j["series"])
     assert j["series"]["TREND"]["group"] == "Strategies"
