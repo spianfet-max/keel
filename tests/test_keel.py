@@ -688,3 +688,52 @@ def test_fxfactors(client, monkeypatch):
     assert "JPY" in j["spot"] and "USD" not in j["spot"] and len(j["spot"]["JPY"]) == len(j["months"])
     assert j["rate"]["USD"][-1] is not None and "USD" in j["equity"]
     assert j["cost_bp"]["THB"] == 9
+
+
+def test_volprem_engine():
+    from app import volprem as VP
+    rng = np.random.default_rng(1)
+    s = 100 * np.exp(np.cumsum(rng.normal(0, 0.01, 1500)))
+    iv = np.full(1500, 0.25)          # implied well above realised (~16%): sellers should win
+    opt, dlt, prem = VP.option_book(s, iv, "ln", 0.003)
+    for h in ("none", "1", "budget"):
+        hp, _ = VP.hedge_pnl(s, iv, dlt, "ln", h)
+        assert (opt + hp).sum() > 0
+    hp1, d1 = VP.hedge_pnl(s, iv, dlt, "ln", "1")
+    hpb, db = VP.hedge_pnl(s, iv, dlt, "ln", "budget")
+    assert d1.sum() > db.sum() > 0
+    assert np.std(opt + hp1) < np.std(opt)          # hedging daily cuts the noise
+    y = 400 + np.cumsum(rng.normal(0, 5, 800))      # a yield in bp, Bachelier
+    o2, d2, _ = VP.option_book(y, np.full(800, 120.0), "n", 2.0)
+    assert np.isfinite(o2).all()
+
+
+def test_hmm_regimes_sorted():
+    from app import volprem as VP
+    rng = np.random.default_rng(2)
+    x = np.concatenate([rng.normal(m, 0.05, 150) for m in (2.5, 3.0, 3.4, 3.9, 2.5)])
+    m = VP.hmm_fit(x, 4, iters=30)
+    assert list(m["mu"]) == sorted(m["mu"])
+    p = VP.hmm_filter(x, m)
+    assert p.shape == (len(x), 4) and p[-1].argmax() == 0 and p[500].argmax() == 3
+
+
+def test_volpremium_route(client, monkeypatch):
+    idx = pd.bdate_range("2012-01-02", periods=1800)
+    rng = np.random.default_rng(3)
+    def fake(syms, years=3, dividends=False):
+        out = {}
+        for sym in syms:
+            if sym.startswith("^") and sym not in ("^GSPC", "^NDX", "^RUT"):
+                out[sym] = pd.Series(18 + 4 * np.sin(np.arange(1800) / 90) + rng.normal(0, .3, 1800), index=idx)
+            else:
+                out[sym] = pd.Series(100 * np.exp(np.cumsum(rng.normal(0, .009, 1800))), index=idx)
+        return out
+    monkeypatch.setattr(D, "many_closes", fake)
+    monkeypatch.setattr(M, "_yield_series", lambda sym, years: pd.Series(4 + np.cumsum(rng.normal(0, .05, 1800)), index=idx))
+    monkeypatch.setattr(D, "implied_vol", lambda sym, days=365, **k: {"atm_iv": 9.5, "days": 30})
+    j = client.get("/api/volpremium", params={"years": 8}).json()
+    assert "SPX" in j["markets"] and "UST" in j["markets"] and "EURUSD" in j["fx"]
+    m = j["markets"]["SPX"]
+    assert len(m["ret"]["budget"]) == len(m["months"]) and len(m["season"]) == 12
+    assert j["fx"]["EURUSD"]["today"]["iv"] == 9.5

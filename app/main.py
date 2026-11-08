@@ -991,6 +991,180 @@ def fx_factors(years: int = Query(24, ge=8, le=26)):
 
 
 # --------------------------------------------------------------------------- #
+# Option premium: short 1-month straddles off volatility indices, hedging rules, regimes, seasonality
+# --------------------------------------------------------------------------- #
+
+from . import volprem as VP  # noqa: E402
+
+# key -> (underlying, vol index, model, half bid/ask in vol units, hedge cost, name)
+VP_MKTS = {
+    "SPX": ("^GSPC", "^VIX", "ln", 0.003, 1e-4, "S&P 500"),
+    "NDX": ("^NDX", "^VXN", "ln", 0.004, 1e-4, "Nasdaq 100"),
+    "RUT": ("^RUT", "^RVX", "ln", 0.005, 1.5e-4, "Russell 2000"),
+    "EEM": ("EEM", "^VXEEM", "ln", 0.006, 2e-4, "Emerging equities"),
+    "OIL": ("USO", "^OVX", "ln", 0.008, 2e-4, "Oil (USO)"),
+    "GOLD": ("GLD", "^GVZ", "ln", 0.005, 1e-4, "Gold (GLD)"),
+    "UST": ("UST10Y", "^MOVE", "n", 2.0, 0.25, "US Treasuries"),
+}
+VP_UST_DUR = 8.0          # P&L per bp of yield, as a fraction of bond notional: duration / 10,000
+VP_FX = {"EURUSD": "EURUSD=X", "USDJPY": "JPY=X", "GBPUSD": "GBPUSD=X", "AUDUSD": "AUDUSD=X", "USDCAD": "CAD=X",
+         "USDCHF": "CHF=X", "NZDUSD": "NZDUSD=X", "USDNOK": "NOK=X", "USDSEK": "SEK=X"}
+VP_FX_ETF = {"EURUSD": "FXE", "USDJPY": "FXY", "GBPUSD": "FXB", "AUDUSD": "FXA", "USDCAD": "FXC", "USDCHF": "FXF"}
+VP_MODES = ("none", "1", "5", "10", "budget")
+
+
+def _r4(v):
+    return None if v is None or not np.isfinite(v) else float(f"{float(v):.4g}")
+
+
+def _regimes(x: pd.Series, train_end: str = "2012-12-31") -> tuple[pd.Series, dict]:
+    """Four volatility regimes from a Gaussian HMM on weekly log vol, fitted on the early sample and run
+    forward (filtered, no look-ahead). Returns the regime (0 low .. 3 distressed) at each week and the model."""
+    w = np.log(x.resample("W-FRI").last().dropna().clip(lower=1e-6))
+    tr = w[w.index <= train_end]
+    if len(tr) < 260:
+        tr = w.iloc[: max(260, len(w) // 2)]
+    m = VP.hmm_fit(tr.values, 4, iters=40)
+    pr = VP.hmm_filter(w.values, m)
+    return pd.Series(pr.argmax(1), index=w.index), {"levels": [round(float(math.exp(v)), 4) for v in m["mu"]],
+                                                     "today": [round(float(v), 3) for v in pr[-1]],
+                                                     "stay": [round(float(m["A"][i, i]), 3) for i in range(4)],
+                                                     "train_end": str(tr.index[-1].date())}
+
+
+def _seasonal(x: pd.Series) -> list[dict]:
+    """Average month-on-month change in vol (in vol points) by calendar month, and how often it rose."""
+    me = x.resample("ME").last().dropna()
+    ch = me.diff().dropna()
+    out = []
+    for mth in range(1, 13):
+        c = ch[ch.index.month == mth]
+        out.append({"m": mth, "avg": _r4(c.mean()), "up": _r4((c > 0).mean()) if len(c) else None, "n": int(len(c))})
+    return out
+
+
+@D.cached(ttl=6 * 3600)
+def _volpremium(years: float):
+    errors: list[str] = []
+    syms = [v[0] for v in VP_MKTS.values() if v[0] != "UST10Y"] + [v[1] for v in VP_MKTS.values()] + \
+           ["^VIX9D", "^VIX3M", "^VIX6M", "^VVIX", "^SKEW"] + list(VP_FX.values())
+    got = D.many_closes(syms, years)
+    try:
+        ust = _yield_series("UST10Y", years)
+        if ust is not None:
+            got["UST10Y"] = ust * 100            # bp
+    except Exception as e:  # noqa: BLE001
+        errors.append(f"UST10Y: {e}")
+    mk = {}
+    for key, (u, vi, model, oc, hc, name) in VP_MKTS.items():
+        s, v = got.get(u), got.get(vi)
+        if s is None or v is None:
+            errors.append(f"{key}: {'price' if s is None else 'vol index'} missing")
+            continue
+        df = pd.concat([s.rename("s"), v.rename("v")], axis=1).dropna()
+        df = df[(df.s > 0) & (df.v > 0)]
+        if len(df) < 600:
+            errors.append(f"{key}: short history")
+            continue
+        iv = (df.v / 100.0 if model == "ln" else df.v).values        # MOVE is already bp a year
+        sv = df.s.values
+        opt, dlt, prem = VP.option_book(sv, iv, model, oc)
+        scale = VP_UST_DUR / 1e4 if model == "n" else 1.0
+        daily = {}
+        for h in VP_MODES:
+            hp, done = VP.hedge_pnl(sv, iv, dlt, model, h, hc)
+            daily[h] = pd.Series((opt + hp) * scale, index=df.index)
+            if h == "budget":
+                bdone = done
+        rv = VP.realised(df.s, model)
+        hv = VP.horizon_vol(df.s, model)
+        ivs = pd.Series(iv, index=df.index)
+        fwd = rv.shift(-VP.TENOR)
+        reg, rmodel = _regimes(ivs)
+        regm = reg.resample("ME").last()
+        unit = 100.0 if model == "ln" else 1.0                        # vol points (%) or bp
+        mo = {h: daily[h].resample("ME").sum() for h in VP_MODES}
+        pm = pd.Series(prem * scale, index=df.index).resample("ME").sum()
+        idx = mo["none"].index
+        bs = VP.budget_state(sv, iv, bdone, model, 10.0)
+        last = df.index[-260:]
+        mk[key] = {
+            "name": name, "model": model, "unit": "bp" if model == "n" else "%",
+            "start": str(df.index[0].date()),
+            "months": [str(d.date()) for d in idx],
+            "iv": [_r4(x * unit) for x in ivs.resample("ME").last().reindex(idx).values],
+            "rv_fwd": [_r4(x * unit) for x in fwd.resample("ME").last().reindex(idx).values],
+            "hv": [_r4(x * unit) for x in hv.resample("ME").last().reindex(idx).values],
+            "ret": {h: [_r4(x) for x in mo[h].values] for h in VP_MODES},
+            "prem": [_r4(x) for x in pm.reindex(idx).values],
+            "regime": [None if pd.isna(regm.get(d, np.nan)) else int(regm.get(d)) for d in idx],
+            "reg_model": rmodel,
+            "season": _seasonal(ivs * unit),
+            "today": {"date": str(df.index[-1].date()), "spot": _r4(sv[-1]), "iv": _r4(iv[-1] * unit),
+                      "rv1m": _r4(rv.iloc[-1] * unit), "rv3m": _r4(VP.realised(df.s, model, 63).iloc[-1] * unit),
+                      "hv": _r4(hv.iloc[-1] * unit),
+                      "iv_pct": _r4((ivs.iloc[-VP.DAYS * 10:] <= ivs.iloc[-1]).mean()),
+                      "budget": {k: _r4(v) if isinstance(v, float) else v for k, v in bs.items()},
+                      "hedges_per_month": _r4(bdone[-VP.DAYS:].sum() / 12)},
+            "daily": {"d": [str(d.date()) for d in last], "iv": [_r4(x * unit) for x in ivs[last].values],
+                      "rv": [_r4(x * unit) for x in rv[last].values]},
+        }
+    # FX: realised only (no free implied history), plus today's implied from currency ETF options
+    fx = {}
+    for pair, sym in VP_FX.items():
+        s = got.get(sym)
+        if s is None or len(s) < 600:
+            errors.append(f"{pair} spot")
+            continue
+        rv = VP.realised(s, "ln").dropna() * 100
+        reg, rmodel = _regimes(rv / 100)
+        regm = reg.resample("ME").last()
+        me = rv.resample("ME").last()
+        fx[pair] = {"months": [str(d.date()) for d in me.index], "rv": [_r4(x) for x in me.values],
+                    "regime": [None if pd.isna(regm.get(d, np.nan)) else int(regm.get(d)) for d in me.index],
+                    "reg_model": rmodel, "season": _seasonal(rv),
+                    "today": {"rv1m": _r4(rv.iloc[-1]), "rv3m": _r4(VP.realised(s, "ln", 63).iloc[-1] * 100),
+                              "date": str(rv.index[-1].date())}}
+    def _iv(pair):
+        try:
+            return pair, D.implied_vol(VP_FX_ETF[pair], 30)
+        except Exception:  # noqa: BLE001
+            return pair, {}
+    for pair, r in (D._pool(lambda p: _iv(p)[1], list(VP_FX_ETF), workers=3) or {}).items():
+        if pair in fx and r:
+            fx[pair]["today"].update({"iv": _r4(r.get("atm_iv")), "iv_days": r.get("days"), "iv_src": VP_FX_ETF[pair]})
+    try:
+        spy = D.implied_vol("SPY", 30)
+    except Exception:  # noqa: BLE001
+        spy = {}
+    term = {k: _r4(got[k].iloc[-1]) if got.get(k) is not None else None for k in ("^VIX9D", "^VIX", "^VIX3M", "^VIX6M", "^VVIX", "^SKEW")}
+    v, v3 = got.get("^VIX"), got.get("^VIX3M")
+    ratio = []
+    if v is not None and v3 is not None:
+        r = (v / v3).dropna().resample("ME").last()
+        ratio = [{"d": str(d.date()), "v": _r4(x)} for d, x in r.items()]
+    return {"asof": str(date.today()), "markets": mk, "fx": fx, "term": term, "vix_vix3m": ratio,
+            "spy_skew": {k: _r4(spy.get(k)) if isinstance(spy.get(k), (int, float)) else spy.get(k) for k in ("atm_iv", "put90_iv", "skew_90", "days")},
+            "modes": list(VP_MODES), "errors": errors,
+            "note": "Short 1-month ATM straddles sold weekly (1/4 notional each), priced Black-Scholes off the vol index "
+                    "(Bachelier off MOVE for the 10-year yield, P&L x duration 8), marked daily, costs included. "
+                    "Returns are fractions of notional per month. Regimes: 4-state HMM on weekly log vol, fitted on the "
+                    "early sample, filtered forward. FX: realised vol (Yahoo), today's implied from currency ETF options."}
+
+
+@app.get("/api/volpremium", operation_id="option_premium", dependencies=[Depends(check_token)])
+def vol_premium(years: int = Query(22, ge=8, le=26)):
+    """Option premium across equities, oil, gold, Treasuries and FX: implied vs realised vol at the option's
+    horizon, back-tests of selling 1-month straddles (unhedged, hedged every 1/5/10 days, or on a variance
+    budget), four volatility regimes (HMM), seasonality, the VIX term structure, and today's state
+    (implied vol percentile, hedge budget used). Heavy: cached for six hours."""
+    try:
+        return _safe(_volpremium(float(D.year_bucket(years))))
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(503, f"Option premium data did not load: {e}") from e
+
+
+# --------------------------------------------------------------------------- #
 # Macro regimes (growth x inflation)
 # --------------------------------------------------------------------------- #
 
