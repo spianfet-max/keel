@@ -76,7 +76,7 @@ table.mt tr.click{cursor:pointer}table.mt tr.click:hover td{background:var(--sel
     </section>
     <section class="sec two even">
       <div style="min-width:0">
-        <div class="sh"><h2 data-ja="通貨：インプライドと実現">Currencies: implied against realised</h2><p data-ja="インプライドは通貨ETFのオプション（約1か月）、実現は直近1か月・3か月。評価は2007〜2021年の通貨オプション研究による。">Implied from currency ETF options (about one month); realised over one and three months. The structural column is what fifteen years of systematic FX option selling found.</p></div>
+        <div class="sh"><h2 data-ja="通貨：インプライドと実現">Currencies: implied against realised</h2><p data-ja="実現ボラ（1か月・3か月）とレジーム。構造的評価は2007〜2021年の通貨オプションの体系的な売りの研究による（タグにカーソルで理由）。">Realised vol over one and three months, and the regime. The structural column is what fifteen years of systematic FX option selling found (hover a tag for why).</p></div>
         <div class="tw"><table class="mt" id="fxT"></table></div><p class="stat" id="fxNote"></p>
       </div>
       <div style="min-width:0">
@@ -217,7 +217,7 @@ function renderMap(){
   const K=[[T('VIX','VIX'),T0['^VIX']!=null?num(T0['^VIX'],1):'—',DATA.markets.SPX?T(`${num(DATA.markets.SPX.today.iv_pct*100,0)}th percentile, 10 years`,`過去10年の${num(DATA.markets.SPX.today.iv_pct*100,0)}パーセンタイル`):''],
     [T('VIX ÷ VIX3M','VIX÷VIX3M'),inv!=null?num(inv,2):'—',inv>1?T('Inverted: stress','逆転：ストレス'):T('Contango: normal','順ザヤ：通常')],
     [T('Vol of VIX (VVIX)','VVIX'),T0['^VVIX']!=null?num(T0['^VVIX'],0):'—',T('Above 100: the vol market is nervous','100超：ボラ市場が神経質')],
-    [T('SPY 90% put skew','SPY 90%プット・スキュー'),sk.skew_90!=null?'+'+num(sk.skew_90,1)+T(' pts',' pt'):'—',sk.atm_iv!=null?T(`ATM ${num(sk.atm_iv,1)}%, ${sk.days} days`,`ATM ${num(sk.atm_iv,1)}%、${sk.days}日`):''],
+    [T('VIX 9-day ÷ VIX','VIX9日÷VIX'),T0['^VIX9D']&&T0['^VIX']?num(T0['^VIX9D']/T0['^VIX'],2):'—',T('Above 1: the next days are priced as the riskiest','1超：直近数日が最もリスク高と織り込み')],
     [T('CBOE SKEW','CBOE SKEW'),T0['^SKEW']!=null?num(T0['^SKEW'],0):'—',T('Price of S&P tail risk','S&Pテールリスクの価格')],
     [T('Markets rich to sell','売り妙味のある市場'),`${rich.length} / ${ks.length}`,T('Implied > adjusted realised by 15%+','インプライドが調整後実現を15%以上上回る')]];
   $('#kpis').innerHTML=K.map(([a,v,s])=>`<div class="kpi"><span class="lbl">${a}</span><span class="v" style="font-size:24px">${v}</span><span class="s">${s}</span></div>`).join('');
@@ -236,11 +236,11 @@ function renderMap(){
   const pos=vp.filter(p=>p.y>0).length/Math.max(1,vp.length);
   $('#vrpSub').innerHTML=T(`Positive in <b>${num(pos*100,0)}%</b> of months since ${M.start.slice(0,4)}, averaging <b>${vfmt(k,mean(vp.map(p=>p.y)))}</b> vol points. Sellers earn this in calm months and give much of it back in a few shocks.`,`${M.start.slice(0,4)}年以降、<b>${num(pos*100,0)}%</b>の月でプラス、平均<b>${vfmt(k,mean(vp.map(p=>p.y)))}</b>ポイント。平穏な月に稼ぎ、少数のショックで大きく返す。`);
   /* FX */
-  let f=`<tr><th>${T('Pair','通貨ペア')}</th><th>${T('Implied (ETF)','インプライド（ETF）')}</th><th>${T('Realised 1M','実現1か月')}</th><th>${T('Realised 3M','実現3か月')}</th><th>${T('Implied − 3M','IV−3か月')}</th><th>${T('Regime','レジーム')}</th><th>${T('Structural','構造的')}</th></tr>`;
+  let f=`<tr><th>${T('Pair','通貨ペア')}</th><th>${T('Realised 1M','実現1か月')}</th><th>${T('Realised 3M','実現3か月')}</th><th>${T('Regime','レジーム')}</th><th>${T('Structural','構造的')}</th></tr>`;
   Object.entries(DATA.fx||{}).forEach(([p,F])=>{const t=F.today,v=FXV[p]||['—','—','thin'];const g=F.reg_model.today.indexOf(Math.max(...F.reg_model.today));const d=t.iv!=null&&t.rv3m!=null?t.iv-t.rv3m:null;
-    f+=`<tr><td>${p}</td><td>${t.iv!=null?num(t.iv,1):'—'}</td><td>${num(t.rv1m,1)}</td><td>${num(t.rv3m,1)}</td><td class="${d==null?'':d>0?'pos':'neg'}">${d==null?'—':(d>0?'+':'')+num(d,1)}</td><td><span style="color:${rcol(g)}">●</span> ${rname(g)}</td><td><span class="tag ${v[2]}" title="${esc(v[3]||'')}">${JA()?v[1]:v[0]}</span></td></tr>`});
+    f+=`<tr><td>${p}</td><td>${num(t.rv1m,1)}</td><td>${num(t.rv3m,1)}</td><td><span style="color:${rcol(g)}">●</span> ${rname(g)}</td><td><span class="tag ${v[2]}" title="${esc(v[3]||'')}">${JA()?v[1]:v[0]}</span></td></tr>`});
   $('#fxT').innerHTML=f;
-  $('#fxNote').textContent=Object.values(DATA.fx||{}).some(F=>F.today.iv!=null)?'':T('Currency ETF option prices did not load this time, so implied is blank; realised, regimes and the structural view still apply.','通貨ETFのオプション価格を今回取得できなかったため、インプライドは空欄。実現・レジーム・構造的評価は有効。');
+  $('#fxNote').textContent=T('There is no free source of currency implied vol, so the premium for currencies is not measured here.','通貨のインプライド・ボラの無料データがないため、通貨のプレミアムはここでは測定していない。');
   /* term structure */
   const ts=[['^VIX9D','9D'],['^VIX','1M'],['^VIX3M','3M'],['^VIX6M','6M']].filter(([s])=>T0[s]!=null);
   lineChart($('#tsC'),[{name:'VIX',color:cssv('--red'),pts:ts.map(([s],i)=>({x:i,y:T0[s]})),width:2}],{h:200,xFmt:i=>ts[i]?ts[i][1]:'',yFmt:v=>num(v,0),tipFmt:v=>num(v,2)});
@@ -380,8 +380,8 @@ function renderBook(){
 }
 
 function method(){
-  $('#method').innerHTML=T(`<b>Method.</b> Straddles: 1-month at the money, one sold every week for a quarter of the notional, held to expiry, Black-Scholes off the market’s volatility index divided by a typical index-to-at-the-money ratio (VIX ÷ 1.10, VXN ÷ 1.08, OVX on USO ÷ 1.05, GVZ on GLD ÷ 1.04: these indices price variance swaps, which sit above at-the-money vol because of the skew), and Bachelier off MOVE for the US 10-year yield (P&amp;L × duration 8). Marked daily at the index level, so smile and term-structure effects are left out. Costs: half bid/ask of 0.3–0.8 vol points (2bp for MOVE) on entry, 1–2bp on every hedge trade. Hedging: none, every 1, 5 or 10 trading days, or a variance budget (re-hedge once squared moves since the last hedge add up to ten days of implied variance). Adjusted realised vol: monthly moves over two years, scaled up by the volatility of volatility. Regimes: four-state Gaussian hidden Markov model on weekly log vol. Currencies: realised vol from Yahoo; implied from currency ETF options (FXE, FXY, FXB, FXA, FXC, FXF). Data to ${fdate(DATA.asof)}${(DATA.errors||[]).length?'; missing: '+esc(DATA.errors.join('; ')):''}. Back-tests on free public data describe the past; short volatility has fat left tails that a short history can understate. Not advice.`,
-    `<b>算出方法。</b>ストラドル：1か月ATM、毎週想定元本の1/4ずつ売り満期まで保有。各市場のボラ指数を典型的な指数/ATM比で割った値（VIX÷1.10、VXN÷1.08、USOのOVX÷1.05、GLDのGVZ÷1.04：これらは分散スワップの価格でスキューの分ATMより高い）でブラック・ショールズ、米10年金利はMOVEでバシュリエ（損益×デュレーション8）。日次で指数水準で評価するため、スマイルと期間構造の効果は含まない。コスト：エントリー時にビッド・アスクの半分0.3〜0.8ポイント（MOVEは2bp）、ヘッジ取引ごとに1〜2bp。ヘッジ：なし、1・5・10営業日ごと、または分散予算（前回ヘッジ以降の二乗変動がインプライド分散の10日分に達したら再ヘッジ）。調整後実現ボラ：2年間の月次変動をボラのボラで上方調整。レジーム：週次対数ボラの4状態ガウス隠れマルコフ・モデル。通貨：実現はYahoo、インプライドは通貨ETF（FXE、FXY、FXB、FXA、FXC、FXF）のオプション。データは${fdate(DATA.asof)}まで${(DATA.errors||[]).length?'。欠損：'+esc(DATA.errors.join('; ')):''}。無料の公開データによるバックテストは過去の記述。ボラ売りは左裾が厚く、短い履歴では過小評価されうる。助言ではありません。`);
+  $('#method').innerHTML=T(`<b>Method.</b> Straddles: 1-month at the money, one sold every week for a quarter of the notional, held to expiry, Black-Scholes off the market’s volatility index divided by a typical index-to-at-the-money ratio (VIX ÷ 1.10, VXN ÷ 1.08, OVX on USO ÷ 1.05, GVZ on GLD ÷ 1.04: these indices price variance swaps, which sit above at-the-money vol because of the skew), and Bachelier off MOVE for the US 10-year yield (P&amp;L × duration 8). Marked daily at the index level, so smile and term-structure effects are left out. Costs: half bid/ask of 0.3–0.8 vol points (2bp for MOVE) on entry, 1–2bp on every hedge trade. Hedging: none, every 1, 5 or 10 trading days, or a variance budget (re-hedge once squared moves since the last hedge add up to ten days of implied variance). Adjusted realised vol: monthly moves over two years, scaled up by the volatility of volatility. Regimes: four-state Gaussian hidden Markov model on weekly log vol. Currencies: realised vol from Yahoo (no free implied history). Data to ${fdate(DATA.asof)}${(DATA.errors||[]).length?'; missing: '+esc(DATA.errors.join('; ')):''}. Back-tests on free public data describe the past; short volatility has fat left tails that a short history can understate. Not advice.`,
+    `<b>算出方法。</b>ストラドル：1か月ATM、毎週想定元本の1/4ずつ売り満期まで保有。各市場のボラ指数を典型的な指数/ATM比で割った値（VIX÷1.10、VXN÷1.08、USOのOVX÷1.05、GLDのGVZ÷1.04：これらは分散スワップの価格でスキューの分ATMより高い）でブラック・ショールズ、米10年金利はMOVEでバシュリエ（損益×デュレーション8）。日次で指数水準で評価するため、スマイルと期間構造の効果は含まない。コスト：エントリー時にビッド・アスクの半分0.3〜0.8ポイント（MOVEは2bp）、ヘッジ取引ごとに1〜2bp。ヘッジ：なし、1・5・10営業日ごと、または分散予算（前回ヘッジ以降の二乗変動がインプライド分散の10日分に達したら再ヘッジ）。調整後実現ボラ：2年間の月次変動をボラのボラで上方調整。レジーム：週次対数ボラの4状態ガウス隠れマルコフ・モデル。通貨：実現ボラはYahoo（インプライドの無料履歴なし）。データは${fdate(DATA.asof)}まで${(DATA.errors||[]).length?'。欠損：'+esc(DATA.errors.join('; ')):''}。無料の公開データによるバックテストは過去の記述。ボラ売りは左裾が厚く、短い履歴では過小評価されうる。助言ではありません。`);
 }
 
 /* ---------------- wiring ---------------- */
@@ -390,7 +390,11 @@ function render(){if(!DATA)return;$$('#tabs button').forEach(b=>b.classList.togg
 window.redraw=render;
 async function load(fresh){
   setStatus('busy');
-  const r=await keel('api_volpremium',{years:22},{fresh});
+  /* a cold server computes for a minute or two after waking; it caches the result, so ask again */
+  let r;for(let a=0;a<4;a++){r=await keel('api_volpremium',{years:22},{fresh:fresh&&a===0});
+    if(r.ok&&r.data&&r.data.markets)break;
+    if(a<3){$('#banner').hidden=false;$('#banner').innerHTML=T(`<b>Keel is preparing the data.</b> The first load after the server wakes takes a minute or two; trying again (${a+2} of 4)…`,`<b>Keelがデータを準備中です。</b>サーバー起動後の初回は1〜2分かかります。再試行中（${a+2}/4）…`);
+      await new Promise(res=>setTimeout(res,20000))}}
   if(r.ok&&r.data&&r.data.markets){DATA=r.data;LIVE=true;setStatus('live')}
   else{DATA=SAMPLE;LIVE=false;setStatus(r.code==='no_mcp'?'sample':'err',r.code,r.message)}
   render();

@@ -1126,18 +1126,7 @@ def _volpremium(years: float):
                     "reg_model": rmodel, "season": _seasonal(rv),
                     "today": {"rv1m": _r4(rv.iloc[-1]), "rv3m": _r4(VP.realised(s, "ln", 63).iloc[-1] * 100),
                               "date": str(rv.index[-1].date())}}
-    def _iv(pair):
-        try:
-            return pair, D.implied_vol(VP_FX_ETF[pair], 30)
-        except Exception:  # noqa: BLE001
-            return pair, {}
-    for pair, r in (D._pool(lambda p: _iv(p)[1], list(VP_FX_ETF), workers=3) or {}).items():
-        if pair in fx and r:
-            fx[pair]["today"].update({"iv": _r4(r.get("atm_iv")), "iv_days": r.get("days"), "iv_src": VP_FX_ETF[pair]})
-    try:
-        spy = D.implied_vol("SPY", 30)
-    except Exception:  # noqa: BLE001
-        spy = {}
+    spy = {}   # option chains are slow and unreliable from the server; skew comes from CBOE SKEW instead
     term = {k: _r4(got[k].iloc[-1]) if got.get(k) is not None else None for k in ("^VIX9D", "^VIX", "^VIX3M", "^VIX6M", "^VVIX", "^SKEW")}
     v, v3 = got.get("^VIX"), got.get("^VIX3M")
     ratio = []
@@ -1155,6 +1144,27 @@ def _volpremium(years: float):
                     "early sample, filtered forward. FX: realised vol (Yahoo), today's implied from currency ETF options."}
 
 
+import threading  # noqa: E402
+
+VP_LOCK = threading.Lock()
+
+
+def _warm_volpremium():
+    """Compute the default option-premium payload in the background at start-up, so the first page
+    load after the free server wakes finds it cached instead of timing out."""
+    import time  # noqa: PLC0415
+    time.sleep(8)
+    try:
+        with VP_LOCK:
+            _volpremium(float(D.year_bucket(22)))
+    except Exception as e:  # noqa: BLE001
+        log.warning("volpremium warm-up failed: %s", e)
+
+
+if os.environ.get("KEEL_WARM", "1") == "1" and not os.environ.get("PYTEST_CURRENT_TEST"):
+    threading.Thread(target=_warm_volpremium, daemon=True).start()
+
+
 @app.get("/api/volpremium", operation_id="option_premium", dependencies=[Depends(check_token)])
 def vol_premium(years: int = Query(22, ge=8, le=26)):
     """Option premium across equities, oil, gold, Treasuries and FX: implied vs realised vol at the option's
@@ -1162,7 +1172,8 @@ def vol_premium(years: int = Query(22, ge=8, le=26)):
     budget), four volatility regimes (HMM), seasonality, the VIX term structure, and today's state
     (implied vol percentile, hedge budget used). Heavy: cached for six hours."""
     try:
-        return _safe(_volpremium(float(D.year_bucket(years))))
+        with VP_LOCK:
+            return _safe(_volpremium(float(D.year_bucket(years))))
     except Exception as e:  # noqa: BLE001
         raise HTTPException(503, f"Option premium data did not load: {e}") from e
 

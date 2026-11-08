@@ -1,6 +1,9 @@
 """Offline tests: the data layer is replaced by synthetic series."""
 
 import math
+import os
+
+os.environ["KEEL_WARM"] = "0"   # no background warm-up thread during tests
 
 import numpy as np
 import pandas as pd
@@ -736,4 +739,4 @@ def test_volpremium_route(client, monkeypatch):
     assert "SPX" in j["markets"] and "UST" in j["markets"] and "EURUSD" in j["fx"]
     m = j["markets"]["SPX"]
     assert len(m["ret"]["budget"]) == len(m["months"]) and len(m["season"]) == 12
-    assert j["fx"]["EURUSD"]["today"]["iv"] == 9.5
+    assert "rv1m" in j["fx"]["EURUSD"]["today"]
