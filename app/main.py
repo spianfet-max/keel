@@ -1323,6 +1323,20 @@ def dimensions(years: int = Query(20, ge=5, le=22)):
         raise HTTPException(503, f"Dimensions data did not load: {e}") from e
 
 
+@app.get("/api/revisions", operation_id="earnings_revisions", dependencies=[Depends(check_token)])
+def earnings_revisions(fresh: bool = Query(False, description="Re-fetch now instead of using the 12-hour cache")):
+    """Analysts' earnings revisions for baskets of large companies standing in for the 11 world sectors, four
+    regions, the 17 TOPIX sectors and the Japanese gaming peers (Yahoo earningsTrend). Per group: median
+    12-month-forward EPS revision over 1 and 2 months, share of companies revised up/down, net share of analysts
+    raising in the last 30 days, and the weeks since the direction of revisions last turned (coarse: 1, 4 or 9,
+    or '13+'). About 170 companies: the first call after the server wakes returns status 'preparing'; ask again."""
+    from . import revisions as RV  # noqa: PLC0415
+    try:
+        return _safe(RV.get(wait=40.0, fresh=fresh))
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(503, f"Revisions did not load: {e}") from e
+
+
 # --------------------------------------------------------------------------- #
 # Macro regimes (growth x inflation)
 # --------------------------------------------------------------------------- #

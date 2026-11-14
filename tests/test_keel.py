@@ -764,3 +764,38 @@ def test_dimensions_route(client, monkeypatch):
     rc_vals = [v for v in j["series"]["RATESCARRY"]["vals"] if v is not None]
     assert abs(rc_vals[-1] - 0.00167) < 1e-4     # flat curve, no yield change: (4-2 and 3-1)/12 = 0.17%
     assert all(len(s["vals"]) == len(j["months"]) for s in j["series"].values())
+
+
+def test_revisions_parse_and_groups():
+    from app import revisions as R
+
+    def item(period, pts, up=2, dn=1):
+        keys = ["current", "7daysAgo", "30daysAgo", "60daysAgo", "90daysAgo"]
+        return {"period": period, "endDate": "2027-03-31",
+                "epsTrend": {k: {"raw": v} for k, v in zip(keys, pts)},
+                "epsRevisions": {"upLast30days": {"raw": up}, "downLast30days": {"raw": dn}},
+                "earningsEstimate": {"numberOfAnalysts": {"raw": 10}}}
+
+    # rising for a month after two months of cuts: the turn is about 4 weeks ago
+    rec = R.parse_trend("XOM", [item("0y", [1.10, 1.08, 1.00, 1.03, 1.06]), item("+1y", [1.32, 1.30, 1.20, 1.24, 1.27])])
+    assert rec["fy0"][0] == 1.10 and rec["fy1_up"] == 2 and rec["fy0_end"] == "2027-03-31"
+    recs = {t: R.parse_trend(t, rec and [item("0y", [1.10, 1.08, 1.00, 1.03, 1.06]), item("+1y", [1.32, 1.30, 1.20, 1.24, 1.27])])
+            for t in R.GROUPS["energy"][3]}
+    d = R.build(recs)
+    g = d["groups"]["energy"]
+    assert g["n"] == 10 and g["direction"] == 1 and g["weeks_since_turn"] == 4
+    assert g["up_share"] == 1.0 and g["net_analysts"] == pytest.approx(1 / 3)
+    assert "reg_US" in d["groups"] and "world" in d["groups"]
+
+
+def test_revisions_route_preparing_then_ok(client, monkeypatch):
+    from app import revisions as R
+
+    monkeypatch.setattr(R, "_STATE", {"data": None, "at": 0.0, "running": False, "error": None})
+    monkeypatch.setattr(R, "fetch_trend", lambda t: R.parse_trend(t, [{"period": "+1y", "epsTrend": {
+        "current": {"raw": 2.0}, "7daysAgo": {"raw": 2.0}, "30daysAgo": {"raw": 1.9}, "60daysAgo": {"raw": 1.8},
+        "90daysAgo": {"raw": 1.8}}}]))
+    R._run(fetch=R.fetch_trend, workers=2)
+    j = client.get("/api/revisions").json()
+    assert j["status"] == "ok" and j["groups"]["gaming"]["n"] == 10
+    assert j["groups"]["world"]["rev2m"] > 0
