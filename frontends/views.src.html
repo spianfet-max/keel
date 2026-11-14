@@ -1,0 +1,341 @@
+<title>Views</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@300;400;500;600&family=Noto+Sans+JP:wght@300;400&display=swap">
+<style>
+/*CORE_CSS*/
+/* Views: Black-Litterman. House views, each with a confidence, blended with the market's own implied returns
+   into a portfolio. Steel = the neutral starting point, red = the portfolio after your views. */
+.app{padding-left:max(20px,env(safe-area-inset-left,0px));padding-right:max(20px,env(safe-area-inset-right,0px))}
+@media (max-width:480px){.app{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}}
+.ctl{display:flex;flex-direction:column;gap:5px;min-width:0}
+.verdict{font-size:17px;line-height:1.55;max-width:82ch;margin:0;text-wrap:pretty}
+.verdict b{font-weight:500}.verdict .r{color:var(--red)}.verdict .s{color:var(--steel)}
+table.vt{font-size:13px}table.vt td,table.vt th{padding:6px 6px;white-space:nowrap;text-align:left;vertical-align:middle}
+table.vt td.num,table.vt th.num{text-align:right}
+table.vt select{min-height:30px;padding:0 6px;font-size:13px;max-width:190px}
+table.vt input.q{width:64px;text-align:right;min-height:30px}
+table.vt input[type=range]{width:120px;vertical-align:middle}
+.conf{display:inline-block;min-width:3.5ch;text-align:right;font-variant-numeric:tabular-nums}
+.bold{display:inline-block;width:62px;height:8px;background:var(--track);position:relative;vertical-align:middle;margin-right:6px}
+.bold i{position:absolute;top:-2px;bottom:-2px;width:2px;background:var(--red)}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{border:1px solid var(--line);background:var(--card);padding:4px 10px;font-size:12.5px;min-height:30px;color:var(--mute)}
+.chip:hover{color:var(--ink);border-color:var(--ink)}
+table.mt{font-size:13px}table.mt td,table.mt th{padding:6px 7px;text-align:right;white-space:nowrap}
+table.mt td:first-child,table.mt th:first-child{text-align:left}
+.stat{font-size:12.5px;line-height:1.5;color:var(--mute);margin-top:8px;max-width:78ch}.stat b{color:var(--ink);font-weight:500}
+.small{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:18px}
+.small h3{font-size:13px;font-weight:500;margin:0 0 2px}.small p{margin:0;font-size:12px;color:var(--mute)}
+svg.ch .lab{fill:var(--ink);font-size:12px}
+svg.ch .lbm{fill:var(--mute);font-size:11px}
+.warnline{font-size:12.5px;color:var(--warn);margin-top:6px}
+</style>
+
+<div class="app">
+  <header class="top">
+    <div class="brand"><h1 data-ja="ビュー">Views</h1><span data-ja="ブラック・リッターマン：ハウスビューを確信度つきで入力し、市場が織り込む期待リターンと融合してポートフォリオに変換">Black-Litterman: house views, each with a confidence, blended with the returns the market itself implies, turned into a portfolio</span></div>
+    <div class="tright">
+      <span class="pill busy" id="status"><i></i></span>
+      <button class="btn q" id="refresh" data-ja="更新">Refresh</button>
+      <button class="btn q" id="themeBtn">Dark</button>
+      <div class="seg" id="langSeg"><button data-l="en">EN</button><button data-l="ja">日本語</button></div>
+    </div>
+  </header>
+  <div class="banner" id="banner" hidden></div>
+  <div class="help" id="how" hidden></div>
+
+  <div class="bar">
+    <div class="ctl"><span class="lbl" data-ja="基準通貨">Base currency</span><div class="seg" id="ccySeg"><button data-v="USD">USD</button><button data-v="JPY" data-ja="円（ヘッジなし）">JPY, unhedged</button></div></div>
+    <div class="ctl"><span class="lbl" data-ja="出発点">Starting point</span><div class="seg" id="priorSeg"></div></div>
+    <div class="ctl"><span class="lbl" data-ja="リスク推定期間">Risk window</span><div class="seg" id="winSeg"><button data-v="60" data-ja="5年">5Y</button><button data-v="120" data-ja="10年">10Y</button><button data-v="0" data-ja="全期間">Full</button></div></div>
+    <div class="ctl"><span class="lbl" data-ja="リスク回避度">Risk aversion</span><div class="seg" id="dSeg"><button data-v="2">2</button><button data-v="2.5">2.5</button><button data-v="3.5">3.5</button></div></div>
+    <div class="ctl"><span class="lbl" data-ja="制約">Constraint</span><div class="seg" id="cSeg"><button data-v="lo" data-ja="ロングのみ・1資産40%まで">Long-only, 40% cap</button><button data-v="un" data-ja="制約なし">Unconstrained</button></div></div>
+  </div>
+
+  <section class="sec">
+    <div class="sh"><h2 data-ja="ビュー">Your views</h2><p id="vSub"></p></div>
+    <div class="chips" id="presets"></div>
+    <div class="tw" style="margin-top:10px"><table class="vt" id="vT"></table></div>
+    <div style="margin-top:8px"><button class="btn" id="addV" data-ja="＋ビューを追加">+ Add a view</button></div>
+  </section>
+
+  <section class="sec"><p class="verdict" id="verdict"></p><div class="warnline" id="warn"></div></section>
+  <section class="kpis" id="kpis"></section>
+
+  <section class="sec two">
+    <div style="min-width:0">
+      <div class="sh"><h2 data-ja="ウェイト：出発点とビュー反映後">Weights: starting point and after your views</h2><p id="wSub"></p></div>
+      <svg class="ch" id="wC"></svg>
+    </div>
+    <div style="min-width:0">
+      <div class="sh"><h2 data-ja="どのビューが何を動かしたか">Which view moved what</h2><p data-ja="出発点からの変化（%ポイント）を、ビューごとに分解。制約なしの解で計算。">Change from the starting point (% points), split by view; from the unconstrained solution, where the split is exact.</p></div>
+      <svg class="ch" id="pullC"></svg><div class="leg" id="pullLeg"></div>
+    </div>
+  </section>
+
+  <section class="sec two even">
+    <div style="min-width:0">
+      <div class="sh"><h2 data-ja="期待リターン：市場の織り込みとビュー反映後">Expected returns: what the market implies, and after your views</h2><p data-ja="年率。灰色の点＝均衡（市場の出発点が最適になる期待リターン）、赤＝ビューを融合した後。">A year. Grey dot = equilibrium (the returns that make the starting portfolio optimal); red = after blending in your views.</p></div>
+      <svg class="ch" id="rC"></svg>
+    </div>
+    <div style="min-width:0">
+      <div class="sh"><h2 data-ja="効率的フロンティア">Efficient frontier, before and after</h2><p data-ja="同じ制約の下で。点は出発点と新しいポートフォリオ。">Same constraints. Dots mark the starting portfolio and the new one.</p></div>
+      <svg class="ch" id="fC" height="300"></svg><div class="leg" id="fLeg"></div>
+    </div>
+  </section>
+
+  <section class="sec">
+    <div class="sh"><h2 data-ja="ビューはどれほど大胆か">How bold is each view?</h2><p id="bSub"></p></div>
+    <div class="small" id="bold"></div>
+  </section>
+
+  <section class="sec two even">
+    <div style="min-width:0">
+      <div class="sh"><h2 data-ja="確信度の感応度">How much the confidence matters</h2><p id="sSub"></p></div>
+      <div class="chips" id="sPick" style="margin-bottom:8px"></div>
+      <svg class="ch" id="sC" height="260"></svg><div class="leg" id="sLeg"></div>
+    </div>
+    <div style="min-width:0">
+      <div class="sh"><h2 data-ja="出発点が暗に置いているビュー">What the starting portfolio already bets on</h2><p id="iSub"></p></div>
+      <div class="tw"><table class="mt" id="iT"></table></div>
+    </div>
+  </section>
+  <p class="note" id="method"></p>
+</div>
+
+<script>
+/*CORE_JS*/
+let DATA=null,LIVE=false;
+const ASSETS=['SPY','EFA','EWJ','EEM','IEF','TLT','LQD','HYG','EMB','GLD','DBC','VNQ','BTC','JPY','EUR'];
+/* Global market portfolio, approximate investable weights (equities, bonds, real assets, crypto) in this universe;
+   currencies have no net supply, so they start at zero. */
+const PRIORS={
+  mkt:{en:'Global market (approx.)',ja:'世界の市場構成（概算）',w:{SPY:30,EFA:11,EWJ:3,EEM:6,IEF:14,TLT:4,LQD:9,HYG:2,EMB:2,GLD:4,DBC:1,VNQ:2,BTC:1}},
+  '6040':{en:'60/40',ja:'60/40',w:{SPY:40,EFA:15,EEM:5,IEF:30,LQD:10}},
+  pb:{en:'Typical PB book',ja:'典型的なPBポートフォリオ',w:{SPY:30,EFA:10,EWJ:10,IEF:15,LQD:15,HYG:5,GLD:5,EMB:10}},
+};
+const PRESETS=[
+  {en:'Yen recovery',ja:'円高回帰',v:[{t:'abs',a:'JPY',q:6,c:60}]},
+  {en:'Soft landing: stocks over bonds',ja:'ソフトランディング：株＞債券',v:[{t:'rel',a:'SPY',b:'IEF',q:4,c:50}]},
+  {en:'Gold keeps going',ja:'金の上昇継続',v:[{t:'abs',a:'GLD',q:8,c:40}]},
+  {en:'Japan beats the US',ja:'日本株＞米国株',v:[{t:'rel',a:'EWJ',b:'SPY',q:5,c:40}]},
+  {en:'Credit stress',ja:'クレジット・ストレス',v:[{t:'rel',a:'IEF',b:'HYG',q:5,c:50},{t:'abs',a:'SPY',q:-5,c:35}]},
+];
+let S={ccy:'JPY',prior:'mkt',win:120,delta:2.5,cons:'lo',views:[{t:'rel',a:'SPY',b:'IEF',q:4,c:50},{t:'abs',a:'GLD',q:8,c:40}],sens:0};
+try{Object.assign(S,JSON.parse(localStorage.getItem('keel-views2')||'{}'))}catch(e){}
+const save=()=>{try{localStorage.setItem('keel-views2',JSON.stringify(S))}catch(e){}};
+const TAU=.05,CAP=.40;
+const NAMES_JPY={JPY:['USD cash vs yen','ドル現金（対円）'],EUR:['Euro vs yen','ユーロ（対円）']};
+const nm=k=>{if(S.ccy==='JPY'&&NAMES_JPY[k])return NAMES_JPY[k][JA()?1:0];const s=DATA.series[k];return s?s.name:k};
+const sh=k=>{const m={SPY:'US eq',EFA:'Dev ex-US',EWJ:'Japan eq',EEM:'EM eq',IEF:'UST 7-10',TLT:'UST 20+',LQD:'IG credit',HYG:'High yield',EMB:'EM bonds',GLD:'Gold',DBC:'Commod.',VNQ:'REITs',BTC:'Bitcoin',JPY:S.ccy==='JPY'?'USD cash':'Yen',EUR:'Euro'};const j={SPY:'米国株',EFA:'先進国株',EWJ:'日本株',EEM:'新興国株',IEF:'米国債7-10',TLT:'米国債20+',LQD:'IG社債',HYG:'ハイイールド',EMB:'新興国債',GLD:'金',DBC:'商品',VNQ:'REIT',BTC:'ビットコイン',JPY:S.ccy==='JPY'?'ドル現金':'円',EUR:'ユーロ'};return JA()?(j[k]||k):(m[k]||k)};
+const mean=a=>a.reduce((s,x)=>s+x,0)/(a.length||1);
+const quant=(a,q)=>{const s=[...a].sort((x,y)=>x-y);if(!s.length)return NaN;const i=(s.length-1)*q,lo=Math.floor(i),hi=Math.ceil(i);return s[lo]+(s[hi]-s[lo])*(i-lo)};
+const pc=(v,d=1)=>v==null||!isFinite(v)?'—':pct(v*100,d);
+const pp=(v,d=1)=>v==null||!isFinite(v)?'—':num(v*100,d)+'%';
+
+/* ---------------- linear algebra ---------------- */
+const zeros=(r,c)=>[...Array(r)].map(()=>Array(c).fill(0));
+const mm=(A,B)=>A.map(r=>B[0].map((_,j)=>r.reduce((s,v,k)=>s+v*B[k][j],0)));
+const mv=(A,x)=>A.map(r=>r.reduce((s,v,j)=>s+v*x[j],0));
+const tr=A=>A[0].map((_,j)=>A.map(r=>r[j]));
+const add=(A,B)=>A.map((r,i)=>r.map((v,j)=>v+B[i][j]));
+const sc=(A,k)=>A.map(r=>r.map(v=>v*k));
+function inv(A){const n=A.length,M=A.map((r,i)=>[...r,...Array(n).fill(0).map((_,j)=>i===j?1:0)]);
+  for(let i=0;i<n;i++){let p=i;for(let k=i+1;k<n;k++)if(Math.abs(M[k][i])>Math.abs(M[p][i]))p=k;[M[i],M[p]]=[M[p],M[i]];const d=M[i][i];if(Math.abs(d)<1e-16)return null;
+    for(let j=0;j<2*n;j++)M[i][j]/=d;for(let k=0;k<n;k++)if(k!==i){const f=M[k][i];if(f)for(let j=0;j<2*n;j++)M[k][j]-=f*M[i][j]}}return M.map(r=>r.slice(n))}
+const qf=(w,C)=>w.reduce((s,x,i)=>s+x*C[i].reduce((t,v,j)=>t+v*w[j],0),0);
+
+/* ---------------- data in the chosen base currency ---------------- */
+function returns(){const n=DATA.months.length,out={};const j=DATA.series.JPY?DATA.series.JPY.vals:null;
+  ASSETS.forEach(k=>{const s=DATA.series[k];if(!s)return;out[k]=s.vals.map((v,t)=>{if(v==null)return null;if(S.ccy==='USD')return v;
+    const y=j?j[t]:null;if(y==null)return null;if(k==='JPY')return 1/(1+y)-1; /* USD cash held by a yen investor */
+    return (1+v)/(1+y)-1})});return out}
+function model(){
+  const R=returns(),keys=ASSETS.filter(k=>R[k]),n=DATA.months.length,s0=S.win?Math.max(0,n-S.win):0;
+  const rows=[];for(let t=s0;t<n;t++){const r=keys.map(k=>R[k][t]);if(r.every(v=>v!=null&&isFinite(v)))rows.push(r)}
+  /* drop assets that shorten the window too much (bitcoin before 2014) when the full window is asked for */
+  let K=keys,RR=rows;if(rows.length<36){K=keys.filter(k=>k!=='BTC');RR=[];for(let t=s0;t<n;t++){const r=K.map(k=>R[k][t]);if(r.every(v=>v!=null&&isFinite(v)))RR.push(r)}}
+  const N=K.length,T=RR.length,m=Array(N).fill(0);RR.forEach(r=>r.forEach((v,i)=>m[i]+=v/T));
+  let C=zeros(N,N);RR.forEach(r=>{for(let i=0;i<N;i++)for(let j=0;j<N;j++)C[i][j]+=(r[i]-m[i])*(r[j]-m[j])/(T-1)*12});
+  /* shrink correlations 20% towards zero: steadier weights, especially with short windows */
+  C=C.map((r,i)=>r.map((v,j)=>i===j?v:v*.8));
+  const P0=PRIORS[S.prior].w,tot=K.reduce((s,k)=>s+(P0[k]||0),0),w0=K.map(k=>(P0[k]||0)/tot);
+  const pi=mv(sc(C,S.delta),w0);                          /* equilibrium (implied) returns */
+  return {R,K,N,T,C,w0,pi,rows:RR,from:DATA.months[s0]}}
+
+/* views -> P, Q, Omega (Idzorek-style: confidence c maps to omega = (1-c)/c * p tau Sigma p') */
+function viewMats(M,views){const P=[],Q=[],Om=[];views.forEach(v=>{const p=Array(M.N).fill(0),ia=M.K.indexOf(v.a);if(ia<0)return;p[ia]=1;if(v.t==='rel'){const ib=M.K.indexOf(v.b);if(ib<0||ib===ia)return;p[ib]=-1}
+  const c=Math.min(.999,Math.max(.001,v.c/100)),pv=qf(p,M.C)*TAU;P.push(p);Q.push(v.q/100);Om.push(pv*(1-c)/c)});return {P,Q,Om}}
+function blend(M,views){
+  const {P,Q,Om}=viewMats(M,views),tS=sc(M.C,TAU),itS=inv(tS);
+  if(!P.length)return {mu:M.pi,Cp:add(M.C,tS),P,Q,Om,lam:[]};
+  const iO=Om.map((o,i)=>Om.map((_,j)=>i===j?1/o:0));
+  const A=add(itS,mm(mm(tr(P),iO),P)),iA=inv(A);
+  const b=mv(itS,M.pi).map((v,i)=>v+mv(mm(tr(P),iO),Q)[i]);
+  const mu=mv(iA,b),Cp=add(M.C,iA);
+  /* He-Litterman: unconstrained optimum = w0/(1+tau) + P' Lambda, so each view's pull on the weights is exact */
+  const wU=mv(inv(sc(Cp,S.delta)),mu);const base=M.w0.map(x=>x/(1+TAU));const d=wU.map((x,i)=>x-base[i]);
+  const PPt=mm(P,tr(P)),iPPt=inv(PPt);const lam=iPPt?mv(iPPt,mv(P,d)):P.map(()=>0);
+  return {mu,Cp,P,Q,Om,lam,wU}}
+/* long-only, capped, fully invested: maximise mu'w - delta/2 w'Cw by projected gradient onto the capped simplex */
+function projCap(y,cap){let lo=Math.min(...y)-1,hi=Math.max(...y)+1;for(let it=0;it<80;it++){const t=(lo+hi)/2,s=y.reduce((a,v)=>a+Math.min(cap,Math.max(0,v-t)),0);if(s>1)lo=t;else hi=t}const t=(lo+hi)/2;return y.map(v=>Math.min(cap,Math.max(0,v-t)))}
+function optLO(mu,C,delta,cap){const N=mu.length;let w=Array(N).fill(1/N);const L=Math.max(...C.map((r,i)=>r.reduce((s,v)=>s+Math.abs(v),0)))*delta;const step=1/Math.max(L,1e-6);
+  for(let it=0;it<3000;it++){const g=mu.map((m,i)=>m-delta*C[i].reduce((s,v,j)=>s+v*w[j],0));const nw=projCap(w.map((x,i)=>x+step*g[i]),cap);let ch=0;nw.forEach((x,i)=>ch+=Math.abs(x-w[i]));w=nw;if(ch<1e-9)break}return w}
+/* long-only: the fundable portfolio closest to the unconstrained Black-Litterman one, closeness measured in risk
+   (minimise (w - wU)' Sigma (w - wU) over the capped simplex). Keeps the tilts intuitive instead of jumping to corners. */
+function nearestLO(wU,C,cap){const N=wU.length;let w=projCap(wU.map(x=>Math.max(0,x)),cap);const L=Math.max(...C.map(r=>r.reduce((s,v)=>s+Math.abs(v),0)));const step=1/Math.max(L,1e-6);
+  for(let it=0;it<4000;it++){const d=w.map((x,i)=>x-wU[i]),g=C.map(r=>r.reduce((s,v,j)=>s+v*d[j],0));const nw=projCap(w.map((x,i)=>x-step*g[i]),cap);let ch=0;nw.forEach((x,i)=>ch+=Math.abs(x-w[i]));w=nw;if(ch<1e-10)break}return w}
+function solveW(M,B){const wU=B.wU||mv(inv(sc(B.Cp,S.delta)),B.mu);if(S.cons==='un')return wU;return nearestLO(wU,M.C,CAP)}
+/* historical distribution of 12-month returns of a view portfolio (overlapping windows) */
+function viewHist(M,v){const n=DATA.months.length,a=M.R[v.a],b=v.t==='rel'?M.R[v.b]:null,out=[];if(!a)return out;
+  for(let t=11;t<n;t++){let ga=1,gb=1,ok=true;for(let k=t-11;k<=t;k++){if(a[k]==null||(b&&b[k]==null)){ok=false;break}ga*=1+a[k];if(b)gb*=1+b[k]}if(ok)out.push(b?ga-gb:ga-1)}return out}
+
+/* ---------------- charts ---------------- */
+function weightBars(svg,K,w0,w1){const w=W(svg),rowH=24,h=K.length*rowH+30,lw=Math.min(150,w*.28),mid=lw+(w-lw)/2,half=(w-lw)/2-50;
+  const mx=Math.max(.05,...w0.map(Math.abs),...w1.map(Math.abs));let g=`<line class="ax" x1="${mid}" x2="${mid}" y1="14" y2="${h-10}"/>`;
+  g+=`<text class="lbm" x="${mid-8}" y="10" text-anchor="end">${T('Starting point','出発点')}</text><text class="lbm" x="${mid+8}" y="10">${T('After your views','ビュー反映後')}</text>`;
+  K.forEach((k,i)=>{const y=22+i*rowH,a=w0[i]/mx*half,b=w1[i]/mx*half,ch=w1[i]-w0[i];
+    g+=`<text class="lab" x="0" y="${y+12}">${esc(sh(k))}</text>`;
+    g+=`<rect x="${mid-Math.max(0,a)}" y="${y+3}" width="${Math.abs(a)}" height="12" fill="var(--steel)" opacity=".75"><title>${esc(nm(k))}: ${pp(w0[i])}</title></rect>`;
+    g+=`<rect x="${b>=0?mid:mid+b}" y="${y+3}" width="${Math.abs(b)}" height="12" fill="var(--red)"><title>${esc(nm(k))}: ${pp(w1[i])}</title></rect>`;
+    g+=`<text class="lbm" x="${mid-Math.max(0,a)-4}" y="${y+13}" text-anchor="end">${num(w0[i]*100,0)}</text>`;
+    g+=`<text x="${mid+Math.max(0,b)+4}" y="${y+13}" class="lab">${num(w1[i]*100,0)}<tspan class="lbm" dx="4">${Math.abs(ch)>=.005?(ch>0?'+':'−')+num(Math.abs(ch)*100,0):''}</tspan></text>`});
+  svg.setAttribute('viewBox',`0 0 ${w} ${h}`);svg.setAttribute('height',h);svg.innerHTML=g}
+function pullBars(svg,K,contrib,cols){const w=W(svg),rowH=24,h=K.length*rowH+30,lw=Math.min(150,w*.28),mid=lw+(w-lw)/2,half=(w-lw)/2-30;
+  const tot=K.map((_,i)=>contrib.reduce((s,c)=>s+Math.abs(c[i]),0)),mx=Math.max(.02,...tot);
+  let g=`<line class="ax" x1="${mid}" x2="${mid}" y1="14" y2="${h-10}"/><text class="lbm" x="${mid-8}" y="10" text-anchor="end">${T('less','減')}</text><text class="lbm" x="${mid+8}" y="10">${T('more','増')}</text>`;
+  K.forEach((k,i)=>{const y=22+i*rowH;g+=`<text class="lab" x="0" y="${y+12}">${esc(sh(k))}</text>`;let pos=mid,neg=mid;
+    contrib.forEach((c,v)=>{const d=c[i]/mx*half;if(Math.abs(c[i])<1e-4)return;if(d>=0){g+=`<rect x="${pos}" y="${y+3}" width="${d}" height="12" fill="${cols[v%cols.length]}"><title>${T('View','ビュー')} ${v+1}: ${pct(c[i]*100,1)}</title></rect>`;pos+=d}
+      else{neg+=d;g+=`<rect x="${neg}" y="${y+3}" width="${-d}" height="12" fill="${cols[v%cols.length]}"><title>${T('View','ビュー')} ${v+1}: ${pct(c[i]*100,1)}</title></rect>`}})});
+  svg.setAttribute('viewBox',`0 0 ${w} ${h}`);svg.setAttribute('height',h);svg.innerHTML=g}
+function dumbbell(svg,K,a,b){const w=W(svg),rowH=24,h=K.length*rowH+34,lw=Math.min(150,w*.28),x0=lw+10,x1=w-12;
+  const lo=Math.min(0,...a,...b),hi=Math.max(...a,...b,.02),X=v=>x0+(v-lo)/(hi-lo)*(x1-x0);let g='';
+  const ticks=niceTicks(lo,hi,5).filter(t=>t>=lo-1e-9&&t<=hi+1e-9);ticks.forEach(t=>{g+=`<line class="grd" x1="${X(t)}" x2="${X(t)}" y1="14" y2="${h-18}"/><text class="lbm" x="${X(t)}" y="${h-4}" text-anchor="middle">${num(t*100,0)}%</text>`});
+  g+=`<line class="zero" x1="${X(0)}" x2="${X(0)}" y1="14" y2="${h-18}"/>`;
+  K.forEach((k,i)=>{const y=22+i*rowH;g+=`<text class="lab" x="0" y="${y+10}">${esc(sh(k))}</text><line x1="${X(a[i])}" x2="${X(b[i])}" y1="${y+6}" y2="${y+6}" stroke="var(--mute)" stroke-width="1.5"/>`;
+    g+=`<circle cx="${X(a[i])}" cy="${y+6}" r="4" fill="var(--mute)"><title>${esc(nm(k))} ${T('equilibrium','均衡')}: ${pc(a[i])}</title></circle><circle cx="${X(b[i])}" cy="${y+6}" r="4.5" fill="var(--red)"><title>${esc(nm(k))} ${T('after views','ビュー後')}: ${pc(b[i])}</title></circle>`});
+  svg.setAttribute('viewBox',`0 0 ${w} ${h}`);svg.setAttribute('height',h);svg.innerHTML=g}
+function frontier(svg,lines,dots){const w=W(svg),h=300,m={l:46,r:14,t:12,b:30};const all=[...lines.flatMap(l=>l.pts),...dots];
+  const xs=all.map(p=>p.x),ys=all.map(p=>p.y),xa=0,xb=Math.max(...xs)*1.08,ya=Math.min(0,...ys),yb=Math.max(...ys)*1.1;
+  const X=v=>m.l+(v-xa)/(xb-xa)*(w-m.l-m.r),Y=v=>h-m.b-(v-ya)/(yb-ya)*(h-m.t-m.b);let g='';
+  niceTicks(ya,yb,5).forEach(t=>g+=`<line class="grd" x1="${m.l}" x2="${w-m.r}" y1="${Y(t)}" y2="${Y(t)}"/><text x="${m.l-6}" y="${Y(t)+4}" text-anchor="end">${num(t*100,0)}%</text>`);
+  niceTicks(xa,xb,6).forEach(t=>g+=`<text x="${X(t)}" y="${h-10}" text-anchor="middle">${num(t*100,0)}%</text>`);
+  g+=`<text x="${w-m.r}" y="${m.t+10}" text-anchor="end" class="lbm">${T('return ↑ · volatility →','リターン↑・ボラ→')}</text>`;
+  lines.forEach(l=>{g+=`<path d="${l.pts.map((p,i)=>(i?'L':'M')+X(p.x).toFixed(1)+','+Y(p.y).toFixed(1)).join('')}" fill="none" stroke="${l.color}" stroke-width="${l.width||1.6}" ${l.dash?'stroke-dasharray="4 3"':''}/>`});
+  dots.forEach(d=>g+=`<circle cx="${X(d.x)}" cy="${Y(d.y)}" r="5" fill="${d.color}" stroke="var(--bg)" stroke-width="1.5"><title>${esc(d.label)}: ${T('return','リターン')} ${pc(d.y)}, ${T('vol','ボラ')} ${pp(d.x)}</title></circle><text x="${X(d.x)+8}" y="${Y(d.y)+4}" class="lab">${esc(d.label)}</text>`);
+  svg.setAttribute('viewBox',`0 0 ${w} ${h}`);svg.innerHTML=g}
+function hist(svg,vals,q,col){const w=W(svg),h=110,m={l:4,r:4,t:8,b:18};if(vals.length<12){svg.innerHTML='';return}
+  const lo=Math.min(...vals,q),hi=Math.max(...vals,q),nb=24,st=(hi-lo)/nb||1,b=Array(nb).fill(0);vals.forEach(v=>b[Math.min(nb-1,Math.floor((v-lo)/st))]++);const mx=Math.max(...b);
+  const X=v=>m.l+(v-lo)/(hi-lo)*(w-m.l-m.r);let g='';b.forEach((c,i)=>{const x=X(lo+i*st),bw=(w-m.l-m.r)/nb-1,hh=(h-m.t-m.b)*c/mx;g+=`<rect x="${x}" y="${h-m.b-hh}" width="${bw}" height="${hh}" fill="var(--steel)" opacity=".55"/>`});
+  if(lo<0&&hi>0)g+=`<line class="zero" x1="${X(0)}" x2="${X(0)}" y1="${m.t}" y2="${h-m.b}"/>`;
+  g+=`<line x1="${X(q)}" x2="${X(q)}" y1="${m.t-4}" y2="${h-m.b}" stroke="${col}" stroke-width="2"/><text x="${X(q)}" y="${h-4}" text-anchor="middle" class="lab">${pct(q*100,0)}</text>`;
+  svg.setAttribute('viewBox',`0 0 ${w} ${h}`);svg.setAttribute('height',h);svg.innerHTML=g}
+
+/* ---------------- render ---------------- */
+const VCOL=()=>[cssv('--red'),cssv('--a1'),cssv('--a3'),cssv('--a7'),cssv('--a8'),cssv('--a6')];
+function vlabel(v){return v.t==='rel'?`${sh(v.a)} ${T('over','＞')} ${sh(v.b)} ${pct(v.q,1)}`:`${sh(v.a)} ${pct(v.q,1)}`}
+function render(){
+  if(!DATA)return;
+  $$('#ccySeg button').forEach(b=>b.classList.toggle('on',b.dataset.v===S.ccy));$$('#winSeg button').forEach(b=>b.classList.toggle('on',+b.dataset.v===S.win));
+  $$('#dSeg button').forEach(b=>b.classList.toggle('on',+b.dataset.v===S.delta));$$('#cSeg button').forEach(b=>b.classList.toggle('on',b.dataset.v===S.cons));
+  $('#priorSeg').innerHTML=Object.entries(PRIORS).map(([k,p])=>`<button data-v="${k}" class="${k===S.prior?'on':''}">${JA()?p.ja:p.en}</button>`).join('');
+  $$('#priorSeg button').forEach(b=>b.onclick=()=>{S.prior=b.dataset.v;save();render()});
+  const M=model(),views=S.views.filter(v=>M.K.includes(v.a)&&(v.t!=='rel'||M.K.includes(v.b))),B=blend(M,views),w1=solveW(M,B),w0=M.w0;
+  /* views table */
+  $('#presets').innerHTML=PRESETS.map((p,i)=>`<button class="chip" data-i="${i}">${JA()?p.ja:p.en}</button>`).join('')+`<button class="chip" data-i="-1">${T('Clear all','すべて削除')}</button>`;
+  /* presets are written from a dollar investor's side; for a yen investor the yen line is "USD cash in yen", so a yen view flips sign */
+  $$('#presets button').forEach(b=>b.onclick=()=>{const i=+b.dataset.i;S.views=i<0?[]:[...S.views,...PRESETS[i].v.map(v=>({...v,q:S.ccy==='JPY'&&v.a==='JPY'&&v.t==='abs'?-v.q:v.q}))].slice(-6);save();render()});
+  const opt=sel=>M.K.map(k=>`<option value="${k}" ${k===sel?'selected':''}>${esc(nm(k))}</option>`).join('');
+  let vt=`<tr><th>#</th><th>${T('Type','種類')}</th><th>${T('Asset','資産')}</th><th></th><th class="num">${T('Return in 12 months','12か月リターン')}</th><th>${T('Confidence','確信度')}</th><th>${T('Boldness','大胆さ')}</th><th></th></tr>`;
+  S.views.forEach((v,i)=>{const hv=viewHist(M,v),pr=hv.length?hv.filter(x=>x>=v.q/100).length/hv.length:null;const tail=pr==null?null:Math.min(pr,1-pr);
+    vt+=`<tr><td><span style="color:${VCOL()[i%6]}">■</span> ${i+1}</td><td><select data-i="${i}" data-f="t"><option value="abs" ${v.t==='abs'?'selected':''}>${T('Absolute','絶対')}</option><option value="rel" ${v.t==='rel'?'selected':''}>${T('Relative','相対')}</option></select></td>
+      <td><select data-i="${i}" data-f="a">${opt(v.a)}</select></td><td>${v.t==='rel'?`${T('beats','が上回る')} <select data-i="${i}" data-f="b">${opt(v.b||'IEF')}</select>`:''}</td>
+      <td class="num"><input class="q" type="number" step="0.5" data-i="${i}" data-f="q" value="${v.q}"> %</td>
+      <td><input type="range" min="5" max="95" step="5" data-i="${i}" data-f="c" value="${v.c}" aria-label="Confidence"> <span class="conf">${v.c}%</span></td>
+      <td>${pr==null?'—':`<span class="bold"><i style="left:${(1-pr)*100}%"></i></span>${tail<.1?T('very bold','非常に大胆'):tail<.25?T('bold','大胆'):T('ordinary','通常')}`}</td><td><button class="lnk" data-x="${i}">×</button></td></tr>`});
+  if(!S.views.length)vt+=`<tr><td colspan="8" class="lbm">${T('No views: the portfolio stays at the starting point.','ビューなし：出発点のまま。')}</td></tr>`;
+  $('#vT').innerHTML=vt;
+  $$('#vT select,#vT input').forEach(el=>{const ev=el.type==='range'?'input':'change';el.addEventListener(ev,()=>{const i=+el.dataset.i,f=el.dataset.f;let v=el.value;if(f==='q'||f==='c')v=+v;S.views[i][f]=v;if(f==='t'&&v==='rel'&&!S.views[i].b)S.views[i].b=S.views[i].a==='IEF'?'SPY':'IEF';save();
+    if(el.type==='range'){el.nextElementSibling.textContent=v+'%';clearTimeout(window._rt);window._rt=setTimeout(render,120)}else render()})});
+  $$('#vT button[data-x]').forEach(b=>b.onclick=()=>{S.views.splice(+b.dataset.x,1);save();render()});
+  $('#vSub').innerHTML=T(`Each view is a total return over the next 12 months in ${S.ccy==='JPY'?'yen (unhedged)':'dollars'}, either for one asset or one asset against another, with how sure you are. Low confidence barely moves the portfolio; 95% makes the model take the view almost as fact. Boldness: where your number sits among every 12-month outcome since ${M.from.slice(0,4)}.`,
+    `各ビューは今後12か月の${S.ccy==='JPY'?'円建て（ヘッジなし）':'ドル建て'}トータル・リターン。単独資産、または資産間の差で入力し、確信度を付ける。低い確信度ではほぼ動かず、95%ではほぼ事実として扱う。大胆さ：${M.from.slice(0,4)}年以降の全12か月の結果の中での位置。`);
+  /* KPIs and verdict */
+  const r0=w0.reduce((s,x,i)=>s+x*M.pi[i],0),r1=w1.reduce((s,x,i)=>s+x*B.mu[i],0),v0=Math.sqrt(qf(w0,M.C)),v1=Math.sqrt(qf(w1,M.C));
+  const dw=w1.map((x,i)=>x-w0[i]),te=Math.sqrt(qf(dw,M.C)),act=dw.reduce((s,x)=>s+Math.abs(x),0)/2,gross=w1.reduce((s,x)=>s+Math.abs(x),0);
+  const K=[[T('Expected return','期待リターン'),pc(r1),T(`starting point ${pc(r0)}`,`出発点 ${pc(r0)}`)],[T('Volatility','ボラティリティ'),pp(v1),T(`starting point ${pp(v0)}`,`出発点 ${pp(v0)}`)],
+    [T('Return ÷ risk','リターン÷リスク'),num(r1/v1,2),T(`starting point ${num(r0/v0,2)}`,`出発点 ${num(r0/v0,2)}`)],[T('Tracking error','トラッキング・エラー'),pp(te),T('vs the starting point','出発点比')],
+    [T('Active share','アクティブ・シェア'),pp(act,0),S.cons==='un'?T(`gross ${num(gross*100,0)}% of capital`,`グロス 資金の${num(gross*100,0)}%`):T('of capital moved','資金の移動割合')]];
+  $('#kpis').innerHTML=K.map(([a,v,s])=>`<div class="kpi"><span class="lbl">${a}</span><span class="v">${v}</span><span class="s">${s}</span></div>`).join('');
+  const ord=M.K.map((k,i)=>[k,dw[i]]).sort((a,b)=>b[1]-a[1]),up=ord.filter(x=>x[1]>.01).slice(0,3),dn=ord.filter(x=>x[1]<-.01).slice(-3).reverse();
+  $('#verdict').innerHTML=!views.length?T('Add a view to see how it moves the portfolio. With no views, Black-Litterman returns the starting point unchanged.','ビューを追加すると、ポートフォリオの変化が表示されます。ビューがなければ出発点のまま。'):
+    T(`Your ${views.length} view${views.length>1?'s':''} ${up.length?`<b class="r">add ${up.map(x=>`${esc(sh(x[0]))} (+${num(x[1]*100,0)})`).join(', ')}</b>`:''}${up.length&&dn.length?' and ':''}${dn.length?`<b class="s">cut ${dn.map(x=>`${esc(sh(x[0]))} (−${num(-x[1]*100,0)})`).join(', ')}</b>`:''} percentage points. Expected return moves from ${pc(r0)} to <b>${pc(r1)}</b> for ${pp(te)} of tracking error.`,
+      `${views.length}つのビューで${up.length?`<b class="r">${up.map(x=>`${esc(sh(x[0]))}（+${num(x[1]*100,0)}）`).join('、')}を増やし</b>`:''}${dn.length?`<b class="s">${dn.map(x=>`${esc(sh(x[0]))}（−${num(-x[1]*100,0)}）`).join('、')}を減らす</b>`:''}（%ポイント）。期待リターンは${pc(r0)}→<b>${pc(r1)}</b>、トラッキング・エラー${pp(te)}。`);
+  $('#warn').textContent=S.views.length>views.length?T('Some views refer to assets outside this window and were skipped.','一部のビューは対象外の資産のため除外。'):(S.cons==='un'&&gross>2?T('Unconstrained weights are leveraged; switch to long-only to see a fundable portfolio.','制約なしではレバレッジがかかっています。ロングのみに切り替えると実行可能なポートフォリオに。'):'');
+  /* charts */
+  const keepIdx=M.K.map((k,i)=>i).filter(i=>Math.abs(w0[i])>.001||Math.abs(w1[i])>.001);
+  weightBars($('#wC'),keepIdx.map(i=>M.K[i]),keepIdx.map(i=>w0[i]),keepIdx.map(i=>w1[i]));
+  $('#wSub').innerHTML=T(`${PRIORS[S.prior].en} on the left; ${S.cons==='lo'?'long-only, fully invested, no asset above 40%':'unconstrained (can be leveraged or short)'} on the right. Numbers are % of capital; the grey figure after is the change.`,`左：${PRIORS[S.prior].ja}、右：${S.cons==='lo'?'ロングのみ・全額投資・1資産40%まで':'制約なし（レバレッジ・ショート可）'}。数字は資金の%、灰色は変化。`);
+  const cols=VCOL(),contrib=views.map((_,v)=>M.K.map((_,i)=>B.P[v]?B.P[v][i]*B.lam[v]:0)),ci=M.K.map((k,i)=>i).filter(i=>contrib.some(c=>Math.abs(c[i])>.002));
+  pullBars($('#pullC'),ci.map(i=>M.K[i]),contrib.map(c=>ci.map(i=>c[i])),cols);
+  $('#pullLeg').innerHTML=views.map((v,i)=>`<span><i style="background:${cols[i%6]};height:8px"></i>${i+1}. ${esc(vlabel(v))}</span>`).join('');
+  dumbbell($('#rC'),M.K,M.pi,B.mu);
+  /* frontiers: same constraint, a range of risk aversions */
+  const fr=(mu,C)=>[.6,1,1.5,2.5,4,6,9,14,25,50].map(d=>{const w=S.cons==='lo'?optLO(mu,C,d,1):mv(inv(sc(C,d)),mu);return {x:Math.sqrt(qf(w,M.C)),y:w.reduce((s,x,i)=>s+x*mu[i],0)}}).sort((a,b)=>a.x-b.x);
+  const L=[{name:T('Before views (equilibrium)','ビュー前（均衡）'),color:cssv('--steel'),pts:fr(M.pi,M.C),dash:1},{name:T('After your views','ビュー反映後'),color:cssv('--red'),pts:fr(B.mu,B.Cp),width:2.2}];
+  frontier($('#fC'),L,[{x:v0,y:r0,color:cssv('--steel'),label:T('Start','出発点')},{x:v1,y:r1,color:cssv('--red'),label:T('New','新')}]);
+  $('#fLeg').innerHTML=L.map(l=>`<span><i class="${l.dash?'d':''}" style="background:${l.color};border-color:${l.color}"></i>${l.name}</span>`).join('');
+  /* boldness small multiples */
+  $('#bold').innerHTML=S.views.map((v,i)=>{const hv=viewHist(M,v),pr=hv.length?hv.filter(x=>x>=v.q/100).length/hv.length:null;
+    return `<div><h3><span style="color:${cols[i%6]}">■</span> ${i+1}. ${esc(vlabel(v))}</h3><p>${pr==null?T('Not enough history.','履歴不足。'):T(`${num(pr*100,0)}% of 12-month periods since ${M.from.slice(0,4)} did at least this well; median ${pct(quant(hv,.5)*100,1)}.`,`${M.from.slice(0,4)}年以降の12か月のうち${num(pr*100,0)}%がこれ以上。中央値${pct(quant(hv,.5)*100,1)}。`)}</p><svg class="ch" id="h${i}" height="110"></svg></div>`}).join('')||`<p class="lbm">${T('No views yet.','ビューはまだありません。')}</p>`;
+  S.views.forEach((v,i)=>{const el=$('#h'+i);if(el)hist(el,viewHist(M,v),v.q/100,cols[i%6])});
+  $('#bSub').innerHTML=T(`Every overlapping 12-month return of the view’s portfolio over the ${S.win?S.win/12+'-year':'full'} history, with your number in colour. A view far in the tail needs a good reason, or a lower confidence.`,`ビューのポートフォリオの重複する12か月リターンすべて（${S.win?S.win/12+'年':'全期間'}）と、入力値（色）。分布の端にあるビューには十分な根拠か、低い確信度が必要。`);
+  sensitivity(M);implied(M);method(M);
+}
+function sensitivity(M){
+  if(!S.views.length){$('#sC').innerHTML='';$('#sPick').innerHTML='';$('#sLeg').innerHTML='';$('#sSub').textContent='';return}
+  const si=Math.min(S.sens,S.views.length-1),cols=VCOL();
+  $('#sPick').innerHTML=S.views.map((v,i)=>`<button class="chip" style="${i===si?'border-color:var(--ink);color:var(--ink)':''}" data-i="${i}">${i+1}. ${esc(vlabel(v))}</button>`).join('');
+  $$('#sPick button').forEach(b=>b.onclick=()=>{S.sens=+b.dataset.i;save();sensitivity(model())});
+  const grid=[5,15,25,35,45,55,65,75,85,95],res=grid.map(c=>{const vs=S.views.map((v,i)=>i===si?{...v,c}:v);const B=blend(M,vs);return solveW(M,B)});
+  const moved=M.K.map((k,i)=>[i,Math.max(...res.map(w=>w[i]))-Math.min(...res.map(w=>w[i]))]).sort((a,b)=>b[1]-a[1]).slice(0,4).map(x=>x[0]);
+  const lc=[cssv('--red'),cssv('--steel'),cssv('--gold'),cssv('--a7')];
+  const ser=moved.map((i,j)=>({name:sh(M.K[i]),color:lc[j],pts:grid.map((c,g)=>({x:c,y:res[g][i]*100}))}));
+  lineChart($('#sC'),ser,{xType:'num',h:260,xFmt:v=>v+'%',yFmt:v=>num(v,0)+'%',tipFmt:v=>num(v,1)+'%'});legend($('#sLeg'),ser);
+  const cur=S.views[si].c;$('#sSub').innerHTML=T(`The four weights that move most as the confidence in view ${si+1} goes from 5% to 95% (now ${cur}%). Flat lines mean the confidence barely matters; steep ones mean it is doing the work.`,`ビュー${si+1}の確信度を5%から95%まで動かした時に最も変わる4つのウェイト（現在${cur}%）。平らなら確信度はほぼ影響せず、急なら確信度が結果を決めている。`);
+}
+function implied(M){
+  /* the views the starting portfolio implies, beyond the equilibrium of the global market portfolio */
+  const Pm=PRIORS.mkt.w,tm=M.K.reduce((s,k)=>s+(Pm[k]||0),0),wm=M.K.map(k=>(Pm[k]||0)/tm),pim=mv(sc(M.C,S.delta),wm),pis=M.pi;
+  const rows=M.K.map((k,i)=>[k,pis[i],pim[i],pis[i]-pim[i]]).sort((a,b)=>Math.abs(b[3])-Math.abs(a[3]));
+  $('#iT').innerHTML=`<tr><th>${T('Asset','資産')}</th><th>${T('Implied by the starting point','出発点の暗黙リターン')}</th><th>${T('Global market','世界市場')}</th><th>${T('Difference','差')}</th></tr>`+
+    rows.slice(0,9).map(r=>`<tr><td>${esc(nm(r[0]))}</td><td>${pc(r[1])}</td><td>${pc(r[2])}</td><td style="color:${Math.abs(r[3])<.002?'var(--mute)':r[3]>0?'var(--pos)':'var(--neg)'}">${pct(r[3]*100,1)}</td></tr>`).join('');
+  $('#iSub').innerHTML=S.prior==='mkt'?T('The starting point is the global market, so it bets on nothing beyond equilibrium. Pick 60/40 or the PB book above to see the bets they hide.','出発点が世界市場なので、均衡以上の賭けはない。上で60/40やPBポートフォリオを選ぶと、隠れた賭けが見える。'):
+    T(`Holding ${PRIORS[S.prior].en} is optimal only if you believe these returns. The difference from the global market is the bet the portfolio already makes before any view.`,`${PRIORS[S.prior].ja}を保有することは、これらのリターンを信じる場合にのみ最適。世界市場との差が、ビュー以前にすでに置いている賭け。`);
+}
+function method(M){
+  $('#method').innerHTML=T(`<b>Method.</b> Black-Litterman. Risk: covariance of monthly total returns over the ${S.win?S.win/12+' years':'full history'} to ${fdate(DATA.asof)} (${M.T} months${S.ccy==='JPY'?', in yen, unhedged':', in dollars'}), correlations shrunk 20% towards zero. Equilibrium returns = risk aversion (${S.delta}) × covariance × starting weights, so the starting portfolio is optimal before any view. Views: 12-month total returns, absolute or relative; uncertainty set from your confidence c as (1 − c)/c × the view portfolio’s variance × τ (τ = ${TAU}), an Idzorek-style mapping where 50% gives the view the same weight as the prior. Posterior returns and covariance from the standard Black-Litterman formulas; weights: the unconstrained Black-Litterman optimum${S.cons==='lo'?', then the closest long-only, fully invested portfolio with at most 40% per asset (closest in risk terms), which keeps the tilts instead of jumping to corner solutions':''}. Frontiers: mean-variance with the same long-only rule (no cap) or unconstrained. View contributions use the He-Litterman decomposition of the unconstrained optimum. The global market starting weights are approximate investable shares (equities, bonds, real assets, crypto; currencies at zero). Data: Yahoo ETF total returns via Keel; bitcoin from 2014 (dropped when the window is longer than its history). Not advice.`,
+    `<b>算出方法。</b>ブラック・リッターマン。リスク：${fdate(DATA.asof)}までの${S.win?S.win/12+'年':'全期間'}の月次トータル・リターンの共分散（${M.T}か月${S.ccy==='JPY'?'、円建て・ヘッジなし':'、ドル建て'}）、相関を20%ゼロ方向に縮小。均衡リターン＝リスク回避度（${S.delta}）×共分散×出発点ウェイト（ビュー前は出発点が最適）。ビュー：12か月のトータル・リターン（絶対・相対）。不確実性は確信度cから(1−c)/c×ビュー・ポートフォリオの分散×τ（τ=${TAU}）で設定（Idzorek型、50%で事前分布と同じ重み）。事後リターンと共分散は標準的な公式、ウェイトは制約なしのブラック・リッターマン最適解${S.cons==='lo'?'から、リスクで測って最も近いロングのみ・全額投資・1資産40%までのポートフォリオ（端点解を避け傾斜を保つ）':''}。ビューの寄与は制約なし最適解のHe-Litterman分解。世界市場の出発点ウェイトは投資可能資産の概算（株式・債券・実物資産・暗号資産、通貨はゼロ）。データ：Keel経由のYahoo ETFトータル・リターン、ビットコインは2014年以降（期間がそれより長い場合は除外）。助言ではありません。`)}
+
+/* ---------------- wiring ---------------- */
+window.redraw=render;
+async function load(fresh){
+  setStatus('busy');let r;
+  for(let a=0;a<4;a++){r=await keel('api_dimensions',{years:20},{fresh:fresh&&a===0});if((r.ok&&r.data&&r.data.series)||r.code==='no_mcp'||!MCP)break;
+    if(a<3){$('#banner').hidden=false;$('#banner').innerHTML=T(`<b>Keel is preparing the data.</b> The first load after the server wakes takes a minute or two; trying again (${a+2} of 4)…`,`<b>Keelがデータを準備中です。</b>サーバー起動後の初回は1〜2分かかります。再試行中（${a+2}/4）…`);await new Promise(res=>setTimeout(res,20000))}}
+  if(r.ok&&r.data&&r.data.series){DATA=r.data;LIVE=true;setStatus('live')}else{DATA=SAMPLE;LIVE=false;setStatus(r.code==='no_mcp'?'sample':'err',r.code,r.message)}
+  render();
+}
+const SAMPLE=/*SAMPLE*/;
+$('#how').innerHTML=howHtml();
+$$('#ccySeg button').forEach(b=>b.onclick=()=>{if(S.ccy!==b.dataset.v)S.views.forEach(v=>{if(v.a==='JPY'&&v.t==='abs')v.q=-v.q});S.ccy=b.dataset.v;save();render()});
+$$('#winSeg button').forEach(b=>b.onclick=()=>{S.win=+b.dataset.v;save();render()});
+$$('#dSeg button').forEach(b=>b.onclick=()=>{S.delta=+b.dataset.v;save();render()});
+$$('#cSeg button').forEach(b=>b.onclick=()=>{S.cons=b.dataset.v;save();render()});
+$('#addV').onclick=()=>{if(S.views.length>=6)return;S.views.push({t:'abs',a:'SPY',q:5,c:50});save();render()};
+$$('#langSeg button').forEach(b=>b.onclick=()=>{setLang(b.dataset.l);$('#how').innerHTML=howHtml();restatus();render()});
+$('#refresh').onclick=()=>load(true);
+setLang(LANG);load(false);
+</script>
