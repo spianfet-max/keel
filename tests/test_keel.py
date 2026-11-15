@@ -799,3 +799,14 @@ def test_revisions_route_preparing_then_ok(client, monkeypatch):
     j = client.get("/api/revisions").json()
     assert j["status"] == "ok" and j["groups"]["gaming"]["n"] == 10
     assert j["groups"]["world"]["rev2m"] > 0
+
+
+def test_revisions_parse_yahoo_page():
+    from app import revisions as R
+
+    page = open(os.path.join(os.path.dirname(__file__), "fixtures_yahoo_analysis_xom.html")).read()
+    r = R.parse_page("XOM", page)
+    assert r["fy0"] == [13.7, 13.65, 12.49, 11.74, 11.54] and r["fy1"][0] == 12.55
+    assert r["fy0_up"] == 12 and r["fy0_dn"] == 0 and r["fy1_dn"] == 4 and r["fy0_end"] == "2026-12-31"
+    c = R.company(r)
+    assert c["r2m"] > 0.1 and c["up"] == 27

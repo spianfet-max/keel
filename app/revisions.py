@@ -120,24 +120,87 @@ def parse_trend(t: str, raw: list) -> dict | None:
     return out if "fy0" in out or "fy1" in out else None
 
 
-def fetch_trend(t: str) -> dict | None:
-    """One Yahoo quoteSummary call (module earningsTrend) through yfinance."""
-    import yfinance as yf  # noqa: PLC0415
+_API_BROKEN = {"v": False}  # Yahoo's quoteSummary API refuses this server (401 crumb): go straight to the page
 
-    tk = yf.Ticker(t)
-    an = getattr(tk, "_analysis", None)
-    if an is not None and hasattr(an, "_fetch_earnings_trend"):
-        if getattr(an, "_earnings_trend", None) is None:
+
+_MON = {m: i for i, m in enumerate(["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"], 1)}
+
+
+def parse_page(t: str, page: str) -> dict | None:
+    """Yahoo's analysis page (server-rendered tables) -> the same record as parse_trend."""
+    import calendar  # noqa: PLC0415
+    import re  # noqa: PLC0415
+
+    def table(sec):
+        i = page.find(f'data-testid="{sec}"')
+        if i < 0:
+            return {}, None
+        j = page.find("</section>", i)
+        chunk = page[i:j]
+        rows = {}
+        for tr in re.findall(r"<tr[^>]*>(.*?)</tr>", chunk, flags=re.S):
+            lab = re.search(r'data-testid-cell="label"[^>]*>(.*?)</td>', tr, flags=re.S)
+            if not lab:
+                continue
+            cells = dict(re.findall(r'data-testid-cell="([^"]+)"[^>]*>\s*([^<]*?)\s*</td>', tr))
+            rows[re.sub(r"\s+", " ", lab.group(1)).strip().lower()] = cells
+        hdr = re.findall(r"Current Year \(([^)]+)\)", chunk)
+        return rows, (hdr[0] if hdr else None)
+
+    num = lambda v: _f(str(v).replace(",", "")) if v not in (None, "--", "") else None  # noqa: E731
+    tr, fy = table("epsTrend")
+    if not tr:
+        return None
+    rv, _ = table("epsRevisions")
+    es, _ = table("earningsEstimate")
+    labels = ["current estimate", "7 days ago", "30 days ago", "60 days ago", "90 days ago"]
+    out: dict = {"t": t}
+    for col, k in (("0y", "fy0"), ("+1y", "fy1")):
+        pts = [num(tr.get(lb, {}).get(col)) for lb in labels]
+        if all(v is None for v in pts):
+            continue
+        out[k] = pts
+        out[k + "_up"] = num(rv.get("up last 30 days", {}).get(col)) or 0.0
+        out[k + "_dn"] = num(rv.get("down last 30 days", {}).get(col)) or 0.0
+        out[k + "_n"] = num(es.get("no. of analysts", {}).get(col))
+    if fy:
+        m = re.match(r"([A-Za-z]{3})\w*\s+(\d{4})", fy.strip())
+        if m and m.group(1).lower() in _MON:
+            y, mo = int(m.group(2)), _MON[m.group(1).lower()]
+            out["fy0_end"] = f"{y}-{mo:02d}-{calendar.monthrange(y, mo)[1]:02d}"
+        elif re.fullmatch(r"\d{4}", fy.strip()):
+            out["fy0_end"] = f"{fy.strip()}-12-31"
+    return out if "fy0" in out or "fy1" in out else None
+
+
+def _from_page(t: str) -> dict | None:
+    """Read the public analysis page (no crumb needed)."""
+    from curl_cffi import requests as cr  # noqa: PLC0415  (ships with yfinance)
+
+    r = cr.get(f"https://finance.yahoo.com/quote/{t}/analysis/", impersonate="chrome", timeout=25,
+               headers={"Accept-Language": "en-US,en;q=0.9"})
+    if r.status_code != 200:
+        raise RuntimeError(f"analysis page HTTP {r.status_code}")
+    return parse_page(t, r.text)
+
+
+def fetch_trend(t: str) -> dict | None:
+    """EPS trend for one company: Yahoo's quoteSummary API through yfinance (cookie + crumb); when Yahoo
+    refuses the crumb from this server, the public analysis page instead."""
+    if not _API_BROKEN["v"]:
+        try:
+            import yfinance as yf  # noqa: PLC0415
+
+            an = yf.Ticker(t)._analysis  # noqa: SLF001
             an._fetch_earnings_trend()  # noqa: SLF001
-        raw = an._earnings_trend  # noqa: SLF001
-        if raw:
-            return parse_trend(t, raw)
-    # fallback: Yahoo's quoteSummary endpoint through yfinance's own session (cookie + crumb)
-    j = tk._data.get_raw_json(  # noqa: SLF001
-        f"https://query2.finance.yahoo.com/v10/finance/quoteSummary/{t}",
-        params={"modules": "earningsTrend", "formatted": "false", "symbol": t})
-    raw = (((j or {}).get("quoteSummary") or {}).get("result") or [{}])[0].get("earningsTrend", {}).get("trend", [])
-    return parse_trend(t, raw)
+            if an._earnings_trend:  # noqa: SLF001
+                return parse_trend(t, an._earnings_trend)  # noqa: SLF001
+        except Exception as e:  # noqa: BLE001
+            if "401" in str(e) or "Crumb" in str(e):
+                _API_BROKEN["v"] = True
+            else:
+                log.info("revisions api %s: %s", t, e)
+    return _from_page(t)
 
 
 # ------------------------------------------------------------------ maths
