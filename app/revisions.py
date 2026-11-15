@@ -124,9 +124,20 @@ def fetch_trend(t: str) -> dict | None:
     """One Yahoo quoteSummary call (module earningsTrend) through yfinance."""
     import yfinance as yf  # noqa: PLC0415
 
-    an = yf.Ticker(t)._analysis  # noqa: SLF001
-    an._fetch_earnings_trend()  # noqa: SLF001
-    return parse_trend(t, an._earnings_trend)  # noqa: SLF001
+    tk = yf.Ticker(t)
+    an = getattr(tk, "_analysis", None)
+    if an is not None and hasattr(an, "_fetch_earnings_trend"):
+        if getattr(an, "_earnings_trend", None) is None:
+            an._fetch_earnings_trend()  # noqa: SLF001
+        raw = an._earnings_trend  # noqa: SLF001
+        if raw:
+            return parse_trend(t, raw)
+    # fallback: Yahoo's quoteSummary endpoint through yfinance's own session (cookie + crumb)
+    j = tk._data.get_raw_json(  # noqa: SLF001
+        f"https://query2.finance.yahoo.com/v10/finance/quoteSummary/{t}",
+        params={"modules": "earningsTrend", "formatted": "false", "symbol": t})
+    raw = (((j or {}).get("quoteSummary") or {}).get("result") or [{}])[0].get("earningsTrend", {}).get("trend", [])
+    return parse_trend(t, raw)
 
 
 # ------------------------------------------------------------------ maths
@@ -241,27 +252,34 @@ _STATE: dict = {"data": None, "at": 0.0, "running": False, "error": None}
 TTL = 12 * 3600
 
 
-def _run(fetch=fetch_trend, workers: int = 6):
+def _run(fetch=fetch_trend, workers: int = 4):
     try:
         ts = all_tickers()
         recs: dict = {}
 
+        errs: dict = {}
+
         def one(t):
             for attempt in range(2):
                 try:
-                    return fetch(t)
+                    r = fetch(t)
+                    if r is None:
+                        errs[t] = "no estimates"
+                    return r
                 except Exception as e:  # noqa: BLE001
-                    if attempt:
-                        log.warning("revisions %s: %s", t, e)
-                    time.sleep(1.5)
+                    errs[t] = f"{type(e).__name__}: {e}"[:160]
+                    time.sleep(1.5 + attempt)
             return None
 
+        # one call first, so the session cookie/crumb is set before the pool starts
+        recs[ts[0]] = one(ts[0])
         with ThreadPoolExecutor(max_workers=workers) as ex:
-            for t, r in zip(ts, ex.map(one, ts)):
+            for t, r in zip(ts[1:], ex.map(one, ts[1:])):
                 recs[t] = r
         data = build(recs)
         if len(data["companies"]) < len(ts) * 0.3:
-            raise RuntimeError(f"only {len(data['companies'])} of {len(ts)} companies answered (Yahoo throttling?)")
+            sample = "; ".join(f"{k}: {v}" for k, v in list(errs.items())[:3])
+            raise RuntimeError(f"only {len(data['companies'])} of {len(ts)} companies answered. First errors: {sample}")
         with _LOCK:
             _STATE.update(data=data, at=time.time(), error=None)
     except Exception as e:  # noqa: BLE001
