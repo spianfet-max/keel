@@ -1,0 +1,1159 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Rineichen</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@300;400;500;600&family=Noto+Sans+JP:wght@300;400&display=swap">
+<style>
+/* House style shared with Frontier, Parity and Cadence: report page on white, black hairline rules, red brand rule, Frutiger stack. */
+:root{
+  --bg:#FFFFFF; --card:#FFFFFF; --ink:#000000; --mute:#6B6B6B; --line:#D8D8D8; --track:#ECECEC; --rule:#000000;
+  --red:#E60000; --steel:#3E5C76; --gold:#8A7015; --pos:#1E7B45; --neg:#C0262D; --sel:rgba(0,0,0,.045);
+  --a1:#3E5C76; --a2:#E60000; --a3:#8A7015; --a4:#262626; --a5:#93A9BC; --a6:#B4532A; --a7:#2E8A86; --a8:#5B4FA0;
+  --tint:rgba(62,92,118,.08); --warn:#9A6A00; --warnbg:rgba(199,160,17,.12);
+  --font:'Frutiger','Frutiger LT Std','Source Sans 3','Hiragino Kaku Gothic ProN','Noto Sans JP',system-ui,-apple-system,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#101112; --card:#19191B; --ink:#EEEEEC; --mute:#8F9297; --line:#2C2D30; --track:#2A2B2E; --rule:#EEEEEC;
+  --red:#F03838; --steel:#7FA3C2; --gold:#D9B53A; --pos:#4CC27E; --neg:#F06A6A; --sel:rgba(255,255,255,.06);
+  --a1:#7FA3C2; --a2:#F03838; --a3:#D9B53A; --a4:#E4E4E2; --a5:#4F6880; --a6:#E8875A; --a7:#5CC4BE; --a8:#9F94E6;
+  --tint:rgba(127,163,194,.12); --warn:#E5C15A; --warnbg:rgba(217,181,58,.12); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#101112; --card:#19191B; --ink:#EEEEEC; --mute:#8F9297; --line:#2C2D30; --track:#2A2B2E; --rule:#EEEEEC;
+  --red:#F03838; --steel:#7FA3C2; --gold:#D9B53A; --pos:#4CC27E; --neg:#F06A6A; --sel:rgba(255,255,255,.06);
+  --a1:#7FA3C2; --a2:#F03838; --a3:#D9B53A; --a4:#E4E4E2; --a5:#4F6880; --a6:#E8875A; --a7:#5CC4BE; --a8:#9F94E6;
+  --tint:rgba(127,163,194,.12); --warn:#E5C15A; --warnbg:rgba(217,181,58,.12); color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--font);font-size:14px;font-weight:300;-webkit-font-smoothing:antialiased;margin:0}
+button,select,input{font:inherit;color:inherit}
+button{cursor:pointer;-webkit-tap-highlight-color:transparent}
+:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.app{max-width:1180px;margin:0 auto;padding-inline:20px;padding-block:24px 56px}
+@media (max-width:480px){.app{padding-inline:16px}}
+.top{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;padding-bottom:16px;border-bottom:1px solid var(--rule)}
+.brand{padding-left:12px;border-left:2px solid var(--red);display:flex;flex-direction:column;gap:3px;min-width:0}
+.brand h1{margin:0;font-size:26px;font-weight:300;letter-spacing:-.01em;line-height:1.1}
+.brand span{color:var(--mute);font-size:13px;max-width:62ch;text-wrap:balance}
+.tright{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.lbl{font-size:12px;color:var(--mute);letter-spacing:.02em}
+.seg{display:inline-flex;flex-wrap:wrap;max-width:100%;border:1px solid var(--line);background:var(--card)}
+.seg button{border:0;background:transparent;min-height:32px;padding:0 11px;color:var(--mute);white-space:nowrap}
+.seg button.on{background:var(--ink);color:var(--bg)}
+.btn{border:1px solid var(--ink);background:var(--card);min-height:34px;padding:0 14px;font-weight:400}
+.btn.p{background:var(--ink);color:var(--bg)}
+.btn.q{border-color:var(--line);color:var(--mute)}
+.btn:disabled{opacity:.45;cursor:default}
+.lnk{border:0;background:none;padding:0;color:var(--steel);text-decoration:underline;text-underline-offset:2px}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;padding:3px 9px;border:1px solid var(--line);white-space:nowrap}
+.pill i{width:7px;height:7px;border-radius:50%;background:var(--mute)}
+.pill.live i{background:var(--pos)} .pill.sample i{background:var(--gold)} .pill.err i{background:var(--neg)} .pill.busy i{background:var(--steel);animation:pulse 1s infinite alternate}
+@keyframes pulse{to{opacity:.25}}
+@media (prefers-reduced-motion:reduce){.pill.busy i{animation:none}}
+.bar{display:flex;gap:10px 22px;flex-wrap:wrap;align-items:center;padding-block:12px;border-bottom:1px solid var(--line)}
+.grp{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.sec{padding-block:22px;border-bottom:1px solid var(--line)}
+.sec:last-of-type{border-bottom:0}
+.two{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:28px}
+.two.even{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+@media (max-width:860px){.two,.two.even{grid-template-columns:minmax(0,1fr)}}
+.sh{display:flex;flex-direction:column;gap:3px;margin-bottom:12px}
+.sh h2{margin:0;font-size:17px;font-weight:400;text-wrap:balance}
+.sh p{margin:0;color:var(--mute);font-size:12.5px;max-width:70ch;line-height:1.45}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:0;border-bottom:1px solid var(--line)}
+.kpi{padding:16px 16px 14px 0;display:flex;flex-direction:column;gap:4px;min-width:0}
+.kpi+.kpi{padding-left:16px;border-left:1px solid var(--line)}
+@media (max-width:520px){.kpi+.kpi{border-left:0;padding-left:0}.kpis{grid-template-columns:1fr 1fr}}
+.kpi .v{font-size:28px;font-weight:300;font-variant-numeric:tabular-nums;line-height:1.1}
+.kpi .v small{font-size:14px;color:var(--mute);margin-left:2px}
+.kpi .s{font-size:12px;color:var(--mute);line-height:1.35}
+.up{color:var(--pos)} .dn{color:var(--neg)}
+.tw{overflow-x:auto;-webkit-overflow-scrolling:touch}
+table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
+th{font-weight:400;color:var(--mute);font-size:12px;padding:7px 8px;text-align:right;border-bottom:1px solid var(--rule);white-space:nowrap}
+th:first-child,td:first-child{text-align:left;padding-left:0}
+td{padding:8px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+tr.hl td{background:var(--tint)}
+th.sort{cursor:pointer;user-select:none} th.sort.on{color:var(--ink)}
+td .nm{display:block;font-size:11.5px;color:var(--mute);max-width:22ch;overflow:hidden;text-overflow:ellipsis}
+svg.ch{display:block;width:100%;user-select:none;overflow:visible}
+svg.ch text{fill:var(--mute);font-size:11px;font-family:var(--font)}
+svg.ch .grd{stroke:var(--line);stroke-width:1}
+svg.ch .ax{stroke:var(--rule);stroke-width:1}
+svg.ch .zero{stroke:var(--mute);stroke-dasharray:2 3}
+.leg{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:12px;color:var(--mute);margin-top:8px}
+.leg span{display:inline-flex;align-items:center;gap:6px}
+.leg i{display:inline-block;width:14px;height:2px}
+.leg i.d{border-top:2px dashed;height:0;background:none!important}
+.note{color:var(--mute);font-size:12px;line-height:1.55;max-width:90ch;margin:10px 0 0}
+.banner{display:flex;gap:10px 16px;align-items:center;flex-wrap:wrap;padding:10px 12px;margin-top:14px;background:var(--warnbg);font-size:13px;line-height:1.45}
+.banner b{font-weight:500}
+.banner .x{margin-left:auto}
+#tip{position:fixed;pointer-events:none;background:var(--card);border:1px solid var(--rule);padding:7px 9px;font-size:12px;line-height:1.45;z-index:20;max-width:260px;font-variant-numeric:tabular-nums;box-shadow:0 2px 10px rgba(0,0,0,.08)}
+#tip .m{color:var(--mute)}
+.help{border:1px solid var(--line);padding:14px 16px;margin-top:14px;font-size:13px;line-height:1.55;background:var(--card)}
+.help ol{margin:6px 0 0;padding-left:20px}
+.help code{font-family:ui-monospace,Menlo,monospace;font-size:12px;background:var(--track);padding:1px 4px;word-break:break-all}
+input[type=text],input[type=number],select{border:1px solid var(--line);background:var(--card);min-height:34px;padding:0 9px}
+input[type=number]{width:84px}
+input[type=range]{accent-color:var(--ink)}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{display:inline-flex;align-items:center;border:1px solid var(--line);font-size:13px;background:var(--card)}
+.chip span{padding:4px 4px 4px 9px}
+.chip button{border:0;background:none;color:var(--mute);padding:0 8px 0 4px;font-size:15px;line-height:1}
+.empty{color:var(--mute);font-size:13px;padding:14px 0}
+
+/* Rineichen: a weekly nowcast in heatmaps. Green = good for risk assets / winner, red = bad / loser, ink = the reading itself. */
+.app{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.ctl{display:flex;flex-direction:column;gap:5px;min-width:0}
+.tabs{position:sticky;top:0;z-index:5;background:var(--bg);padding-block:10px;border-bottom:1px solid var(--line);overflow-x:auto;-webkit-overflow-scrolling:touch}
+.tabs .seg{flex-wrap:nowrap}
+.panel[hidden]{display:none}
+.epi{margin:0;padding:18px 0 4px;max-width:80ch}
+.epi q{display:block;font-size:16px;line-height:1.55;font-style:italic;quotes:"“" "”";outline:none}
+.epi q:empty::before{content:attr(data-ph);color:var(--mute)}
+.epi cite{display:block;margin-top:4px;font-size:12px;color:var(--mute);font-style:normal;outline:none}
+.epi cite:empty::before{content:attr(data-ph)}
+.headline{font-size:24px;font-weight:300;line-height:1.35;margin:14px 0 4px;max-width:46ch;text-wrap:balance}
+.headline b{font-weight:500}
+.tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0;border-block:1px solid var(--line);margin-top:14px}
+@media (max-width:860px){.tiles{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.tile{padding:16px 16px 14px 0;min-width:0;display:flex;flex-direction:column;gap:4px}
+.tile+.tile{padding-left:16px;border-left:1px solid var(--line)}
+@media (max-width:860px){.tile:nth-child(3){border-left:0;padding-left:0}.tile:nth-child(n+3){border-top:1px solid var(--line)}}
+.tile .big{font-size:40px;font-weight:300;line-height:1;font-variant-numeric:tabular-nums}
+.tile .big small{font-size:16px;color:var(--mute);margin-left:3px}
+.tile .nm{font-size:15px}
+.tile .s{font-size:12px;color:var(--mute);line-height:1.4}
+.caps{list-style:none;margin:0;padding:0;display:grid;gap:9px}
+.caps li{display:flex;gap:10px;align-items:baseline;font-size:15px;line-height:1.4}
+.caps li i{flex:none;width:9px;height:9px;border-radius:50%;transform:translateY(-1px)}
+.caps li span{color:var(--mute);font-size:12.5px}
+.wl{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:28px}
+@media (max-width:860px){.wl{grid-template-columns:minmax(0,1fr)}}
+.wl h3{font-size:13px;font-weight:500;margin:0 0 6px}
+.rk{width:100%;font-size:13px}.rk td{padding:5px 4px;border-bottom:1px solid var(--line)}
+.rk td.n{text-align:right;font-variant-numeric:tabular-nums;width:56px}
+.chip{display:inline-block;min-width:22px;text-align:center;padding:1px 5px;font-variant-numeric:tabular-nums;font-size:12px}
+svg.hm{display:block;width:100%;user-select:none}
+svg.hm text{fill:var(--mute);font-size:11px;font-family:var(--font)}
+svg.hm text.rl{fill:var(--ink);font-size:12px}
+svg.hm text.lv{fill:var(--ink);font-size:12px;font-weight:500}
+.scale{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--mute);margin-top:8px;flex-wrap:wrap}
+.scale .bar2{width:160px;height:9px}
+.help2{font-size:12.5px;line-height:1.55;color:var(--mute);max-width:90ch;margin-top:10px;border-left:2px solid var(--line);padding-left:10px}
+.help2 b{color:var(--ink);font-weight:500}
+.otab td,.otab th{padding:5px 6px;font-size:12.5px;text-align:center}
+.otab th:first-child,.otab td:first-child{text-align:left;white-space:nowrap}
+.otab td.c{font-variant-numeric:tabular-nums;min-width:56px}
+.otab tr.grp td{font-size:11px;color:var(--mute);text-transform:uppercase;letter-spacing:.04em;padding-top:12px;border-bottom:1px solid var(--line);text-align:left}
+.otab td.big2{outline:1.5px solid var(--ink);outline-offset:-2px;font-weight:500}
+.ytab td{padding:6px 4px;text-align:center;font-variant-numeric:tabular-nums;font-size:12.5px;min-width:42px}
+.ytab th{font-size:11px;font-weight:400;color:var(--mute);padding:4px}
+.cs td,.cs th{padding:4px 3px;font-size:11.5px;text-align:center;font-variant-numeric:tabular-nums}
+.cs th{font-weight:400;color:var(--mute);vertical-align:bottom;line-height:1.2;white-space:normal}
+.cs td:first-child,.cs th:first-child{text-align:left;white-space:nowrap;font-size:12.5px}
+.cs td.w{min-width:42px}
+.cs td.sum{font-weight:500;min-width:52px}
+.flag{color:var(--neg);font-size:11px;margin-left:4px}
+.flag.g{color:var(--pos)}
+@media print{
+  .tabs,.bar,#refresh,#themeBtn,#langSeg,#printBtn,.banner,.help{display:none!important}
+  .panel[hidden]{display:block!important}
+  .panel{break-before:page}.panel:first-of-type{break-before:auto}
+  .sec{break-inside:avoid}
+  body{background:#fff}
+}
+</style>
+
+<div class="app">
+  <header class="top">
+    <div class="brand"><h1>Rineichen</h1><span data-ja="週次ナウキャスト：リスク、マクロ、勝ち組と負け組をヒートマップで">A weekly nowcast in heatmaps: risk, macro, and the identifiable winners and losers</span></div>
+    <div class="tright">
+      <span class="pill busy" id="status"><i></i></span>
+      <button class="btn q" id="refresh" data-ja="更新">Refresh</button>
+      <button class="btn q" id="printBtn" data-ja="1枚にまとめて印刷">Print</button>
+      <button class="btn q" id="themeBtn">Dark</button>
+      <div class="seg" id="langSeg"><button data-l="en">EN</button><button data-l="ja">日本語</button></div>
+    </div>
+  </header>
+  <div class="banner" id="banner" hidden></div>
+  <div class="help" id="how" hidden></div>
+
+  <div class="bar">
+    <div class="ctl"><span class="lbl" data-ja="通貨">Currency</span><div class="seg" id="ccySeg"><button data-v="USD">USD</button><button data-v="JPY" data-ja="円">JPY</button></div></div>
+    <div class="ctl"><span class="lbl" data-ja="ヒートマップの期間">Heatmap span</span><div class="seg" id="spanSeg"><button data-v="26" data-ja="26週">26 weeks</button><button data-v="52" data-ja="52週">52 weeks</button><button data-v="104" data-ja="2年">2 years</button></div></div>
+    <div class="ctl"><span class="lbl" data-ja="並び順">Order</span><div class="seg" id="sortSeg"><button data-v="score" data-ja="最新スコア順">Latest score</button><button data-v="list" data-ja="既定">Default</button></div></div>
+  </div>
+
+  <nav class="tabs"><div class="seg" id="tabSeg">
+    <button data-v="weather" data-ja="天気図">Weather</button>
+    <button data-v="wl" data-ja="勝ち組と負け組">Winners &amp; losers</button>
+    <button data-v="rv" data-ja="業績修正">Revisions</button>
+    <button data-v="br" data-ja="プラス比率">Breadth</button>
+    <button data-v="cs" data-ja="国×セクター">Country × sector</button>
+    <button data-v="risk" data-ja="リスク">Risk</button>
+    <button data-v="macro" data-ja="マクロ十分位">Macro decile</button>
+    <button data-v="out" data-ja="アウトライヤー">Outliers</button>
+    <button data-v="rr" data-ja="転換レーダー">Reversals</button>
+    <button data-v="reg" data-ja="レジーム">Regimes</button>
+  </div></nav>
+
+  <!-- WEATHER -->
+  <div class="panel" data-tab="weather">
+    <section class="sec">
+      <figure class="epi"><q id="epiQ" contenteditable="true" spellcheck="false" data-ph="Click to type this week’s quote…"></q><cite id="epiC" contenteditable="true" spellcheck="false" data-ph="— who said it"></cite></figure>
+      <h2 class="headline" id="headline"></h2>
+      <p class="lbl" id="asofLine"></p>
+      <div class="tiles" id="tiles"></div>
+    </section>
+    <section class="sec two">
+      <div><div class="sh"><h2 data-ja="今週の見出し">This week in one line each</h2><p data-ja="データから自動で書かれます。緑はリスク資産に追い風、赤は向かい風。">Written by the data. Green helps risk assets, red does not.</p></div><ul class="caps" id="caps"></ul></div>
+      <div><div class="sh"><h2 data-ja="最大のアウトライヤー（今週）">Biggest outliers this week</h2><p id="outSub"></p></div><table class="rk" id="topOut"></table></div>
+    </section>
+    <section class="sec">
+      <div class="sh"><h2 data-ja="特定できる勝ち組と負け組">Identifiable winners and losers</h2><p id="wlSub"></p></div>
+      <div class="wl" id="wlLists"></div>
+    </section>
+    <section class="sec">
+      <div class="sh"><h2 data-ja="トリビア">Trivia</h2><p id="trivSub"></p></div>
+      <svg class="ch" id="trivia" height="220"></svg>
+    </section>
+  </div>
+
+  <!-- WINNERS & LOSERS -->
+  <div class="panel" data-tab="wl" hidden>
+    <section class="sec">
+      <div class="sh"><h2 data-ja="国別株式スコア（0〜9）">Country equity score, 0 to 9</h2><p id="hmCSub"></p></div>
+      <svg class="hm" id="hmC"></svg><div class="scale" id="scC"></div>
+    </section>
+    <section class="sec">
+      <div class="sh"><h2 data-ja="世界のセクター別スコア">Global sector score</h2><p data-ja="iShares グローバル・セクターETF。">iShares global sector ETFs.</p></div>
+      <svg class="hm" id="hmS"></svg>
+    </section>
+    <section class="sec">
+      <div class="sh"><h2 data-ja="TOPIX-17業種スコア">TOPIX-17 sector score</h2><p data-ja="NEXT FUNDS TOPIX-17 業種別ETF（1617〜1633）。">NEXT FUNDS TOPIX-17 sector ETFs (1617–1633).</p></div>
+      <svg class="hm" id="hmT"></svg>
+    </section>
+    <section class="sec">
+      <div class="sh"><h2 data-ja="ゲーム関連銘柄スコア">Gaming peers score</h2><p data-ja="日本のゲーム関連8社。世界（ACWI）と同じ通貨で比較。">The eight Japanese gaming peers, against the world (ACWI) in the same currency.</p></div>
+      <svg class="hm" id="hmG"></svg>
+      <div class="help2" id="scoreHelp"></div>
+    </section>
+  </div>
+
+
+  <!-- REVISIONS -->
+  <div class="panel" data-tab="rv" hidden>
+    <section class="sec">
+      <div class="banner" id="rvWait" hidden></div>
+      <h2 class="headline" id="rvHead"></h2>
+      <p class="lbl" id="rvAsof"></p>
+      <div class="tiles" id="rvTiles"></div>
+    </section>
+    <section class="sec">
+      <div class="sh"><h2 data-ja="業績予想修正の非対称性">The asymmetry of earnings revisions</h2><p data-ja="2か月で12か月先EPS予想が上がった企業（右）と下がった企業（左）の比率。右端は修正の中央値。">Share of companies whose 12-month-forward EPS estimate rose (right) or fell (left) over two months. Right column: the median revision.</p></div>
+      <svg class="ch" id="rvAsym"></svg>
+    </section>
+    <section class="sec">
+      <div class="sh"><h2 data-ja="世界のセクター：スコア・修正・期間・年初来">World sectors: score, revisions, how long, year to date</h2><p data-ja="価格スコア（0〜9）と業績予想の修正を1行に。並び順「最新スコア順」では両方を合わせた順位。">The price score (0–9) and earnings revisions on one line. With “Latest score” order, ranked on both.</p></div>
+      <div class="tw"><table class="otab" id="rvSect"></table></div>
+    </section>
+    <section class="sec two even">
+      <div><div class="sh"><h2 data-ja="地域">Regions</h2><p data-ja="世界バスケットの企業を上場地で分類。価格は SPY・ユーロストックス50・EWJ・EEM。">Companies in the world baskets grouped by listing. Prices: SPY, Euro Stoxx 50, EWJ, EEM.</p></div><div class="tw"><table class="otab" id="rvReg"></table></div></div>
+      <div><div class="sh"><h2 data-ja="ゲーム関連（企業別）">Gaming peers, company by company</h2><p data-ja="各社自身の予想修正（ソニーはADR経由、他の日本企業は予想なし）。テイクツーとネットイースは修正のみ。">Each company’s own revision where Yahoo has one (Sony via its ADR; the other Japanese peers have none). Take-Two and NetEase: revisions only.</p></div><div class="tw"><table class="otab" id="rvGame"></table></div></div>
+    </section>
+    <section class="sec">
+      <div class="sh"><h2 data-ja="TOPIX-17業種">TOPIX-17 sectors</h2><p data-ja="価格はNEXT FUNDS業種別ETF。業績修正は米国ADRのある企業のみ（下の注を参照）。">Prices are the NEXT FUNDS sector ETFs. Revisions only where a company has a US ADR (see the note below).</p></div>
+      <div class="tw"><table class="otab" id="rvTopix"></table></div>
+      <div class="help2" id="rvHelp"></div>
+    </section>
+  </div>
+
+  <!-- BREADTH -->
+  <div class="panel" data-tab="br" hidden>
+    <section class="sec">
+      <h2 class="headline" id="brHead"></h2>
+      <div class="tiles" id="brTiles"></div>
+    </section>
+    <section class="sec">
+      <div class="sh"><h2 data-ja="すべてのプラス比率">Percent positive of everything</h2><p data-ja="プラスのトレンド指標の比率（週次、2006年以降）。">Share of trend measures that are positive, weekly since 2006.</p></div>
+      <svg class="ch" id="brLine" height="260"></svg><div class="leg" id="brLeg"></div>
+    </section>
+    <section class="sec">
+      <div class="sh"><h2 data-ja="グループ別">By group</h2><p data-ja="1列＝1週。緑＝上昇トレンドが多数。括弧内は市場数。">One column per week. Green = most measures up. Number of markets in brackets.</p></div>
+      <svg class="hm" id="brHm"></svg><div class="scale" id="scBr"></div>
+    </section>
+    <section class="sec">
+      <div class="sh"><h2 data-ja="期間別：転換はどこから来るか">By horizon: where the turn starts</h2><p id="brMeasSub"></p></div>
+      <svg class="hm" id="brMeas"></svg>
+      <div class="help2" id="brHelp"></div>
+    </section>
+  </div>
+
+  <!-- COUNTRY x SECTOR -->
+  <div class="panel" data-tab="cs" hidden>
+    <section class="sec">
+      <div class="sh"><h2 data-ja="国の成績はセクター構成で説明できる">Countries win or lose by what they are made of</h2><p id="csSub"></p></div>
+      <div class="tw"><table class="cs" id="csTab"></table></div>
+      <div class="help2" id="csHelp"></div>
+    </section>
+    <section class="sec">
+      <div class="sh"><h2 data-ja="構成レンズ：セクター構成か、国内要因か">Composition lens: the sector mix or the country itself?</h2><p id="cmpSub"></p></div>
+      <div class="ctl" style="margin-bottom:10px"><span class="lbl" data-ja="期間">Period</span><div class="seg" id="cmpSeg"></div></div>
+      <div class="tw"><table class="otab" id="cmpTab"></table></div>
+      <div class="help2" id="cmpHelp"></div>
+    </section>
+  </div>
+
+  <!-- RISK -->
+  <div class="panel" data-tab="risk" hidden>
+    <section class="sec two even">
+      <div><div class="sh"><h2 id="riskH"></h2><p id="riskSub"></p></div><svg class="ch" id="riskLine" height="240"></svg></div>
+      <div><div class="sh"><h2 data-ja="年平均（ビューフォート）">Yearly average, Beaufort</h2><p data-ja="過去の嵐と比べた今年の風の強さ。">How this year compares with past storms.</p></div><div class="tw"><table class="ytab" id="yTab"></table></div></div>
+    </section>
+    <section class="sec">
+      <div class="sh"><h2 data-ja="リスク指標ごとの風力">Each risk measure on the same wind scale</h2><p id="riskHmSub"></p></div>
+      <svg class="hm" id="hmR"></svg><div class="scale" id="scR"></div>
+      <div class="help2" id="riskHelp"></div>
+    </section>
+  </div>
+
+  <!-- MACRO -->
+  <div class="panel" data-tab="macro" hidden>
+    <section class="sec two">
+      <div><div class="sh"><h2 id="macH"></h2><p id="macSub"></p></div><svg class="ch" id="macLine" height="240"></svg></div>
+      <div><div class="sh"><h2 data-ja="十分位の読み方">Reading the decile</h2></div><div class="help2" id="macHelp" style="margin-top:0"></div></div>
+    </section>
+    <section class="sec">
+      <div class="sh"><h2 data-ja="26指標のパーセンタイル（月次・5グループ）">The 26 indicators, percentile each month, in five groups</h2><p data-ja="過去10年の中での位置。緑＝リスク資産に良い側。">Where each sits within its last 10 years. Green = the side that is good for risk assets.</p></div>
+      <svg class="hm" id="hmM"></svg><div class="scale" id="scM"></div>
+    </section>
+  </div>
+
+  <!-- OUTLIERS -->
+  <div class="panel" data-tab="out" hidden>
+    <section class="sec">
+      <div class="sh"><h2 data-ja="アウトライヤーは重要">Outliers matter</h2><p id="oSub"></p></div>
+      <div class="tw"><table class="otab" id="oTab"></table></div><div class="scale" id="scO"></div>
+    </section>
+    <section class="sec">
+      <div class="sh"><h2 data-ja="アウトライヤーは群れて来る">Outliers come in clusters</h2><p id="clSub"></p></div>
+      <svg class="ch" id="clBars" height="200"></svg>
+      <p class="note" data-ja="毎週、±2sdを超えた市場の比率。上＝上昇、下＝下落。直近10年。">Each week, the share of markets that moved more than ±2 sd. Up = up moves, down = down moves. Last 10 years.</p>
+    </section>
+    <section class="sec">
+      <div class="sh"><h2 data-ja="クラスターの強さ（13週）">Clustering intensity, 13 weeks</h2><p id="clInt"></p></div>
+      <svg class="ch" id="clLine" height="220"></svg><div class="leg" id="clLeg"></div>
+    </section>
+    <section class="sec">
+      <div class="sh"><h2 data-ja="グループ別：上方−下方アウトライヤー数">By group: up minus down outliers</h2><p data-ja="1列＝1週。セルにカーソルで該当市場を表示。">One column per week. Hover a cell for the markets.</p></div>
+      <svg class="hm" id="clHm"></svg><div class="scale" id="scCl"></div>
+    </section>
+  </div>
+
+  <!-- REVERSALS -->
+  <div class="panel" data-tab="rr" hidden>
+    <section class="sec">
+      <div class="sh"><h2 data-ja="転換レーダー">Reversal radar</h2><p id="rrSub"></p></div>
+      <div class="ctl" style="margin-bottom:10px"><div class="seg" id="rrSeg"><button data-v="ctry" data-ja="国">Countries</button><button data-v="sect" data-ja="世界のセクター">World sectors</button><button data-v="topix">TOPIX-17</button><button data-v="game" data-ja="ゲーム">Gaming</button></div></div>
+      <svg class="ch" id="rrPlot" height="400"></svg>
+    </section>
+    <section class="sec">
+      <div class="sh"><h2 data-ja="転換シグナル（全市場）">Turning now, all markets</h2><p id="rrCount"></p></div>
+      <div class="tw"><table class="otab" id="rrTab"></table></div>
+      <div class="help2" id="rrHelp"></div>
+    </section>
+  </div>
+
+  <!-- REGIMES -->
+  <div class="panel" data-tab="reg" hidden>
+    <section class="sec two even">
+      <div><div class="sh"><h2 data-ja="成長×インフレ">Growth × inflation</h2><p id="quadSub"></p></div><svg class="ch" id="quad" height="300"></svg></div>
+      <div><div class="sh"><h2 data-ja="エネルギー・レジーム">Energy regime</h2><p id="enSub"></p></div><svg class="ch" id="energy" height="300"></svg><div class="leg" id="enLeg"></div></div>
+    </section>
+    <section class="sec">
+      <div class="sh"><h2 data-ja="原油建てのS&amp;P500">The S&amp;P 500 in oil terms</h2><p id="oilSub"></p></div>
+      <svg class="ch" id="oil" height="220"></svg>
+    </section>
+  </div>
+
+  <p class="note" id="method"></p>
+</div>
+
+<script>
+const SAMPLE=/*SAMPLE*/;
+/* ===== Shared core: language, formatting, Keel connection, tooltip, charts ===== */
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+/* Light by default, whatever the OS setting; the toggle switches and is remembered. */
+let THEME='light';try{const t=localStorage.getItem('keel-theme');if(t==='dark'||t==='light')THEME=t}catch(e){}
+document.documentElement.dataset.theme=THEME;
+function bindTheme(){const b=document.getElementById('themeBtn');if(!b)return;const lab=()=>{b.textContent=THEME==='light'?(LANG==='ja'?'ダーク':'Dark'):(LANG==='ja'?'ライト':'Light');b.setAttribute('aria-label',THEME==='light'?'Switch to dark':'Switch to light')};lab();
+  b.onclick=()=>{THEME=THEME==='light'?'dark':'light';document.documentElement.dataset.theme=THEME;try{localStorage.setItem('keel-theme',THEME)}catch(e){}lab();window.redraw&&window.redraw()};bindTheme.lab=lab}
+let LANG='en';
+try{const l=localStorage.getItem('keel-lang');if(l==='ja'||l==='en')LANG=l}catch(e){}
+const JA=()=>LANG==='ja', T=(en,ja)=>JA()?ja:en;
+function setLang(l){LANG=l;try{localStorage.setItem('keel-lang',l)}catch(e){}document.documentElement.lang=l;
+  $$('[data-ja]').forEach(e=>{if(e.dataset.en==null)e.dataset.en=e.innerHTML;e.innerHTML=JA()?e.dataset.ja:e.dataset.en});
+  $$('#langSeg button').forEach(b=>b.classList.toggle('on',b.dataset.l===l));if(bindTheme.lab)bindTheme.lab();}
+const num=(v,d=2)=>v==null||!isFinite(v)?'—':Number(v).toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d});
+const pct=(v,d=1,sign=true)=>v==null||!isFinite(v)?'—':(sign&&v>0?'+':v<0?'−':'')+Math.abs(v).toFixed(d)+'%';
+const bp=v=>{if(v==null||!isFinite(v))return'—';const r=Math.round(v*100);return(r>0?'+':r<0?'−':'')+Math.abs(r)+'bp'};
+const cls=v=>v==null?'':v>0?'up':v<0?'dn':'';
+const px=v=>{if(v==null||!isFinite(v))return'—';const a=Math.abs(v);return num(v,a>=1000?0:a>=100?1:a>=10?2:3)};
+const big=v=>{if(v==null||!isFinite(v))return'—';const a=Math.abs(v);return a>=1e12?(v/1e12).toFixed(1)+'T':a>=1e9?(v/1e9).toFixed(0)+'B':a>=1e6?(v/1e6).toFixed(0)+'M':num(v,0)};
+const fdate=(d,o={day:'numeric',month:'short',year:'numeric'})=>{if(!d)return'—';const x=new Date(String(d).length<=10?d+'T00:00:00':d);return isNaN(x)?String(d):x.toLocaleDateString(JA()?'ja-JP':'en-GB',o)};
+
+/* ----- Keel: market data through the viewer's "Keel" connector ----- */
+const KEEL='keel'; /* exact display name of the custom connector (a different 'Keel' exists in the connector directory) */
+let MCP=null, MCPREADY=null;
+function mcpReady(){
+  if(!MCPREADY)MCPREADY=(window.claude&&window.claude.use?window.claude.use('mcp'):Promise.resolve(null)).then(m=>(MCP=m)).catch(()=>null);
+  return MCPREADY;
+}
+const unwrap=p=>{if(p&&typeof p==='object'&&!Array.isArray(p)&&Object.keys(p).length===1&&p.result&&typeof p.result==='object')return p.result;return p};
+/* Returns {ok:true,data} or {ok:false,code,message}. Retries once on retryable errors (Render waking up). */
+/* Outside claude.ai (GitHub Pages, a local file, VS Code Live Server) there is no connector:
+   call the Keel REST API directly. Address can be changed with localStorage 'keel-url'. */
+let KEEL_URL='https://keel-api-tqpz.onrender.com';try{KEEL_URL=localStorage.getItem('keel-url')||KEEL_URL}catch(e){}
+const REST={api_yields:'/api/yields',api_brief:'/api/brief',api_sp_screen:'/api/sp/screen',api_comps:'/api/comps',api_history:'/api/history',api_revisions:'/api/revisions',api_returns:'/api/returns',api_ppp:'/api/ppp',api_snapshot:'/api/snapshot',api_fxcarry:'/api/fxcarry',api_macro:'/api/macro',api_newsmood:'/api/newsmood'};
+let VIA=null;
+async function keelRest(tool,input){
+  const path=REST[tool];if(!path)return{ok:false,code:'no_mcp'};
+  const qs=new URLSearchParams(Object.entries(input||{}).filter(([,v])=>v!=null).map(([k,v])=>[k,String(v)])).toString();
+  for(let attempt=0;attempt<2;attempt++){
+    try{const ac=new AbortController(),to=setTimeout(()=>ac.abort(),90000);
+      const r=await fetch(KEEL_URL.replace(/\/+$/,'')+path+(qs?'?'+qs:''),{signal:ac.signal});clearTimeout(to);
+      if(r.ok){VIA='rest';return{ok:true,data:await r.json()}}
+      if(r.status>=500&&attempt===0){await new Promise(ok=>setTimeout(ok,5000));continue}
+      let msg='';try{msg=(await r.json()).detail||''}catch(e){}
+      return{ok:false,code:'rest_error',message:'HTTP '+r.status+(msg?': '+msg:'')};
+    }catch(e){if(attempt===0)continue;return{ok:false,code:'rest_unreachable',message:String(e&&e.message||e)}}
+  }
+  return{ok:false,code:'rest_unreachable'};
+}
+async function keel(tool,input,{fresh=false}={}){
+  const m=await mcpReady();
+  if(!m)return keelRest(tool,input);
+  VIA='mcp';
+  const opts={cache:fresh?{refresh:true,staleTime:300000,gcTime:3600000}:{staleTime:300000,gcTime:3600000}};
+  for(let attempt=0;attempt<2;attempt++){
+    try{const r=await m.callTool(KEEL,tool,input,opts);
+      let d=unwrap(r.payload);
+      if(typeof d==='string'){try{d=JSON.parse(d)}catch(e){return{ok:false,code:'tool_error',message:d.slice(0,200)}}}
+      return{ok:true,data:d,storedAt:r.cache?.storedAt};
+    }catch(e){
+      if(e&&e.retryable&&attempt===0){await new Promise(ok=>setTimeout(ok,Math.min(e.retryAfterMs||4000+Math.random()*3000,20000)));continue}
+      const msg=e?.message||'';if(/unknown tool|tool not found|no such tool|not found: *api_|Tool .* not found/i.test(msg))return{ok:false,code:'tool_missing',message:msg};
+      return{ok:false,code:e?.code||'upstream_error',message:msg};
+    }
+  }
+  return{ok:false,code:'upstream_error'};
+}
+/* Status pill + explanation for each failure code */
+function keelMsg(code,message){
+  switch(code){
+    case 'no_mcp':case 'not_granted':case 'capability_disabled':case 'capability_removed':
+      return T('Live data runs inside claude.ai. This view shows sample data.','ライブデータはclaude.ai内で動作します。この表示はサンプルデータです。');
+    case 'rest_unreachable':return T('Could not reach the Keel API. The free server may be waking up (about a minute), or this network blocks onrender.com.','Keel APIに接続できません。無料サーバーの起動中（約1分）か、このネットワークでonrender.comがブロックされています。');
+    case 'rest_error':return T('The Keel API returned an error: ','Keel APIのエラー：')+(message||'');
+    case 'server_not_connected':case 'selection_required':case 'server_not_found':
+      return T('Add your keel connector in claude.ai Settings → Connectors, then reload.','claude.aiの設定 → コネクタでKeelを追加し、再読み込みしてください。');
+    case 'needs_reauth':return T('Reconnect Keel in claude.ai Settings → Connectors.','claude.aiの設定 → コネクタでKeelを再接続してください。');
+    case 'not_in_manifest':return T('Keel is not allowed for this page. Allow it from the page’s Permissions menu.','このページではKeelが許可されていません。ページの権限メニューから許可してください。');
+    case 'approval_required':return T('Keel is connected, but claude.ai needs your OK before this page can use it, and the request was declined or not shown. Press Allow Keel and approve the prompt.','Keelは接続済みですが、このページでの利用にはclaude.aiでの許可が必要です（許可の確認が拒否されたか、表示されませんでした）。「Keelを許可」を押して承認してください。');
+    case 'blocked_by_policy':return T('claude.ai is not letting this page use a Keel tool. Usually its saved list of Keel’s tools is out of date: in Settings → Connectors, disconnect and reconnect keel, check the tool is switched on, then reload. If it persists, an organisation setting may be blocking it.','claude.aiがこのページでのKeelツールの使用を許可していません。多くはKeelのツール一覧が古いためです：設定 → コネクタでkeelを切断・再接続し、ツールが有効か確認して再読み込みしてください。解決しない場合は組織の設定でブロックされている可能性があります。');
+    case 'tool_missing':return T('Keel is connected but does not have the tool this page needs yet: merge the matching Keel pull request, let Render redeploy, then reconnect keel in claude.ai Settings → Connectors so it picks up the new tool.','Keelは接続済みですが、このページに必要なツールがまだありません。対応するKeelのプルリクエストをマージしてRenderの再デプロイを待ち、claude.aiの設定 → コネクタでkeelを再接続して新しいツールを読み込んでください。');
+    case 'server_unavailable':return T('Keel did not answer. The free server may be waking up; try Refresh in a minute.','Keelが応答しません。無料サーバーの起動中の可能性があります。1分後に更新してください。');
+    case 'tool_error':return T('Keel reported an error: ','Keelのエラー：')+(message||'');
+    default:return T('Live data unavailable','ライブデータを取得できません')+(message?': '+message:'.');
+  }
+}
+let STAT=null;
+function restatus(){if(STAT)setStatus(...STAT)}
+function setStatus(state,code,message){
+  STAT=[state,code,message];const p=$('#status');if(!p)return;
+  p.className='pill '+state;
+  p.innerHTML='<i></i>'+(state==='live'?(VIA==='rest'?T('Live · Keel API','ライブ · Keel API'):T('Live · Keel','ライブ · Keel')):state==='busy'?T('Loading…','読み込み中…'):state==='sample'?T('Sample data','サンプルデータ'):T('Sample data','サンプルデータ'));
+  const b=$('#banner');if(!b)return;
+  if(state==='live'||state==='busy'){b.hidden=true;return}
+  b.hidden=false;
+  b.innerHTML=`<span>${state==='sample'&&code==='no_mcp'?'':'<b>'+T('Showing sample figures.','サンプル数値を表示中。')+'</b> '}${esc(keelMsg(code,message))}</span>${code==='approval_required'?`<button class="btn q" id="allowBtn">${T('Allow Keel','Keelを許可')}</button>`:''}<button class="lnk" id="howBtn">${T('How to connect','接続方法')}</button>`;
+  $('#howBtn').onclick=()=>{const h=$('#how');h.hidden=!h.hidden};
+  const ab=$('#allowBtn');if(ab)ab.onclick=()=>{if(typeof load==='function')load(true)};
+}
+function howHtml(){return `<b>${T('Connect live data (one time)','ライブデータの接続（初回のみ）')}</b><ol>
+<li>${T('Deploy the Keel repo on Render (Blueprint). It creates <code>keel-api</code> and <code>keel-mcp</code>.','KeelリポジトリをRenderにデプロイ（Blueprint）。<code>keel-api</code>と<code>keel-mcp</code>が作成されます。')}</li>
+<li>${T('In claude.ai, Settings → Connectors → Add custom connector. Name it exactly <code>keel</code> (lowercase; a different “Keel” connector exists); URL: your <code>keel-mcp</code> service address on Render + <code>/mcp</code>.','claude.aiの設定 → コネクタ → カスタムコネクタを追加。名前は必ず小文字の<code>keel</code>（別の「Keel」コネクタがあるため）、URLはRenderの<code>keel-mcp</code>のアドレス＋<code>/mcp</code>。')}</li>
+<li>${T('Reload this page and allow Keel when asked.','このページを再読み込みし、確認が出たらKeelを許可します。')}</li></ol>
+<p class="note" style="margin-top:8px">${T('Only ticker symbols and parameters are sent. Public market data from OpenBB providers; free sources can be delayed.','送信されるのはティッカーとパラメータのみ。データはOpenBB経由の公開市場データで、無料ソースのため遅延する場合があります。')}</p>`}
+
+/* ----- tooltip ----- */
+let TIP=null;
+function tip(html,ev){if(!TIP){TIP=document.createElement('div');TIP.id='tip';document.body.appendChild(TIP)}
+  if(html==null){TIP.hidden=true;return}TIP.hidden=false;TIP.innerHTML=html;
+  const r=TIP.getBoundingClientRect(),W=innerWidth,H=innerHeight;let x=ev.clientX+14,y=ev.clientY+14;
+  if(x+r.width>W-8)x=ev.clientX-r.width-14;if(y+r.height>H-8)y=ev.clientY-r.height-14;TIP.style.left=Math.max(8,x)+'px';TIP.style.top=Math.max(8,y)+'px'}
+
+/* ----- scales ----- */
+function niceTicks(lo,hi,n=5){if(!(hi>lo)){hi=lo+1}const raw=(hi-lo)/n,p=Math.pow(10,Math.floor(Math.log10(raw))),f=raw/p,st=(f<=1?1:f<=2?2:f<=2.5?2.5:f<=5?5:10)*p;
+  const a=Math.floor(lo/st)*st,b=Math.ceil(hi/st)*st,t=[];for(let v=a;v<=b+st*1e-9;v+=st)t.push(+v.toFixed(10));return t}
+const W=el=>Math.max(260,el.clientWidth||el.parentNode.clientWidth||600);
+
+/* Line chart. series:[{name,color,dash,pts:[{x:Number|Date,y}],width}]
+   opts:{h,xType:'date'|'num',yFmt,xFmt,yLabel,zero,tipX,area} */
+function lineChart(svg,series,o={}){
+  const w=W(svg),h=o.h||260,m={l:o.ml||44,r:o.mr||14,t:12,b:26};
+  const all=series.flatMap(s=>s.pts).filter(p=>p.y!=null&&isFinite(p.y));
+  if(!all.length){svg.setAttribute('viewBox',`0 0 ${w} ${h}`);svg.innerHTML=`<text x="${w/2}" y="${h/2}" text-anchor="middle">${T('No data','データなし')}</text>`;return}
+  const xs=all.map(p=>+p.x),x0=Math.min(...xs),x1=Math.max(...xs);
+  let y0=Math.min(...all.map(p=>p.y)),y1=Math.max(...all.map(p=>p.y));if(o.zero){y0=Math.min(0,y0);y1=Math.max(0,y1)}
+  const pad=(y1-y0)*.06||1;const yt=niceTicks(o.floor!=null?Math.max(o.floor,y0-pad):y0-pad,y1+pad,o.yt||5);y0=yt[0];y1=yt[yt.length-1];
+  const X=v=>m.l+(x1>x0?(v-x0)/(x1-x0):.5)*(w-m.l-m.r),Y=v=>m.t+(1-(v-y0)/(y1-y0))*(h-m.t-m.b);
+  const yf=o.yFmt||(v=>num(v,Math.abs(y1-y0)<2?2:Math.abs(y1-y0)<20?1:0));
+  let g='';
+  yt.forEach(v=>g+=`<line class="grd" x1="${m.l}" x2="${w-m.r}" y1="${Y(v)}" y2="${Y(v)}"/><text x="${m.l-6}" y="${Y(v)+4}" text-anchor="end">${yf(v)}</text>`);
+  if(o.zero&&y0<0&&y1>0)g+=`<line class="zero" x1="${m.l}" x2="${w-m.r}" y1="${Y(0)}" y2="${Y(0)}"/>`;
+  /* x ticks */
+  if(o.xType==='date'){
+    const span=(x1-x0)/864e5,step=span>1500?12:span>700?6:span>300?3:span>90?1:0;
+    const d0=new Date(x0),ticks=[];
+    if(step){let d=new Date(d0.getFullYear(),d0.getMonth()+1,1);while(+d<=x1){if(d.getMonth()%step===0)ticks.push(+d);d=new Date(d.getFullYear(),d.getMonth()+1,1)}}
+    else{let d=new Date(x0);while(+d<=x1){ticks.push(+d);d=new Date(+d+7*864e5)}}
+    const maxT=Math.max(2,Math.floor((w-m.l-m.r)/70)),every=Math.ceil(ticks.length/maxT);
+    ticks.forEach((t,i)=>{if(i%every)return;const d=new Date(t);const lab=step>=12||(step&&d.getMonth()===0)?String(d.getFullYear()):d.toLocaleDateString(JA()?'ja-JP':'en-GB',step?{month:'short'}:{day:'numeric',month:'short'});
+      g+=`<line class="grd" x1="${X(t)}" x2="${X(t)}" y1="${h-m.b}" y2="${h-m.b+4}"/><text x="${X(t)}" y="${h-8}" text-anchor="middle">${lab}</text>`});
+  }else{
+    const xt=o.xTicks||niceTicks(x0,x1,6);const xf=o.xFmt||(v=>v);
+    let lastX=-1e9;xt.filter(v=>v>=x0&&v<=x1).forEach(v=>{if(X(v)-lastX<26)return;lastX=X(v);g+=`<text x="${X(v)}" y="${h-8}" text-anchor="middle">${xf(v)}</text>`});
+  }
+  g+=`<line class="ax" x1="${m.l}" x2="${w-m.r}" y1="${h-m.b}" y2="${h-m.b}"/>`;
+  series.forEach(s=>{const pts=s.pts.filter(p=>p.y!=null&&isFinite(p.y));if(!pts.length)return;
+    const d=pts.map((p,i)=>(i?'L':'M')+X(+p.x).toFixed(1)+' '+Y(p.y).toFixed(1)).join('');
+    if(s.area){const yb=Y(y0<=0&&y1>=0?0:y0);g+=`<path d="${d}L${X(+pts[pts.length-1].x).toFixed(1)} ${yb}L${X(+pts[0].x).toFixed(1)} ${yb}Z" fill="${s.color}" fill-opacity=".08" stroke="none"/>`}
+    g+=`<path d="${d}" fill="none" stroke="${s.color}" stroke-width="${s.width||1.6}" ${s.dash?'stroke-dasharray="5 4"':''} stroke-linejoin="round" stroke-linecap="round"/>`;
+    if(s.dots)pts.forEach(p=>g+=`<circle cx="${X(+p.x)}" cy="${Y(p.y)}" r="3" fill="${s.color}"/>`);
+    const L=pts[pts.length-1];if(!s.dots)g+=`<circle cx="${X(+L.x)}" cy="${Y(L.y)}" r="2.6" fill="${s.color}"/>`;
+  });
+  g+=`<line id="${svg.id}-hv" class="ax" x1="0" x2="0" y1="${m.t}" y2="${h-m.b}" visibility="hidden"/><rect x="${m.l}" y="${m.t}" width="${w-m.l-m.r}" height="${h-m.t-m.b}" fill="transparent" class="hit"/>`;
+  svg.setAttribute('viewBox',`0 0 ${w} ${h}`);svg.setAttribute('height',h);svg.innerHTML=g;
+  const hit=svg.querySelector('.hit'),hv=svg.querySelector(`[id="${svg.id}-hv"]`);
+  const xsAll=[...new Set(series.flatMap(s=>s.pts.map(p=>+p.x)))].sort((a,b)=>a-b);
+  hit.addEventListener('mousemove',ev=>{const r=svg.getBoundingClientRect(),vx=(ev.clientX-r.left)/r.width*w;
+    const xv=x0+(vx-m.l)/(w-m.l-m.r)*(x1-x0);let best=xsAll[0];for(const v of xsAll)if(Math.abs(v-xv)<Math.abs(best-xv))best=v;
+    hv.setAttribute('x1',X(best));hv.setAttribute('x2',X(best));hv.setAttribute('visibility','visible');
+    const head=o.tipX?o.tipX(best):o.xType==='date'?fdate(new Date(best).toISOString().slice(0,10)):best;
+    const rows=series.map(s=>{const p=s.pts.find(q=>+q.x===best);return p&&p.y!=null?`<div><span style="color:${s.color}">■</span> ${esc(s.name)} <b>${(o.tipFmt||yf)(p.y)}</b></div>`:''}).join('');
+    tip(`<div class="m">${head}</div>${rows}`,ev)});
+  hit.addEventListener('mouseleave',()=>{hv.setAttribute('visibility','hidden');tip(null)});
+}
+function legend(el,series){el.innerHTML=series.map(s=>`<span><i class="${s.dash?'d':''}" style="background:${s.color};border-color:${s.color}"></i>${esc(s.name)}</span>`).join('')}
+function spark(vals,w=120,h=28,color='var(--ink)'){const v=vals.filter(x=>x!=null);if(v.length<2)return'';const lo=Math.min(...v),hi=Math.max(...v);
+  const d=v.map((y,i)=>(i?'L':'M')+(i/(v.length-1)*w).toFixed(1)+' '+(h-2-(hi>lo?(y-lo)/(hi-lo):.5)*(h-4)).toFixed(1)).join('');
+  const lx=w,ly=h-2-(hi>lo?(v[v.length-1]-lo)/(hi-lo):.5)*(h-4);
+  return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" style="display:block;overflow:visible"><path d="${d}" fill="none" stroke="${color}" stroke-width="1.3"/><circle cx="${lx}" cy="${ly}" r="2.2" fill="${color}"/></svg>`}
+const cssv=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+let RZ;addEventListener('resize',()=>{clearTimeout(RZ);RZ=setTimeout(()=>window.redraw&&window.redraw(),150)});
+
+document.addEventListener('DOMContentLoaded',bindTheme);if(document.readyState!=='loading')setTimeout(bindTheme,0);
+
+
+/* ================= universe ================= */
+const COUNTRIES=[['ACWI','World','世界'],['SPY','United States','米国'],['EWJ','Japan','日本'],['EWG','Germany','ドイツ'],['EWQ','France','フランス'],['EWU','United Kingdom','英国'],['EWL','Switzerland','スイス'],['EWI','Italy','イタリア'],['EWP','Spain','スペイン'],['EWN','Netherlands','オランダ'],['EWD','Sweden','スウェーデン'],['EWC','Canada','カナダ'],['EWA','Australia','オーストラリア'],['EWH','Hong Kong','香港'],['MCHI','China','中国'],['EWY','South Korea','韓国'],['EWT','Taiwan','台湾'],['INDA','India','インド'],['EWZ','Brazil','ブラジル'],['EWW','Mexico','メキシコ'],['EIDO','Indonesia','インドネシア'],['EZA','South Africa','南アフリカ'],['EWS','Singapore','シンガポール'],['THD','Thailand','タイ']];
+const SECTORS=[['IXC','Energy','エネルギー','energy'],['MXI','Materials','素材','basic_materials'],['EXI','Industrials','資本財','industrials'],['RXI','Consumer discretionary','一般消費財','consumer_cyclical'],['KXI','Consumer staples','生活必需品','consumer_defensive'],['IXJ','Health care','ヘルスケア','healthcare'],['IXG','Financials','金融','financial_services'],['IXN','Information technology','情報技術','technology'],['IXP','Communication services','コミュニケーション','communication_services'],['JXI','Utilities','公益','utilities'],['REET','Real estate','不動産','realestate']];
+const TOPIX=[['1617.T','Foods','食品'],['1618.T','Energy resources','エネルギー資源'],['1619.T','Construction & materials','建設・資材'],['1620.T','Raw materials & chemicals','素材・化学'],['1621.T','Pharmaceutical','医薬品'],['1622.T','Autos & transport equipment','自動車・輸送機'],['1623.T','Steel & nonferrous','鉄鋼・非鉄'],['1624.T','Machinery','機械'],['1625.T','Electric & precision','電機・精密'],['1626.T','IT & services','情報通信・サービス'],['1627.T','Electric power & gas','電力・ガス'],['1628.T','Transport & logistics','運輸・物流'],['1629.T','Trading & wholesale','商社・卸売'],['1630.T','Retail','小売'],['1631.T','Banks','銀行'],['1632.T','Financials ex banks','金融（除く銀行）'],['1633.T','Real estate','不動産']];
+const GAMING=[['7974.T','Nintendo','任天堂'],['6758.T','Sony Group','ソニーグループ'],['9697.T','Capcom','カプコン'],['7832.T','Bandai Namco','バンダイナムコ'],['9766.T','Konami','コナミ'],['6460.T','Sega Sammy','セガサミー'],['9684.T','Square Enix','スクウェア・エニックス'],['3635.T','Koei Tecmo','コーエーテクモ']];
+const GAMING_X=[['TTWO','Take-Two','テイクツー'],['NTES','NetEase','ネットイース']];
+const OUT_GROUPS=[
+  ['Equity indices','株価指数',[['^GSPC','S&P 500','S&P500'],['^N225','Nikkei 225','日経平均'],['^STOXX50E','Euro Stoxx 50','ユーロ・ストックス50']]],
+  ['Countries','国別',COUNTRIES],
+  ['Global sectors','世界のセクター',SECTORS],
+  ['Currencies','通貨',[['USDJPY=X','USD/JPY','米ドル/円'],['EURJPY=X','EUR/JPY','ユーロ/円'],['GBPJPY=X','GBP/JPY','英ポンド/円'],['AUDJPY=X','AUD/JPY','豪ドル/円'],['CHFJPY=X','CHF/JPY','スイスフラン/円'],['EURUSD=X','EUR/USD','ユーロ/米ドル'],['CNY=X','USD/CNY','米ドル/人民元']]],
+  ['Rates (change in bp)','金利（bp変化）',[['UST2Y','US 2-year','米2年'],['UST10Y','US 10-year','米10年'],['JGB10Y','JGB 10-year','日本10年']]],
+  ['Credit','クレジット',[['HYG','US high yield','米ハイイールド'],['LQD','US investment grade','米投資適格']]],
+  ['Commodities','商品',[['GC=F','Gold','金'],['SI=F','Silver','銀'],['HG=F','Copper','銅'],['CL=F','WTI crude','WTI原油'],['NG=F','Natural gas','天然ガス']]],
+  ['Crypto','暗号資産',[['BTC-USD','Bitcoin','ビットコイン'],['ETH-USD','Ether','イーサリアム']]],
+];
+const NATIVE_JPY=s=>/\.T$/.test(s)||s==='^N225'||s==='^TPX',NATIVE_EUR=s=>s==='^STOXX50E',NOCONV=s=>/=X$/.test(s)||/^(UST|JGB)/.test(s)||s==='^VIX'||s==='^MOVE';
+const ALL_SYMS=[...new Set([...COUNTRIES,...SECTORS,...TOPIX].map(r=>r[0]).concat(OUT_GROUPS.flatMap(g=>g[2].map(r=>r[0]))).concat(['^VIX','^MOVE','IEF','USDJPY=X','EURUSD=X','IWM','EEM','TIP','DX-Y.NYB','RSP','1306.T','JGB2Y']))];
+GAMING.forEach(r=>{if(!ALL_SYMS.includes(r[0]))ALL_SYMS.push(r[0])});
+const nm=r=>JA()?r[2]:r[1];
+
+let S={tab:'weather',ccy:'USD',span:52,sort:'score',rr:'sect',cmpL:null};
+try{Object.assign(S,JSON.parse(localStorage.getItem('rineichen-state')||'{}'))}catch(e){}
+const save=()=>{try{localStorage.setItem('rineichen-state',JSON.stringify(S))}catch(e){}};
+let D=null,LIVE=false,CACHE={};
+
+/* ================= data ================= */
+/* drop trailing week-ends that only a few series reached (crypto trades at weekends) */
+function trimTail(D,raw){const keys=Object.keys(raw);let n=D.t.length;while(n>1){const c=keys.filter(k=>raw[k][n-1]!=null).length;if(c>=keys.length*.5)break;n--}if(n<D.t.length){D.t=D.t.slice(0,n);D.dates=D.dates.slice(0,n);for(const k in D.s)D.s[k]=D.s[k].slice(0,n)}return D}
+function ffill(a){let last=null;return a.map(v=>v==null||!isFinite(v)?last:(last=v))}
+function fromSample(){const s=SAMPLE,D={t:s.d.map(d=>Date.parse(d+'T00:00:00Z')),dates:s.d,s:{},macro:s.m,mood:s.n,w:s.w,gen:s.g,src:'sample'};for(const[k,v]of Object.entries(s.s))D.s[k]=ffill(v);return trimTail(D,s.s)}
+/* merge live Keel series over the sample: union of week-ends, live values win */
+function mergeLive(live,macro,mood){
+  const base=fromSample(),dates=[...new Set([...base.dates,...Object.values(live).flatMap(a=>a.map(p=>p.d))])].sort(),idx=new Map(dates.map((d,i)=>[d,i])),s={};
+  const raw={};
+  for(const k of new Set([...Object.keys(base.s),...Object.keys(live)])){const a=new Array(dates.length).fill(null);
+    if(SAMPLE.s[k])SAMPLE.s[k].forEach((v,i)=>{if(v!=null)a[idx.get(base.dates[i])]=v});
+    if(live[k])live[k].forEach(p=>{a[idx.get(p.d)]=p.v});raw[k]=a;s[k]=ffill(a)}
+  const D={t:dates.map(d=>Date.parse(d+'T00:00:00Z')),dates,s,macro:base.macro,mood:base.mood,w:base.w,gen:base.gen,src:'keel'};
+  const over=(old,neu)=>{const m=new Map(old||[]);neu.forEach(([k,v])=>m.set(k,v));return[...m.entries()].sort((x,y)=>x[0]<y[0]?-1:1)};
+  if(macro){D.macro=JSON.parse(JSON.stringify(base.macro||{}));for(const[a,v]of Object.entries(macro)){const o=D.macro[a]||{cli:[],cpi:[]};D.macro[a]={cli:over(o.cli,(v.cli||[]).map(p=>[p.d.slice(0,7),p.v])),cpi:over(o.cpi,(v.cpi_yoy||[]).map(p=>[p.d.slice(0,7),p.v])),bci:over(o.bci,(v.bci||[]).map(p=>[p.d.slice(0,7),p.v])),cci:over(o.cci,(v.cci||[]).map(p=>[p.d.slice(0,7),p.v]))}}}
+  if(mood)D.mood=over(base.mood,mood.map(p=>[p.d.slice(0,7),p.v]));
+  return trimTail(D,raw)}
+/* a price series in the chosen currency */
+function pxc(sym,ccy=S.ccy){const key=sym+'|'+ccy;if(CACHE[key])return CACHE[key];const a=D.s[sym];if(!a)return null;let out=a;
+  if(!NOCONV(sym)){const fx=D.s['USDJPY=X'],eu=D.s['EURUSD=X'];
+    if(NATIVE_JPY(sym))out=ccy==='JPY'?a:a.map((v,i)=>v!=null&&fx[i]?v/fx[i]:null);
+    else if(NATIVE_EUR(sym))out=a.map((v,i)=>v!=null&&eu[i]?(ccy==='JPY'&&fx[i]?v*eu[i]*fx[i]:v*eu[i]):null);
+    else out=ccy==='JPY'?a.map((v,i)=>v!=null&&fx[i]?v*fx[i]:null):a}
+  return CACHE[key]=out}
+const ret=(a,i,k)=>i-k>=0&&a[i]!=null&&a[i-k]!=null&&a[i-k]>0?a[i]/a[i-k]-1:null;
+function sma(a,n){const o=new Array(a.length).fill(null);let s=0,c=0;for(let i=0;i<a.length;i++){if(a[i]!=null){s+=a[i];c++}if(i>=n&&a[i-n]!=null){s-=a[i-n];c--}if(i>=n-1&&c===n)o[i]=s/n}return o}
+
+/* ================= the 0–9 score ================= */
+/* Nine yes/no tests, one point each (our own, Piotroski-style; price only until the earnings half arrives) */
+const TESTS=[['Above its 10-week average','10週平均より上'],['Above its 40-week (200-day) average','40週（200日）平均より上'],['10-week average above 40-week','10週平均が40週平均より上'],['Up over 13 weeks','13週でプラス'],['Up over 26 weeks','26週でプラス'],['Up over 52 weeks','52週でプラス'],['Beat the world index over 13 weeks','13週で世界指数を上回る'],['Beat the world index over 52 weeks','52週で世界指数を上回る'],['40-week average rising','40週平均が上昇']];
+function scoreSeries(sym){const key='sc|'+sym+'|'+S.ccy;if(CACHE[key])return CACHE[key];const p=pxc(sym);if(!p)return null;const b=pxc('ACWI'),m10=sma(p,10),m40=sma(p,40),self=sym==='ACWI';
+  const out=p.map((v,i)=>{if(v==null||m40[i]==null||i<56||ret(p,i,52)==null)return null;const r13=ret(p,i,13),r26=ret(p,i,26),r52=ret(p,i,52),b13=self?0:ret(b,i,13),b52=self?0:ret(b,i,52);
+    const t=[v>m10[i],v>m40[i],m10[i]>m40[i],r13>0,r26>0,r52>0,b13!=null&&r13>b13,b52!=null&&r52>b52,m40[i-4]!=null&&m40[i]>m40[i-4]];return{s:t.filter(Boolean).length,t,r13,r52}});
+  return CACHE[key]=out}
+const lastScore=sym=>{const a=scoreSeries(sym);if(!a)return null;for(let i=a.length-1;i>=0;i--)if(a[i])return a[i];return null};
+
+/* ================= colour helpers ================= */
+function rgb(h){h=h.trim();if(h.startsWith('#')){const n=h.length===4?h.slice(1).split('').map(c=>c+c).join(''):h.slice(1);return[0,2,4].map(i=>parseInt(n.slice(i,i+2),16))}const m=h.match(/\d+(\.\d+)?/g);return m?m.slice(0,3).map(Number):[128,128,128]}
+function mix(a,b,t){const A=rgb(a),B=rgb(b);return`rgb(${A.map((x,i)=>Math.round(x+(B[i]-x)*t)).join(',')})`}
+/* diverging: v in [lo,hi] around mid; red below, green above */
+function div(v,lo,mid,hi){if(v==null||!isFinite(v))return cssv('--track');const bg=cssv('--card'),t=v>=mid?Math.min(1,(v-mid)/(hi-mid)):Math.min(1,(mid-v)/(mid-lo));return mix(bg,v>=mid?cssv('--pos'):cssv('--neg'),.12+.78*t)}
+const scoreCol=v=>div(v,0,4.5,9);
+const riskCol=v=>v==null?cssv('--track'):div(-v,-12,-4,0);
+function inkOn(fill){const[r,g,b]=rgb(fill);return(r*.299+g*.587+b*.114)>150?'#111':'#fff'}
+function scaleBar(el,lo,hi,mid,labs,fn){const n=24,c=[];for(let i=0;i<=n;i++){const v=lo+(hi-lo)*i/n;c.push((fn?fn(v):div(v,lo,mid,hi))+` ${(i/n*100).toFixed(0)}%`)}el.innerHTML=`<span>${labs[0]}</span><span class="bar2" style="background:linear-gradient(90deg,${c.join(',')})"></span><span>${labs[1]}</span>`}
+
+/* ================= heatmap ================= */
+function heatmap(svg,rows,o){
+  const w=W(svg),narrow=w<640,labW=o.labW||(narrow?104:178),lastW=o.lastW||40,n=o.n,cw=(w-labW-lastW-6)/n,rh=narrow?17:19,top=20,h=top+rows.length*rh+4,i0=o.i0;
+  let g='';let lastMonth=-1,lastLabX=-99;
+  for(let c=0;c<n;c++){const t=o.colT(c);if(t==null)continue;const d=new Date(t),mo=d.getUTCMonth();if(mo!==lastMonth){lastMonth=mo;const x=labW+c*cw;if(x-lastLabX>(narrow?34:30)&&(o.monthly||c>0||true)){const lab=mo===0||c===0?String(d.getUTCFullYear()).slice(o.monthly?0:0):d.toLocaleDateString(JA()?'ja-JP':'en-GB',{month:'short'});g+=`<text x="${x}" y="12">${lab}</text>`;lastLabX=x}}}
+  rows.forEach((r,ri)=>{const y=top+ri*rh;
+    if(r.sep)g+=`<line x1="0" x2="${w}" y1="${y-1}" y2="${y-1}" stroke="var(--line)"/>`;
+    g+=`<text class="rl" x="0" y="${y+rh*.68}" ${r.bold?'style="font-weight:500"':''}>${esc(r.label.length>Math.floor((labW-14)/6.4)?r.label.slice(0,Math.floor((labW-14)/6.4)-1)+'…':r.label)}</text>`;
+    for(let c=0;c<n;c++){const v=r.vals[c];g+=`<rect x="${(labW+c*cw).toFixed(1)}" y="${y}" width="${Math.max(.5,cw-(cw>4?1:.3)).toFixed(1)}" height="${rh-2}" fill="${o.color(v)}"/>`}
+    const lv=r.last;if(lv!=null){const f=o.color(lv);g+=`<rect x="${w-lastW}" y="${y}" width="${lastW-2}" height="${rh-2}" fill="${f}"/><text class="lv" x="${w-lastW/2-1}" y="${y+rh*.68}" text-anchor="middle" style="fill:${inkOn(f)}">${o.fmt(lv)}</text>`}
+    if(r.flag)g+=`<text x="${labW-4}" y="${y+rh*.68}" text-anchor="end" style="fill:${r.flag==='w'?'var(--pos)':'var(--neg)'};font-size:10px">${r.flag==='w'?'▲':'▼'}</text>`});
+  g+=`<text x="${w-lastW/2-1}" y="12" text-anchor="middle">${o.lastLab||T('now','現在')}</text>`;
+  svg.setAttribute('viewBox',`0 0 ${w} ${h}`);svg.setAttribute('height',h);svg.innerHTML=g;
+  svg.onmousemove=ev=>{const b=svg.getBoundingClientRect(),x=(ev.clientX-b.left)*w/b.width,y=(ev.clientY-b.top)*h/b.height,ri=Math.floor((y-top)/rh),c=Math.floor((x-labW)/cw);if(ri<0||ri>=rows.length||c<0||c>=n){tip(null);return}const v=rows[ri].vals[c];tip(o.tip(rows[ri],c,v),ev)};
+  svg.onmouseleave=()=>tip(null);
+}
+const md=t=>fdate(new Date(t).toISOString().slice(0,10),{day:'numeric',month:'short',year:'numeric'});
+const my=t=>fdate(new Date(t).toISOString().slice(0,10),{month:'short',year:'numeric'});
+
+/* ================= sd moves ================= */
+function sdMove(sym,k,iEnd){const isRate=/^(UST|JGB)/.test(sym),a=isRate?D.s[sym]:pxc(sym);if(!a)return null;const i=iEnd??a.length-1,j=i-k;if(j<1||a[i]==null||a[j]==null)return null;
+  const ch=(x,y)=>isRate?(x-y)*100:Math.log(x/y);const mv=ch(a[i],a[j]),r=[];for(let q=Math.max(1,j-156);q<=j;q++){if(a[q]!=null&&a[q-1]!=null&&(isRate||a[q-1]>0&&a[q]>0))r.push(ch(a[q],a[q-1]))}
+  if(r.length<52)return null;const m=r.reduce((x,y)=>x+y,0)/r.length,sd=Math.sqrt(r.reduce((x,y)=>x+(y-m)**2,0)/(r.length-1));if(!sd)return null;return{sd:mv/(sd*Math.sqrt(k)),mv:isRate?mv:Math.exp(mv)-1,rate:isRate}}
+function ytdWeeks(){const N=D.t.length,y=new Date(D.t[N-1]).getUTCFullYear();let k=0;for(let i=N-1;i>=0;i--){if(new Date(D.t[i]).getUTCFullYear()<y)break;k++}return k}
+
+/* ================= risk Beaufort ================= */
+const BEAU=[['Calm','静穏'],['Light air','至軽風'],['Light breeze','軽風'],['Gentle breeze','軟風'],['Moderate breeze','和風'],['Fresh breeze','疾風'],['Strong breeze','雄風'],['Near gale','強風'],['Gale','疾強風'],['Strong gale','大強風'],['Storm','全強風'],['Violent storm','暴風'],['Hurricane','颶風']];
+const RISK_IND=[['vix','Equity implied volatility (VIX)','株式インプライド・ボラ（VIX）'],['move','Bond implied volatility (MOVE)','債券インプライド・ボラ（MOVE）'],['credit','Credit: high yield vs Treasuries, 13 weeks','クレジット：ハイイールド対米国債（13週）'],['dd','S&P 500 fall from its 52-week high','S&P500の52週高値からの下落'],['fxv','USD/JPY realised volatility, 13 weeks','ドル円の実現ボラ（13週）'],['carry','AUD/JPY over 13 weeks (carry unwind)','豪ドル円13週（キャリー巻き戻し）']];
+function riskRaw(){if(CACHE.riskRaw)return CACHE.riskRaw;const N=D.t.length,s=D.s,o={};
+  o.vix=s['^VIX'].slice();o.move=(s['^MOVE']||[]).slice();
+  const hy=s['HYG'],ie=s['IEF'];o.credit=hy.map((v,i)=>{const a=ret(hy,i,13),b=ret(ie,i,13);return a==null||b==null?null:-(a-b)});
+  const sp=s['^GSPC'];o.dd=sp.map((v,i)=>{if(v==null||i<52)return null;let m=0;for(let q=i-51;q<=i;q++)if(sp[q]!=null&&sp[q]>m)m=sp[q];return m?1-v/m:null});
+  const fx=s['USDJPY=X'];o.fxv=fx.map((v,i)=>{if(i<14)return null;const r=[];for(let q=i-12;q<=i;q++)if(fx[q]&&fx[q-1])r.push(Math.log(fx[q]/fx[q-1]));if(r.length<10)return null;const m=r.reduce((a,b)=>a+b,0)/r.length;return Math.sqrt(r.reduce((a,b)=>a+(b-m)**2,0)/(r.length-1)*52)*100});
+  const aj=s['AUDJPY=X'];o.carry=aj.map((v,i)=>{const r=ret(aj,i,13);return r==null?null:-r});
+  return CACHE.riskRaw=o}
+/* each measure -> its percentile over the whole history since 2006 -> 0..12 */
+const B_LO=.6,B_HI=.95; /* percentile at which the scale leaves calm, and reaches hurricane */
+const toB=p=>p==null?null:Math.max(0,Math.min(12,(p-B_LO)/(B_HI-B_LO)*12));
+function pctRankAll(a){const v=a.filter(x=>x!=null).sort((x,y)=>x-y);return a.map(x=>{if(x==null||!v.length)return null;let lo=0,hi=v.length;while(lo<hi){const m=(lo+hi)>>1;if(v[m]<x)lo=m+1;else hi=m}return lo/(v.length-1||1)})}
+function riskB(){if(CACHE.riskB)return CACHE.riskB;const raw=riskRaw(),per={};RISK_IND.forEach(([k])=>per[k]=pctRankAll(raw[k]).map(toB));
+  /* the reading = the average of the three roughest measures: a storm is when several blow at once */
+  const tot=D.t.map((_,i)=>{const v=RISK_IND.map(([k])=>per[k][i]).filter(x=>x!=null).sort((a,b)=>b-a);return v.length>=4?(v[0]+v[1]+v[2])/3:null});
+  return CACHE.riskB={per,tot,raw}}
+
+/* ================= macro decile (monthly) ================= */
+/* [key, EN, JA, sign (+1 = higher is better for risk assets), group] */
+const MAC_GROUPS=[['g','Growth','成長'],['i','Inflation','インフレ'],['f','Financial conditions','金融環境'],['m','Markets and the cycle','市場と景気循環'],['s','Mood','ムード']];
+const MAC_IND=[
+  ['cliUS','US leading indicator, 6-month change','米国 景気先行指数（6か月変化）',1,'g'],['cliDE','Germany leading indicator, 6-month change','ドイツ 景気先行指数（6か月変化）',1,'g'],['cliJP','Japan leading indicator, 6-month change','日本 景気先行指数（6か月変化）',1,'g'],['cliCN','China leading indicator, 6-month change','中国 景気先行指数（6か月変化）',1,'g'],['bci','Business confidence, US/DE/JP/CN (OECD)','企業信頼感 米独日中（OECD）',1,'g'],
+  ['cpiUS','US inflation, 6-month change (lower is better)','米国 インフレ率の6か月変化（低いほど良い）',-1,'i'],['cpiDE','Germany inflation, 6-month change','ドイツ インフレ率の6か月変化',-1,'i'],['cpiUK','UK inflation, 6-month change','英国 インフレ率の6か月変化',-1,'i'],['oil','Oil (WTI), 26 weeks (lower is better)','原油（WTI）26週（低いほど良い）',-1,'i'],['tip','Inflation-linked vs nominal Treasuries, 26 weeks','インフレ連動債対名目米国債（26週）',-1,'i'],
+  ['curve','US yield curve, 10y minus 2y','米国イールドカーブ（10年−2年）',1,'f'],['jcurve','JGB curve, 10y minus 2y','日本国債カーブ（10年−2年）',1,'f'],['credit','High yield vs Treasuries, 26 weeks','ハイイールド対米国債（26週）',1,'f'],['vix','VIX (lower is better)','VIX（低いほど良い）',-1,'f'],['move','MOVE bond volatility (lower is better)','MOVE債券ボラ（低いほど良い）',-1,'f'],['usd','Dollar index, 26 weeks (lower is better)','ドル指数26週（低いほど良い）',-1,'f'],
+  ['mom','World equities, 26 weeks','世界株（26週）',1,'m'],['cugo','Copper vs gold, 26 weeks','銅対金（26週）',1,'m'],['cyc','Cyclicals vs defensives, 26 weeks','景気敏感対ディフェンシブ（26週）',1,'m'],['bank','Banks vs world equities, 26 weeks','金融株対世界株（26週）',1,'m'],['small','US small vs large caps, 26 weeks','米小型株対大型株（26週）',1,'m'],['em','Emerging vs world equities, 26 weeks','新興国株対世界株（26週）',1,'m'],['breadth','Equal- vs cap-weighted S&P 500, 26 weeks','S&P500 均等加重対時価加重（26週）',1,'m'],['topix','TOPIX vs world, in yen, 26 weeks','TOPIX対世界株（円建て・26週）',1,'m'],
+  ['news','US news sentiment (SF Fed)','米国ニュース・センチメント（SF連銀）',1,'s'],['cci','Consumer confidence, US/DE/JP/CN (OECD)','消費者信頼感 米独日中（OECD）',1,'s']];
+function monthKeys(){const ks=[...new Set(D.dates.map(d=>d.slice(0,7)))];return ks}
+function lastIdxOfMonth(){const m=new Map();D.dates.forEach((d,i)=>m.set(d.slice(0,7),i));return m}
+function macroRaw(){if(CACHE.macroRaw)return CACHE.macroRaw;const ks=monthKeys(),li=lastIdxOfMonth(),o={},s=D.s;
+  const mser=(area,kind)=>{const a=(D.macro&&D.macro[area]&&D.macro[area][kind])||[];const mp=new Map(a);let last=null;return ks.map(k=>{if(mp.has(k))last=mp.get(k);return mp.has(k)?mp.get(k):last})};
+  const ch6=a=>a.map((v,i)=>i>=6&&v!=null&&a[i-6]!=null?v-a[i-6]:null);
+  for(const a of['US','DE','JP','CN'])o['cli'+a]=ch6(mser(a,'cli'));for(const a of['US','DE','UK'])o['cpi'+a]=ch6(mser(a,'cpi'));
+  const at=(f)=>ks.map(k=>{const i=li.get(k);return f(i)});
+  o.curve=at(i=>s.UST10Y&&s.UST2Y&&s.UST10Y[i]!=null&&s.UST2Y[i]!=null?s.UST10Y[i]-s.UST2Y[i]:null);
+  o.cugo=at(i=>{const c=s['HG=F'],g=s['GC=F'];if(!c||!g||i<26||!c[i]||!g[i]||!c[i-26]||!g[i-26])return null;return(c[i]/g[i])/(c[i-26]/g[i-26])-1});
+  o.credit=at(i=>{const a=ret(s.HYG,i,26),b=ret(s.IEF,i,26);return a==null||b==null?null:a-b});
+  o.vix=at(i=>s['^VIX'][i]);o.mom=at(i=>ret(s.ACWI,i,26));
+  o.cyc=at(i=>{const c=[ret(s.EXI,i,26),ret(s.MXI,i,26)],d=[ret(s.KXI,i,26),ret(s.JXI,i,26)];if(c.concat(d).some(x=>x==null))return null;return(c[0]+c[1])/2-(d[0]+d[1])/2});
+  const rel=(x,y)=>at(i=>{const a=ret(s[x]||[],i,26),b=ret(s[y]||[],i,26);return a==null||b==null?null:a-b});
+  o.jcurve=at(i=>s.JGB10Y&&s.JGB2Y&&s.JGB10Y[i]!=null&&s.JGB2Y[i]!=null?s.JGB10Y[i]-s.JGB2Y[i]:null);
+  o.move=at(i=>(s['^MOVE']||[])[i]);o.oil=at(i=>ret(s['CL=F'],i,26));o.tip=rel('TIP','IEF');o.usd=at(i=>ret(s['DX-Y.NYB']||[],i,26));
+  o.bank=rel('IXG','ACWI');o.small=rel('IWM','SPY');o.em=rel('EEM','ACWI');o.breadth=rel('RSP','SPY');
+  o.topix=at(i=>{const t=pxc('1306.T','JPY'),w=pxc('ACWI','JPY');if(!t)return null;const a=ret(t,i,26),b=ret(w,i,26);return a==null||b==null?null:a-b});
+  /* OECD confidence: average of the areas that report, level (100 = long-term average) */
+  const conf=k=>{const ser=['US','DE','JP','CN'].map(a=>mser(a,k));return ks.map((_,i)=>{const v=ser.map(x=>x[i]).filter(x=>x!=null);return v.length?v.reduce((p,q)=>p+q,0)/v.length:null})};
+  o.bci=conf('bci');o.cci=conf('cci');
+  const mood=new Map(D.mood||[]);o.news=ks.map(k=>mood.has(k)?mood.get(k):null);
+  return CACHE.macroRaw={ks,o}}
+function macroPct(){if(CACHE.macroPct)return CACHE.macroPct;const{ks,o}=macroRaw(),per={};
+  MAC_IND.forEach(([k,,,sign])=>{const a=o[k];per[k]=a.map((v,i)=>{if(v==null)return null;const w=[];for(let q=Math.max(0,i-119);q<=i;q++)if(a[q]!=null)w.push(a[q]);if(w.length<60)return null;const below=w.filter(x=>sign>0?x<v:x>v).length,eq=w.filter(x=>x===v).length;return(below+.5*(eq-1))/(w.length-1)})});
+  /* the latest months: OECD data arrive 1–2 months late, so carry each indicator's last value forward */
+  const L=ks.length-1;MAC_IND.forEach(([k])=>{for(let i=L-2;i<=L;i++){if(per[k][i]==null&&per[k][i-1]!=null)per[k][i]=per[k][i-1]}});
+  /* average within each group, then across groups, so 8 market measures do not outvote 5 economic ones */
+  const grp={};MAC_GROUPS.forEach(([g])=>{const ks_=MAC_IND.filter(r=>r[4]===g).map(r=>r[0]);grp[g]=ks.map((_,i)=>{const v=ks_.map(k=>per[k][i]).filter(x=>x!=null);return v.length?v.reduce((a,b)=>a+b,0)/v.length:null})});
+  const avg=ks.map((_,i)=>{const v=MAC_GROUPS.map(([g])=>grp[g][i]).filter(x=>x!=null);return v.length>=4?v.reduce((a,b)=>a+b,0)/v.length:null});
+  return CACHE.macroPct={ks,per,avg,grp}}
+const decile=p=>p==null?null:Math.min(10,Math.floor(p*10)+1);
+const ord=n=>JA()?`第${n}`:n+(n%10===1&&n!==11?'st':n%10===2&&n!==12?'nd':n%10===3&&n!==13?'rd':'th');
+
+/* ================= regimes ================= */
+function quad(){const{ks,o}=macroRaw(),g=ks.map((_,i)=>{const v=['cliUS','cliDE','cliJP','cliCN'].map(k=>o[k][i]).filter(x=>x!=null);return v.length>=3?v.reduce((a,b)=>a+b,0)/v.length:null}),inf=ks.map((_,i)=>{const v=['cpiUS','cpiDE','cpiUK'].map(k=>o[k][i]).filter(x=>x!=null);return v.length>=2?v.reduce((a,b)=>a+b,0)/v.length:null});
+  /* carry the last reading forward over the publication lag */
+  for(const a of[g,inf])for(let i=1;i<a.length;i++)if(a[i]==null&&a[i-1]!=null&&i>a.length-4)a[i]=a[i-1];return{ks,g,inf}}
+const QNAME={boom:['Boom: growth up, inflation up','好況：成長↑インフレ↑'],gold:['Goldilocks: growth up, inflation down','適温：成長↑インフレ↓'],stag:['Stagflation: growth down, inflation up','スタグフレーション：成長↓インフレ↑'],bust:['Slowdown: growth down, inflation down','減速：成長↓インフレ↓']};
+const qOf=(g,i)=>g==null||i==null?null:g>=0?(i>=0?'boom':'gold'):(i>=0?'stag':'bust');
+function energySeries(){const s=D.s;return D.t.map((_,i)=>{const e=[ret(s.IXC,i,26),ret(s.MXI,i,26)],t=ret(s.IXN,i,26);if(e.some(x=>x==null)||t==null)return null;return((e[0]+e[1])/2-t)*100})}
+
+/* ================= render ================= */
+function render(){
+  setLang(LANG);CACHE={};$('#epiQ').dataset.ph=T('Click to type this week’s quote…','クリックして今週の引用を入力…');$('#epiC').dataset.ph=T('— who said it','— 発言者');
+  $$('#ccySeg button').forEach(b=>b.classList.toggle('on',b.dataset.v===S.ccy));$$('#spanSeg button').forEach(b=>b.classList.toggle('on',+b.dataset.v===S.span));
+  $$('#sortSeg button').forEach(b=>b.classList.toggle('on',b.dataset.v===S.sort));$$('#tabSeg button').forEach(b=>b.classList.toggle('on',b.dataset.v===S.tab));
+  $$('.panel').forEach(p=>p.hidden=p.dataset.tab!==S.tab);
+  const N=D.t.length;$('#asofLine').textContent=T(`Week to ${md(D.t[N-1])} · ${LIVE?'live from Keel':'Keel snapshot of '+D.gen.slice(0,10)} · scores in ${S.ccy}`,`${md(D.t[N-1])}までの週・${LIVE?'Keelライブ':'Keelスナップショット（'+D.gen.slice(0,10)+'）'}・スコアは${S.ccy==='JPY'?'円':'米ドル'}建て`);
+  const R={weather,wl:winners,rv:revisionsTab,br:breadthTab,cs:()=>{countrySector();compositionLens()},risk,macro,out:()=>{outliers();outlierClusters()},rr:reversalsTab,reg:regimes};
+  if(window.__printing)Object.values(R).forEach(f=>f());else R[S.tab]();
+  method();
+}
+/* ---------- weather ---------- */
+function weather(){
+  const N=D.t.length,rb=riskB(),B=rb.tot[N-1],B13=rb.tot[N-14],mp=macroPct(),L=mp.ks.length-1,dec=decile(mp.avg[L]),dec6=decile(mp.avg[L-6]),q=quad(),qq=qOf(q.g[q.g.length-1],q.inf[q.inf.length-1]);
+  const cs=COUNTRIES.filter(r=>r[0]!=='ACWI').map(r=>({r,sc:lastScore(r[0])})).filter(x=>x.sc),win=cs.filter(x=>x.sc.s>=7).length,lose=cs.filter(x=>x.sc.s<=2).length;
+  const sorted=[...cs].sort((a,b)=>b.sc.s-a.sc.s||b.sc.r13-a.sc.r13),best=sorted[0],worst=sorted[sorted.length-1];const Bn=Math.round(B);
+  $('#headline').innerHTML=T(`Risk is a “${BEAU[Bn][0].toLowerCase()}” (<b>${Bn}</b>/12), macro is in the <b>${ord(dec)}</b> decile, and ${best?nm(best.r):''} is the identifiable winner.`,`リスクは「${BEAU[Bn][1]}」（<b>${Bn}</b>/12）、マクロは<b>${ord(dec)}</b>十分位、特定できる勝ち組は${best?nm(best.r):''}。`);
+  const spark=(vals,col)=>{const v=vals.filter(x=>x!=null);if(v.length<2)return'';const lo=Math.min(...v),hi=Math.max(...v),w=150,h=28;return`<svg width="${w}" height="${h}" style="display:block;margin-top:4px">${`<path d="${vals.map((x,i)=>x==null?'':(i?'L':'M')+(i/(vals.length-1)*w).toFixed(1)+' '+(h-2-(x-lo)/((hi-lo)||1)*(h-4)).toFixed(1)).join('')}" fill="none" stroke="${col}" stroke-width="1.5"/>`}</svg>`};
+  const tiles=[
+    [T('Risk, Beaufort scale','リスク（ビューフォート風力）'),`${Bn}<small>/12</small>`,`<span class="nm">${JA()?BEAU[Bn][1]:BEAU[Bn][0]}</span>`,T(`13 weeks ago: ${Math.round(B13)}`,`13週前：${Math.round(B13)}`)+spark(rb.tot.slice(-52),cssv('--steel'))],
+    [T('Macro decile','マクロ十分位'),`${dec}<small>/10</small>`,`<span class="nm">${T(`${ord(dec)} decile`,`${ord(dec)}十分位`)}</span>`,T(`6 months ago: ${dec6} · average percentile ${Math.round(mp.avg[L]*100)}`,`6か月前：${dec6}・平均パーセンタイル ${Math.round(mp.avg[L]*100)}`)+spark(mp.avg.slice(-36),cssv('--steel'))],
+    [T('Regime','レジーム'),`<span style="font-size:24px">${qq?(JA()?QNAME[qq][1]:QNAME[qq][0]).split(/[:：]/)[0]:'—'}</span>`,`<span class="nm" style="font-size:13px">${qq?(JA()?QNAME[qq][1]:QNAME[qq][0]).split(/[:：]/)[1]:''}</span>`,T('OECD leading indicators and CPI, 6-month changes','OECD景気先行指数とCPIの6か月変化')],
+    [T('Winners vs losers','勝ち組 対 負け組'),`${win}<small>:${lose}</small>`,`<span class="nm">${T(win>=lose?'Asymmetry positive':'Asymmetry negative',win>=lose?'非対称性はプラス':'非対称性はマイナス')}</span>`,T(`of ${cs.length} countries score 7–9 vs 0–2 (${S.ccy})`,`${cs.length}か国中、スコア7〜9 対 0〜2（${S.ccy==='JPY'?'円':'米ドル'}建て）`)],
+  ];
+  $('#tiles').innerHTML=tiles.map(([l,b,n,s])=>`<div class="tile"><span class="lbl">${l}</span><span class="big">${b}</span>${n}<span class="s">${s}</span></div>`).join('');
+  /* one-line captions */
+  const{ks,o}=macroRaw(),last=a=>{for(let i=a.length-1;i>=0;i--)if(a[i]!=null)return a[i];return null},gNow=last(q.g),iNow=last(q.inf);
+  const moodA=(D.mood||[]).map(x=>x[1]),m3=moodA.length>3?moodA[moodA.length-1]-moodA[moodA.length-4]:null;
+  const credit13=-rb.raw.credit[N-1];
+  const caps=[
+    [gNow>0,T(gNow>0?'The global economy keeps on growing':'Global growth is slowing',gNow>0?'世界経済は成長を続けている':'世界の成長は減速している'),T('average OECD leading indicator, 6-month change','OECD景気先行指数の6か月変化（平均）')],
+    [iNow<=0,T(iNow<=0?'Inflation is easing':'Inflation is rising',iNow<=0?'インフレは落ち着いている':'インフレは上昇している'),T('CPI, change over 6 months','CPI・6か月の変化')],
+    [m3!=null&&m3>=0,T(m3>=0?'Sentiment is improving':'Sentiment is deteriorating',m3>=0?'センチメントは改善':'センチメントは悪化'),T('US news sentiment, 3 months','米ニュース・センチメント（3か月）')],
+    [B<=B13,T(B<=B13?'Risk is easing':'Risk is rising',B<=B13?'リスクは低下':'リスクは上昇'),T(`Beaufort ${Math.round(B13)} → ${Bn} over 13 weeks`,`ビューフォート ${Math.round(B13)} → ${Bn}（13週）`)],
+    [credit13>=0,T(credit13>=0?'Credit is fine':'Credit is wobbling',credit13>=0?'クレジットは良好':'クレジットに揺らぎ'),T('high yield vs Treasuries, 13 weeks','ハイイールド対米国債（13週）')],
+    [win>=lose,T(win>=lose?'Winners outnumber losers':'Losers outnumber winners',win>=lose?'勝ち組が負け組を上回る':'負け組が勝ち組を上回る'),T(`${win} countries score 7–9, ${lose} score 0–2`,`スコア7〜9が${win}か国、0〜2が${lose}か国`)],
+    (()=>{const w=RV&&RV.groups&&RV.groups.world;if(!w)return[null,T('Earnings revisions: waiting for Keel','業績予想の修正：Keel待ち'),T('his “most important thing”','「最も重要なもの」')];const g=w.up_share>=w.dn_share;return[g,T(g?'Earnings revisions are positive':'Earnings revisions are negative',g?'業績予想の修正はプラス':'業績予想の修正はマイナス'),T(`${Math.round(w.up_share*100)}% of companies revised up, ${Math.round(w.dn_share*100)}% down, 2 months`,`上方修正${Math.round(w.up_share*100)}%、下方${Math.round(w.dn_share*100)}%（2か月）`)]})(),
+    (()=>{const b=breadth(),v=b.tot[N-1],v4=b.tot[N-5];return[v>=.5,T(v>=.5?'Most things are going up':'Most things are going down',v>=.5?'多くが上昇している':'多くが下落している'),T(`${Math.round(v*100)}% of trend measures positive (${Math.round(v4*100)}% a month ago)`,`トレンド指標の${Math.round(v*100)}%がプラス（1か月前${Math.round(v4*100)}%）`)]})(),
+    (()=>{const c=clusters(),pr=pctRankAll(c.neg)[N-1];return[pr<.8,T(pr<.8?'No cluster of negative outliers':'Negative outliers are clustering',pr<.8?'下方アウトライヤーの集中なし':'下方アウトライヤーが集中'),T(`${num(c.neg[N-1]*100,1)}% of moves in 13 weeks were down by 2 sd or more`,`13週で2sd以上の下落が${num(c.neg[N-1]*100,1)}%`)]})(),
+  ];
+  $('#caps').innerHTML=caps.map(([good,t,s])=>`<li><i style="background:${good==null?'var(--line)':good?'var(--pos)':'var(--neg)'}"></i><div>${t} <span>· ${s}</span></div></li>`).join('');
+  /* outliers this week */
+  const all=OUT_GROUPS.flatMap(g=>g[2]).map(r=>({r,m:sdMove(r[0],1)})).filter(x=>x.m).sort((a,b)=>Math.abs(b.m.sd)-Math.abs(a.m.sd)).slice(0,8);
+  $('#outSub').textContent=T(`This week’s move in standard deviations of a normal week (last 3 years), ${S.ccy}.`,`今週の変化を通常の1週間の標準偏差（過去3年）で測ったもの（${S.ccy==='JPY'?'円':'米ドル'}建て）。`);
+  $('#topOut').innerHTML=all.map(x=>{const f=div(x.m.sd,-3,0,3);return`<tr><td>${nm(x.r)}</td><td class="n">${x.m.rate?fbp(x.m.mv):pct(x.m.mv*100,1)}</td><td class="n"><span class="chip" style="background:${f};color:${inkOn(f)}">${x.m.sd>0?'+':''}${num(x.m.sd,1)} sd</span></td></tr>`}).join('');
+  /* winners and losers lists */
+  const lists=[[T('Countries','国'),COUNTRIES.filter(r=>r[0]!=='ACWI')],[T('Global sectors','世界のセクター'),SECTORS],[T('TOPIX-17 sectors','TOPIX-17業種'),TOPIX]];
+  $('#wlSub').textContent=T(`Highest and lowest 0–9 scores this week, ${S.ccy}. 9 = every test passed; 0 = none.`,`今週の0〜9スコア上位と下位（${S.ccy==='JPY'?'円':'米ドル'}建て）。9＝全テスト合格、0＝不合格。`);
+  $('#wlLists').innerHTML=lists.map(([h,rows])=>{const a=rows.map(r=>({r,sc:lastScore(r[0])})).filter(x=>x.sc).sort((x,y)=>y.sc.s-x.sc.s||y.sc.r13-x.sc.r13);const row=x=>{const f=scoreCol(x.sc.s);return`<tr><td>${nm(x.r)}</td><td class="n">${pct(x.sc.r13*100,1)}</td><td class="n"><span class="chip" style="background:${f};color:${inkOn(f)}">${x.sc.s}</span></td></tr>`};
+    return`<div><h3>${h}</h3><table class="rk">${a.slice(0,4).map(row).join('')}<tr><td colspan="3" style="border:0;height:6px"></td></tr>${a.slice(-4).map(row).join('')}</table><span class="lbl">${T('13-week return · score','13週リターン・スコア')}</span></div>`}).join('');
+  /* trivia: gold priced in yen */
+  const g=pxc('GC=F','JPY');const pts=D.t.map((t,i)=>({x:t,y:g[i]})).filter(p=>p.y!=null);lineChart($('#trivia'),[{color:cssv('--gold'),width:1.8,pts}],{h:220,xType:'date',floor:0,yFmt:v=>num(v/1000,0)+'k'});
+  const g0=pts[0],gL=pts[pts.length-1];$('#trivSub').textContent=T(`Gold in yen per ounce: ¥${num(g0.y,0)} in ${my(g0.x)}, ¥${num(gL.y,0)} now, ${num(gL.y/g0.y,1)} times as much.`,`円建ての金価格（1オンス）：${my(g0.x)}は${num(g0.y,0)}円、現在${num(gL.y,0)}円で${num(gL.y/g0.y,1)}倍。`);
+}
+const fbp=v=>(v>0?'+':v<0?'−':'')+num(Math.abs(v),0)+'bp';
+/* ---------- winners & losers ---------- */
+function scoreHeat(svgSel,list,opt={}){
+  const N=D.t.length,n=S.span,i0=N-n;let rows=list.map(r=>{const a=scoreSeries(r[0]);if(!a)return null;const vals=[];for(let c=0;c<n;c++){const x=a[i0+c];vals.push(x?x.s:null)}const L=a[N-1];return{r,label:nm(r),vals,last:L?L.s:null,flag:L?(L.s>=7?'w':L.s<=2?'l':null):null,L}}).filter(Boolean);
+  if(S.sort==='score')rows.sort((a,b)=>(b.last??-1)-(a.last??-1)||((b.L&&b.L.r13)||0)-((a.L&&a.L.r13)||0));
+  heatmap($(svgSel),rows,{n,i0,colT:c=>D.t[i0+c],color:scoreCol,fmt:v=>v,tip:(row,c,v)=>{const a=scoreSeries(row.r[0])[i0+c];if(!a)return`<div class="m">${row.label}</div>${T('no score yet','スコアなし')}`;return`<div class="m">${row.label} · ${md(D.t[i0+c])}</div><div>${T('Score','スコア')} <b>${a.s}</b>/9 · 13w ${pct(a.r13*100,1)} · 52w ${pct(a.r52*100,1)}</div><div style="margin-top:4px;font-size:11.5px">${TESTS.map((t,j)=>`${a.t[j]?'✓':'✗'} ${JA()?t[1]:t[0]}`).join('<br>')}</div>`}});
+}
+function winners(){
+  $('#hmCSub').textContent=T(`iShares MSCI country ETFs in ${S.ccy}, one column per week. ▲ = winner (7–9), ▼ = identifiable loser (0–2). Hover a cell for the nine tests.`,`iShares MSCI国別ETF（${S.ccy==='JPY'?'円':'米ドル'}建て）、1列＝1週。▲＝勝ち組（7〜9）、▼＝特定できる負け組（0〜2）。セルにカーソルで9つのテストを表示。`);
+  scoreHeat('#hmC',COUNTRIES);scoreHeat('#hmS',SECTORS);scoreHeat('#hmT',TOPIX);scoreHeat('#hmG',GAMING);
+  scaleBar($('#scC'),0,9,4.5,[T('0 loser','0 負け組'),T('9 winner','9 勝ち組')]);
+  $('#scoreHelp').innerHTML=T(`<b>Reading help.</b> Each week every market gets one point for each test it passes: ${TESTS.map(t=>t[0].toLowerCase()).join('; ')}. The world index is MSCI ACWI in the same currency. It is a nowcast, not a forecast: it says who is winning now, which tends to persist for a while. The score uses prices only; earnings revisions sit beside it in the Revisions tab. Switching USD/JPY changes the answer for foreign markets, because the yen move is part of the return.`,`<b>読み方。</b>毎週、各市場は合格したテストごとに1点：${TESTS.map(t=>t[1]).join('、')}。世界指数は同じ通貨建てのMSCI ACWI。予測ではなくナウキャストで、今の勝者を示します（勝ち組はしばらく続く傾向）。スコアは価格のみで、業績予想の修正は「業績修正」タブに並べて表示。米ドル/円の切替で海外市場の答えは変わります（為替がリターンの一部のため）。`);
+}
+/* ---------- country x sector ---------- */
+function countrySector(){
+  const sc=Object.fromEntries(SECTORS.map(r=>{const L=lastScore(r[0]);return[r[3],{r,s:L?L.s:null}]}));
+  $('#csSub').textContent=T(`Each cell: the sector’s weight in the country ETF, coloured by that sector’s global score this week (${S.ccy}). “From its sectors” = the weighted average of those scores; compare it with the country’s own score.`,`各セル：国別ETFにおけるセクター比率。色は今週のそのセクターの世界スコア（${S.ccy==='JPY'?'円':'米ドル'}建て）。「セクターから」＝比率で加重平均したスコア。国自体のスコアと比較。`);
+  const rows=COUNTRIES.map(r=>{const w=(D.w||{})[r[0]]||{};const tot=Object.values(w).reduce((a,b)=>a+b,0);if(!tot)return null;let imp=0,ws=0;SECTORS.forEach(s=>{const x=w[s[3]]||0,v=sc[s[3]].s;if(v!=null){imp+=x*v;ws+=x}});const own=lastScore(r[0]);return{r,w,tot,imp:ws?imp/ws:null,own:own?own.s:null}}).filter(Boolean);
+  if(S.sort==='score')rows.sort((a,b)=>(b.imp??0)-(a.imp??0));
+  let h=`<thead><tr><th>${T('Country','国')}</th>${SECTORS.map(s=>{const v=sc[s[3]].s,f=scoreCol(v);return`<th><span style="display:block;max-width:70px;margin:auto">${nm(s)}</span><span class="chip" style="background:${f};color:${inkOn(f)};margin-top:3px">${v??'—'}</span></th>`}).join('')}<th>${T('From its sectors','セクターから')}</th><th>${T('Own score','国のスコア')}</th></tr></thead><tbody>`;
+  rows.forEach(x=>{h+=`<tr><td>${nm(x.r)}${x.imp!=null&&x.imp<3.5?`<span class="flag">${T('loser by mix','構成で負け')}</span>`:x.imp!=null&&x.imp>=6.5?`<span class="flag g">${T('winner by mix','構成で勝ち')}</span>`:''}</td>`;
+    SECTORS.forEach(s=>{const wt=(x.w[s[3]]||0)/x.tot,v=sc[s[3]].s;const f=wt>0.005?mix(cssv('--card'),div(v,0,4.5,9),Math.min(1,.25+wt*2.2)):'transparent';h+=`<td class="w" style="background:${f};color:${wt>0.3?inkOn(f):'var(--ink)'}">${wt>0.005?Math.round(wt*100):''}</td>`});
+    const fi=scoreCol(x.imp),fo=scoreCol(x.own);h+=`<td class="sum" style="background:${fi};color:${inkOn(fi)}">${x.imp==null?'—':num(x.imp,1)}</td><td class="sum" style="background:${fo};color:${inkOn(fo)}">${x.own??'—'}</td></tr>`});
+  $('#csTab').innerHTML=h+'</tbody>';
+  $('#csHelp').innerHTML=T(`<b>Reading help.</b> Numbers are sector weights in %, from the ETF holdings (Yahoo, as of the snapshot). A market made mostly of losing sectors will struggle to win, whatever happens at home; that is the point about France and consumer discretionary. A big gap between “from its sectors” and “own score” means something local (the currency, politics, one large company) is at work.`,`<b>読み方。</b>数字はETF保有銘柄によるセクター比率（%、Yahoo、スナップショット時点）。負けているセクターが中心の市場は、国内事情にかかわらず勝ちにくい（フランスと一般消費財の例）。「セクターから」と「国のスコア」の差が大きい場合は、通貨・政治・巨大企業など国固有の要因が働いています。`);
+}
+/* ---------- risk ---------- */
+function risk(){
+  const rb=riskB(),N=D.t.length,B=rb.tot[N-1],Bn=Math.round(B);
+  $('#riskH').textContent=T(`Risk is a “${BEAU[Bn][0].toLowerCase()}”: ${Bn} on a 0–12 Beaufort scale`,`リスクは「${BEAU[Bn][1]}」：ビューフォート0〜12で${Bn}`);
+  $('#riskSub').textContent=T('Six risk measures on the same wind scale; the reading is the average of the three roughest. 0 = calm, 12 = hurricane (late 2008).','6つのリスク指標を同じ風力スケールに置き、最も荒れている3指標を平均。0＝静穏、12＝颶風（2008年末）。');
+  lineChart($('#riskLine'),[{color:cssv('--steel'),width:1.6,pts:D.t.map((t,i)=>({x:t,y:rb.tot[i]}))}],{h:240,xType:'date',floor:0,yFmt:v=>num(v,0)});
+  /* yearly table */
+  const yrs={};D.t.forEach((t,i)=>{const y=new Date(t).getUTCFullYear(),v=rb.tot[i];if(v==null)return;(yrs[y]=yrs[y]||[]).push(v)});
+  const ys=Object.keys(yrs).map(Number).filter(y=>yrs[y].length>=26).sort();const cell=y=>{const a=yrs[y],v=a.reduce((p,q)=>p+q,0)/a.length,f=riskCol(v);return`<td style="background:${f};color:${inkOn(f)}">${num(v,1)}</td>`};
+  const half=Math.ceil(ys.length/2);$('#yTab').innerHTML=[ys.slice(0,half),ys.slice(half)].map(r=>`<tr>${r.map(y=>`<th>${y}</th>`).join('')}</tr><tr>${r.map(cell).join('')}</tr>`).join('');
+  const n=S.span,i0=N-n;const rows=RISK_IND.map(r=>({r,label:nm(r),vals:Array.from({length:n},(_,c)=>rb.per[r[0]][i0+c]),last:rb.per[r[0]][N-1]}));rows.push({label:T('Average = the Beaufort reading','平均＝ビューフォート'),bold:true,sep:true,vals:Array.from({length:n},(_,c)=>rb.tot[i0+c]),last:rb.tot[N-1]});
+  const rc=riskCol;
+  heatmap($('#hmR'),rows,{n,i0,labW:W($('#hmR'))<640?120:250,colT:c=>D.t[i0+c],color:rc,fmt:v=>Math.round(v),tip:(row,c,v)=>{const raw=row.r?rb.raw[row.r[0]][i0+c]:null,k=row.r&&row.r[0];const rf=raw==null?'':k==='credit'||k==='carry'?pct(-raw*100,1):k==='dd'?'−'+num(raw*100,1)+'%':k==='fxv'?num(raw,1)+'%':num(raw,1);return`<div class="m">${row.label} · ${md(D.t[i0+c])}</div><div>Beaufort <b>${v==null?'—':num(v,1)}</b> · ${JA()?BEAU[Math.round(v||0)][1]:BEAU[Math.round(v||0)][0]}</div>${rf?`<div>${T('Reading','値')} <b>${rf}</b></div>`:''}`}});
+  scaleBar($('#scR'),0,12,4,[T('0 calm','0 静穏'),T('12 hurricane','12 颶風')],riskCol);
+  $('#riskHmSub').textContent=T(`One column per week. A measure at the ${Math.round(B_LO*100)}th percentile of its history or lower = calm (0); at the ${Math.round(B_HI*100)}th = hurricane (12). The reading is the average of the three roughest.`,`1列＝1週。過去の${Math.round(B_LO*100)}パーセンタイル以下＝静穏（0）、${Math.round(B_HI*100)}パーセンタイル＝颶風（12）。読み値は最も荒れている3指標の平均。`);
+  $('#riskHelp').innerHTML=T(`<b>Reading help.</b> Each measure is ranked against its own history since ${new Date(D.t[0]).getUTCFullYear()} and translated to the wind scale; the reading is the average of the three roughest, because storms are when several measures blow at once. Credit is high-yield bonds against Treasuries over 13 weeks (falling = stress); carry is AUD/JPY over 13 weeks (falling = carry trades unwinding). A higher number means a rougher sea, not a forecast of one. The scale is ours, calibrated so that late 2008 reaches 12 and the yearly averages land close to those in his letter (2008 about 11, 2022 about 9).`,`<b>読み方。</b>各指標を${new Date(D.t[0]).getUTCFullYear()}年以降の自らの履歴と比較し風力に換算し、最も荒れている3指標の平均を読み値とします（複数の指標が同時に荒れるのが嵐のため）。クレジットは13週のハイイールド対米国債（下落＝ストレス）、キャリーは13週の豪ドル円（下落＝キャリー巻き戻し）。数値が高いほど海が荒れている状態で、予測ではありません。スケールは独自で、2008年末が12、年平均が同氏のレターに近くなるよう較正（2008年約11、2022年約9）。`);
+}
+/* ---------- macro ---------- */
+function macro(){
+  const mp=macroPct(),L=mp.ks.length-1,dec=decile(mp.avg[L]);
+  $('#macH').textContent=T(`Currently in the ${ord(dec)} macro decile`,`現在はマクロ${ord(dec)}十分位`);
+  $('#macSub').textContent=T(`Average percentile of 26 indicators in five groups: ${Math.round(mp.avg[L]*100)}. 10th decile = the best tenth of the last 10 years for risk assets.`,`5グループ・26指標の平均パーセンタイル：${Math.round(mp.avg[L]*100)}。第10十分位＝過去10年でリスク資産に最良の1割。`);
+  const tm=k=>Date.parse(k+'-15T00:00:00Z');
+  lineChart($('#macLine'),[{color:cssv('--steel'),width:1.6,pts:mp.ks.map((k,i)=>({x:tm(k),y:mp.avg[i]==null?null:mp.avg[i]*100}))}],{h:240,xType:'date',floor:0,yFmt:v=>num(v,0)});
+  const n=Math.min(36,Math.round(S.span*12/52)),i0=L-n+1;const rows=[];MAC_GROUPS.forEach(([g,en,ja])=>{rows.push({label:T(`${en} (group average)`,`${ja}（グループ平均）`),bold:true,sep:rows.length>0,vals:Array.from({length:n},(_,c)=>mp.grp[g][i0+c]),last:mp.grp[g][L]});
+    MAC_IND.filter(r=>r[4]===g).forEach(r=>rows.push({r,label:'  '+nm(r),vals:Array.from({length:n},(_,c)=>mp.per[r[0]][i0+c]),last:mp.per[r[0]][L]}))});
+  rows.push({label:T('Average of the 5 groups → decile','5グループの平均 → 十分位'),bold:true,sep:true,vals:Array.from({length:n},(_,c)=>mp.avg[i0+c]),last:mp.avg[L]});
+  const{o}=macroRaw();
+  heatmap($('#hmM'),rows,{n,i0,monthly:true,labW:W($('#hmM'))<640?130:290,colT:c=>tm(mp.ks[i0+c]),color:v=>div(v,0,.5,1),fmt:v=>Math.round(v*100),tip:(row,c,v)=>{const k=row.r&&row.r[0],raw=k?o[k][i0+c]:null;return`<div class="m">${row.label} · ${my(tm(mp.ks[i0+c]))}</div><div>${T('Percentile','パーセンタイル')} <b>${v==null?'—':Math.round(v*100)}</b>${row.r?'':` · ${T('decile','十分位')} <b>${decile(v)}</b>`}</div>${raw!=null?`<div>${T('Reading','値')} <b>${/cli|cpi|curve|vix|move|news|bci|cci/.test(k)?num(raw,2):pct(raw*100,1)}</b></div>`:''}`}});
+  scaleBar($('#scM'),0,1,.5,[T('worst','最悪'),T('best','最良')]);
+  $('#macHelp').innerHTML=T(`<b>How it works.</b> Each month, each of 26 indicators is ranked within its own last 10 years, oriented so that a high percentile is good for risk assets (falling inflation, a low VIX and a weaker dollar count as good). Percentiles are averaged within five groups, and the five group averages are averaged again, so that the eight market measures do not outvote the economy. That average gives the decile: 1 = the worst tenth of the last 10 years, 10 = the best. <b>Growth:</b> OECD leading indicators for the US, Germany (for the euro area, missing in Keel’s OECD feed), Japan and China, plus OECD business confidence. <b>Inflation:</b> CPI for the US, Germany and the UK (Japan’s CPI in the feed stops in 2021), oil, and inflation-linked against nominal Treasuries as a proxy for inflation expectations. <b>Financial conditions:</b> the US and JGB yield curves, credit, the VIX, MOVE and the dollar. <b>Markets and the cycle:</b> world equities, copper/gold, cyclicals/defensives, banks, small caps, emerging markets, breadth and TOPIX against the world. <b>Mood:</b> SF Fed news sentiment and OECD consumer confidence. OECD data arrive one to two months late; the latest months carry the last reading forward. It describes the backdrop now; it does not forecast it.`,`<b>仕組み。</b>毎月、26指標それぞれを過去10年の中で順位付け（リスク資産に良い側が高パーセンタイル。インフレ低下、VIX低下、ドル安は良い側）。パーセンタイルを5グループ内で平均し、さらに5グループを平均（市場の8指標が経済指標を数で上回らないため）。その平均で十分位を決定：1＝過去10年で最悪の1割、10＝最良の1割。<b>成長：</b>米国・ドイツ（KeelのOECDデータにユーロ圏がないため代用）・日本・中国のOECD景気先行指数とOECD企業信頼感。<b>インフレ：</b>米国・ドイツ・英国のCPI（日本のCPIは2021年で途切れている）、原油、期待インフレの代理としてインフレ連動債対名目米国債。<b>金融環境：</b>米国と日本のイールドカーブ、クレジット、VIX、MOVE、ドル。<b>市場と景気循環：</b>世界株、銅/金、景気敏感/ディフェンシブ、金融株、小型株、新興国株、市場の広がり、TOPIX対世界。<b>ムード：</b>SF連銀ニュース・センチメントとOECD消費者信頼感。OECDデータは1〜2か月遅れで公表され、直近月は最新値を据え置き。現在の環境を示すもので予測ではありません。`);
+}
+/* ---------- outliers ---------- */
+function outliers(){
+  const ytd=ytdWeeks(),H=[[1,T('1 week','1週')],[4,T('1 month','1か月')],[13,T('3 months','3か月')],[ytd,T('Year to date','年初来')],[52,T('1 year','1年')]];
+  $('#oSub').textContent=T(`Each move in standard deviations of a normal move over the same length of time (weekly volatility of the previous 3 years). Beyond ±2 sd is unusual, beyond ±3 extraordinary. Outlined: |sd| ≥ 2. Equities, credit and commodities in ${S.ccy}; currencies and rates as quoted.`,`同じ期間の通常の変動（直前3年の週次ボラ）の何標準偏差かで表示。±2sd超は異例、±3sd超は異常。枠＝|sd|≥2。株式・クレジット・商品は${S.ccy==='JPY'?'円':'米ドル'}建て、通貨と金利は表示通り。`);
+  let h=`<thead><tr><th></th>${H.map(x=>`<th>${x[1]}</th>`).join('')}</tr></thead><tbody>`;
+  OUT_GROUPS.forEach(([en,ja,rows])=>{let list=rows.map(r=>({r,m:H.map(([k])=>sdMove(r[0],k))})).filter(x=>x.m.some(Boolean));
+    if(S.sort==='score')list.sort((a,b)=>((b.m[0]&&b.m[0].sd)||0)-((a.m[0]&&a.m[0].sd)||0));
+    h+=`<tr class="grp"><td colspan="${H.length+1}">${JA()?ja:en}</td></tr>`;
+    list.forEach(x=>{h+=`<tr><td>${nm(x.r)}</td>${x.m.map(m=>{if(!m)return'<td class="c">—</td>';const f=div(m.sd,-3,0,3);return`<td class="c${Math.abs(m.sd)>=2?' big2':''}" style="background:${f};color:${inkOn(f)}" title="${m.rate?fbp(m.mv):pct(m.mv*100,1)}">${m.sd>0?'+':''}${num(m.sd,1)}</td>`}).join('')}</tr>`})});
+  $('#oTab').innerHTML=h+'</tbody>';scaleBar($('#scO'),-3,3,0,['−3 sd','+3 sd']);
+}
+/* ---------- regimes ---------- */
+function regimes(){
+  const q=quad(),c=C(),svg=$('#quad'),w=W(svg),h=300,m={l:46,r:12,t:12,b:30},n=24,L=q.ks.length,idx=[];for(let i=L-n;i<L;i++)if(q.g[i]!=null&&q.inf[i]!=null)idx.push(i);
+  const gs=idx.map(i=>q.g[i]),is=idx.map(i=>q.inf[i]),gx=Math.max(.5,...gs.map(Math.abs))*1.15,ix=Math.max(.5,...is.map(Math.abs))*1.15;
+  const X=v=>m.l+(v+gx)/(2*gx)*(w-m.l-m.r),Y=v=>m.t+(1-(v+ix)/(2*ix))*(h-m.t-m.b);let g='';
+  const qs=[['gold',-1,1],['boom',1,1],['bust',-1,-1],['stag',1,-1]];
+  /* backgrounds: growth on x (right = up), inflation on y (up = rising) */
+  [['boom',X(0),Y(ix),X(gx)-X(0),Y(0)-Y(ix)],['gold',X(0),Y(0),X(gx)-X(0),Y(-ix)-Y(0)],['stag',X(-gx),Y(ix),X(0)-X(-gx),Y(0)-Y(ix)],['bust',X(-gx),Y(0),X(0)-X(-gx),Y(-ix)-Y(0)]].forEach(([k,x,y,ww,hh])=>{const col=k==='gold'?c.pos:k==='stag'?c.neg:k==='boom'?c.gold:c.steel;g+=`<rect x="${x}" y="${y}" width="${ww}" height="${hh}" fill="${col}" fill-opacity=".07"/><text x="${k==='boom'||k==='gold'?x+ww-6:x+6}" y="${k==='boom'||k==='stag'?y+14:y+hh-8}" text-anchor="${k==='boom'||k==='gold'?'end':'start'}" style="fill:${col}">${(JA()?QNAME[k][1]:QNAME[k][0]).split(/[:：]/)[0]}</text>`});
+  g+=`<line class="ax" x1="${X(0)}" x2="${X(0)}" y1="${m.t}" y2="${h-m.b}"/><line class="ax" x1="${m.l}" x2="${w-m.r}" y1="${Y(0)}" y2="${Y(0)}"/>`;
+  g+=`<text x="${w-m.r}" y="${h-10}" text-anchor="end">${T('growth: leading indicator, 6-month change →','成長：景気先行指数6か月変化 →')}</text><text x="${m.l-34}" y="${m.t+8}" transform="rotate(-90 ${m.l-34} ${m.t+8})" text-anchor="end">${T('inflation, 6-month change →','インフレ6か月変化 →')}</text>`;
+  g+=`<path d="${idx.map((i,j)=>(j?'L':'M')+X(q.g[i]).toFixed(1)+' '+Y(q.inf[i]).toFixed(1)).join('')}" fill="none" stroke="${c.mute}" stroke-width="1"/>`;
+  idx.forEach((i,j)=>{const last=j===idx.length-1;g+=`<circle cx="${X(q.g[i])}" cy="${Y(q.inf[i])}" r="${last?6:2+j/idx.length*2}" fill="${last?c.red:c.ink}" fill-opacity="${last?1:.25+.6*j/idx.length}"/>`});
+  const li=idx[idx.length-1];g+=`<text x="${X(q.g[li])+9}" y="${Y(q.inf[li])+4}" style="fill:${c.red};font-weight:500">${q.ks[li]}</text>`;
+  svg.setAttribute('viewBox',`0 0 ${w} ${h}`);svg.setAttribute('height',h);svg.innerHTML=g;
+  const qq=qOf(q.g[li],q.inf[li]);$('#quadSub').textContent=T(`Growth: US, Germany, Japan, China; inflation: US, Germany, UK. Last 24 months (red = latest, ${q.ks[li]}). Now: ${QNAME[qq][0]}.`,`成長：米国・ドイツ・日本・中国、インフレ：米国・ドイツ・英国。直近24か月（赤＝最新 ${q.ks[li]}）。現在：${QNAME[qq][1]}。`);
+  /* energy regime */
+  const en=energySeries(),cut=D.t.length-52*10,pts=D.t.map((t,i)=>({x:t,y:i>=cut?en[i]:null}));
+  lineChart($('#energy'),[{color:c.gold,width:1.6,area:true,pts}],{h:300,xType:'date',zero:true,yFmt:v=>num(v,0)+'%'});
+  legend($('#enLeg'),[{name:T('Energy & materials minus IT, 26 weeks','エネルギー・素材 − 情報技術（26週）'),color:c.gold}]);
+  const eL=en[en.length-1];$('#enSub').textContent=T(`Above zero: energy and mining are beating technology, as in 2022. Now ${eL>0?'+':''}${num(eL,1)} points: ${eL>0?'an energy regime':'not an energy regime'}.`,`ゼロより上：2022年のようにエネルギーと鉱業がテクノロジーを上回る。現在${eL>0?'+':''}${num(eL,1)}ポイント：${eL>0?'エネルギー・レジーム':'エネルギー・レジームではない'}。`);
+  /* S&P in oil */
+  const sp=D.s['^GSPC'],cl=D.s['CL=F'],op=D.t.map((t,i)=>({x:t,y:sp[i]&&cl[i]>5?sp[i]/cl[i]:null}));lineChart($('#oil'),[{color:c.steel,width:1.6,pts:op}],{h:220,xType:'date',floor:0,yFmt:v=>num(v,0)});
+  const oL=op.filter(p=>p.y!=null),o52=oL[oL.length-53];$('#oilSub').textContent=T(`Barrels of WTI crude one S&P 500 “buys”: ${num(oL[oL.length-1].y,0)} now, ${num(o52.y,0)} a year ago. Falling = equities getting cheaper in oil terms.`,`S&P500で買えるWTI原油のバレル数：現在${num(oL[oL.length-1].y,0)}、1年前${num(o52.y,0)}。低下＝原油建てで株が割安化。`);
+}
+const C=()=>({red:cssv('--red'),ink:cssv('--ink'),steel:cssv('--steel'),gold:cssv('--gold'),mute:cssv('--mute'),neg:cssv('--neg'),pos:cssv('--pos'),bg:cssv('--bg')});
+function method(){
+  $('#method').innerHTML=T(`<b>About.</b> A dashboard in the spirit of Alexander Ineichen’s weekly letter: nowcast, don’t forecast; measure moves in standard deviations; identify winners and losers. The scores, wind scale and decile here are our own recipes from free public data, not his or IR&M’s. Prices are weekly closes (Friday) from Keel (Yahoo Finance; US and Japanese government yields from the Fed H.15 and Japan MOF), OECD leading indicators and CPI, and the SF Fed news sentiment index. ETF sector weights from Yahoo. Data can be delayed or wrong. The past describes the past. Not investment advice.`,`<b>概要。</b>Alexander Ineichen氏の週次レターの考え方（予測せずナウキャスト、変化を標準偏差で測る、勝ち組と負け組を特定）に倣ったダッシュボード。スコア・風力スケール・十分位は公開データによる独自の手法で、同氏やIR&M社のものではありません。価格はKeel（Yahoo Finance、米国債・日本国債利回りはFRB H.15と財務省）の週末値、OECD景気先行指数とCPI、SF連銀ニュース・センチメント。ETFのセクター比率はYahoo。データは遅延・誤りの可能性があります。過去は過去を示すのみ。投資助言ではありません。`);
+}
+window.redraw=render;
+
+/* ================= phase 2: breadth, outlier clusters, earnings revisions, reversals, composition ================= */
+let RV=null; /* earnings revisions payload from Keel (api_revisions), or the snapshot */
+const sum=a=>a.reduce((x,y)=>x+(y||0),0);
+const lastOf=a=>{for(let i=a.length-1;i>=0;i--)if(a[i]!=null)return a[i];return null};
+/* a move over k weeks in standard deviations of a normal week (previous 3 years) scaled to k weeks, on any price array */
+function sdOn(a,k,i){const j=i-k;if(!a||j<1||a[i]==null||a[j]==null||a[i]<=0||a[j]<=0)return null;const mv=Math.log(a[i]/a[j]),r=[];
+  for(let q=Math.max(1,j-156);q<=j;q++)if(a[q]>0&&a[q-1]>0)r.push(Math.log(a[q]/a[q-1]));if(r.length<52)return null;
+  const m=r.reduce((x,y)=>x+y,0)/r.length,sd=Math.sqrt(r.reduce((x,y)=>x+(y-m)**2,0)/(r.length-1));return sd?mv/(sd*Math.sqrt(k)):null}
+const relSer=sym=>{const key='rel|'+sym+'|'+S.ccy;if(CACHE[key])return CACHE[key];const p=pxc(sym),w=pxc('ACWI');if(!p||!w)return null;return CACHE[key]=p.map((v,i)=>v!=null&&w[i]?v/w[i]:null)};
+
+/* ---------- 1. percent positive of everything ---------- */
+const BR_GROUPS=()=>[
+  ['ctry','Country equities','国別株式',COUNTRIES.filter(r=>r[0]!=='ACWI')],
+  ['sect','World sectors','世界のセクター',SECTORS],
+  ['topix','TOPIX-17 sectors','TOPIX-17業種',TOPIX],
+  ['game','Gaming peers','ゲーム関連',GAMING],
+  ['fx','Currencies (vs yen)','通貨（対円）',OUT_GROUPS[3][2]],
+  ['cmd','Commodities','商品',OUT_GROUPS[6][2]],
+  ['crd','Credit and bonds','クレジット・債券',[['HYG','US high yield','米ハイイールド'],['LQD','US investment grade','米投資適格'],['IEF','US Treasuries 7–10y','米国債7〜10年'],['TIP','US inflation-linked','米物価連動債']]],
+  ['cry','Crypto','暗号資産',OUT_GROUPS[7][2]]];
+const cmpv=(x,y)=>x==null||y==null?null:x>y?1:0,sgn=r=>r==null?null:r>0?1:0;
+const BR_MEAS=[
+  ['Up over 4 weeks','4週で上昇',(a,i)=>sgn(ret(a.p,i,4))],
+  ['Above its 4-week average','4週平均より上',(a,i)=>cmpv(a.p[i],a.m[4][i])],
+  ['4-week average above 13-week','4週平均が13週平均より上',(a,i)=>cmpv(a.m[4][i],a.m[13][i])],
+  ['Above its 10-week average','10週平均より上',(a,i)=>cmpv(a.p[i],a.m[10][i])],
+  ['Up over 13 weeks','13週で上昇',(a,i)=>sgn(ret(a.p,i,13))],
+  ['Above its 13-week average','13週平均より上',(a,i)=>cmpv(a.p[i],a.m[13][i])],
+  ['13-week average above 26-week','13週平均が26週平均より上',(a,i)=>cmpv(a.m[13][i],a.m[26][i])],
+  ['Above its 26-week average','26週平均より上',(a,i)=>cmpv(a.p[i],a.m[26][i])],
+  ['Up over 26 weeks','26週で上昇',(a,i)=>sgn(ret(a.p,i,26))],
+  ['10-week average above 40-week','10週平均が40週平均より上',(a,i)=>cmpv(a.m[10][i],a.m[40][i])],
+  ['Above its 40-week (200-day) average','40週（200日）平均より上',(a,i)=>cmpv(a.p[i],a.m[40][i])],
+  ['Above its 52-week average','52週平均より上',(a,i)=>cmpv(a.p[i],a.m[52][i])],
+  ['Up over 52 weeks','52週で上昇',(a,i)=>sgn(ret(a.p,i,52))]];
+function breadth(){const key='br|'+S.ccy;if(CACHE[key])return CACHE[key];const N=D.t.length,G=BR_GROUPS(),z=()=>({s:new Float64Array(N),c:new Float64Array(N)});
+  const grp={},meas=BR_MEAS.map(z),tot=z();let nA=0;
+  G.forEach(([k,,,rows])=>{const g=z();rows.forEach(r=>{const p=pxc(r[0]);if(!p)return;nA++;const a={p,m:{}};[4,10,13,26,40,52].forEach(n=>a.m[n]=sma(p,n));
+      for(let i=0;i<N;i++)for(let j=0;j<BR_MEAS.length;j++){const v=BR_MEAS[j][2](a,i);if(v==null)continue;g.s[i]+=v;g.c[i]++;meas[j].s[i]+=v;meas[j].c[i]++;tot.s[i]+=v;tot.c[i]++}});
+    grp[k]=Array.from(g.s,(s,i)=>g.c[i]>=6?s/g.c[i]:null)});
+  const f=(o,min)=>Array.from(o.s,(s,i)=>o.c[i]>=min?s/o.c[i]:null);
+  const t=f(tot,200),sm=t.map((v,i)=>{if(i<3)return null;const w=t.slice(i-3,i+1);return w.some(x=>x==null)?null:w.reduce((a,b)=>a+b,0)/4});
+  return CACHE[key]={grp,meas:meas.map(o=>f(o,20)),tot:t,sm,nA,nM:tot.c[N-1]}}
+/* turns: the 4-week average crossing 50%, and extremes (below 20% / above 80%) */
+function brTurns(sm){const out=[];let side=null;for(let i=0;i<sm.length;i++){const v=sm[i];if(v==null)continue;const s=v>=.5?1:-1;if(side!=null&&s!==side)out.push({i,dir:s});side=s}return out}
+function breadthTab(){
+  const b=breadth(),N=D.t.length,now=b.tot[N-1],w4=b.tot[N-5],w13=b.tot[N-14],pr=pctRankAll(b.tot)[N-1],tr=brTurns(b.sm),last=tr[tr.length-1],wks=last?N-1-last.i:null;
+  const zone=v=>v>=.8?T('broad uptrend','広範な上昇'):v<=.2?T('broad downtrend','広範な下落'):v>=.5?T('more up than down','上昇が優勢'):T('more down than up','下落が優勢');
+  $('#brHead').innerHTML=T(`<b>${Math.round(now*100)}%</b> of ${num(b.nM,0)} trend measures are positive: ${zone(now)}.`,`${num(b.nM,0)}のトレンド指標のうち<b>${Math.round(now*100)}%</b>がプラス：${zone(now)}。`);
+  const tiles=[
+    [T('Percent positive now','現在のプラス比率'),`${Math.round(now*100)}<small>%</small>`,T(`${b.nA} markets × ${BR_MEAS.length} measures`,`${b.nA}市場 × ${BR_MEAS.length}指標`)],
+    [T('4 and 13 weeks ago','4週前・13週前'),`${Math.round(w4*100)}<small>% · ${Math.round(w13*100)}%</small>`,T(now>=w4?'rising over the month':'falling over the month',now>=w4?'この1か月で上昇':'この1か月で低下')],
+    [T('Percentile since 2006','2006年以降のパーセンタイル'),`${Math.round(pr*100)}<small>th</small>`,T('100 = the broadest uptrend on record','100＝記録上最も広範な上昇')],
+    [T('Last turn','直近の転換'),wks==null?'—':`${wks}<small>${T(' weeks ago',' 週前')}</small>`,last?T(`4-week average crossed ${last.dir>0?'above':'below'} 50% in the week to ${md(D.t[last.i])}`,`4週平均が${md(D.t[last.i])}の週に50%を${last.dir>0?'上抜け':'下抜け'}`):'']];
+  $('#brTiles').innerHTML=tiles.map(([l,v,s])=>`<div class="tile"><span class="lbl">${l}</span><span class="big">${v}</span><span class="s">${s}</span></div>`).join('');
+  const c=C(),ref=v=>D.t.map(t=>({x:t,y:v}));
+  lineChart($('#brLine'),[{name:T('80% (broad uptrend)','80%（広範な上昇）'),color:c.mute,dash:true,width:1,pts:ref(80)},{name:'50%',color:c.mute,width:1,dash:true,pts:ref(50)},{name:T('20% (broad downtrend)','20%（広範な下落）'),color:c.mute,dash:true,width:1,pts:ref(20)},
+    {name:T('Percent positive','プラス比率'),color:c.steel,width:1.1,pts:D.t.map((t,i)=>({x:t,y:b.tot[i]==null?null:b.tot[i]*100}))},
+    {name:T('4-week average','4週平均'),color:c.red,width:1.8,pts:D.t.map((t,i)=>({x:t,y:b.sm[i]==null?null:b.sm[i]*100}))}],{h:260,xType:'date',floor:0,yFmt:v=>num(v,0)+'%'});
+  legend($('#brLeg'),[{name:T('Percent positive, weekly','プラス比率（週次）'),color:c.steel},{name:T('4-week average (turns are when it crosses 50%)','4週平均（50%を横切ると転換）'),color:c.red},{name:T('20 / 50 / 80%','20 / 50 / 80%'),color:c.mute,dash:true}]);
+  const n=S.span,i0=N-n,G=BR_GROUPS(),col=v=>div(v,0,.5,1),f=v=>Math.round(v*100);
+  let rows=G.map(([k,en,ja,list])=>({label:`${JA()?ja:en} (${list.filter(r=>pxc(r[0])).length})`,vals:Array.from({length:n},(_,q)=>b.grp[k][i0+q]),last:b.grp[k][N-1]}));
+  if(S.sort==='score')rows.sort((x,y)=>(y.last??-1)-(x.last??-1));
+  rows.push({label:T('Everything','全体'),bold:true,sep:true,vals:Array.from({length:n},(_,q)=>b.tot[i0+q]),last:now});
+  const tp=(row,q,v)=>`<div class="m">${esc(row.label)} · ${md(D.t[i0+q])}</div><div>${T('Positive','プラス')} <b>${v==null?'—':Math.round(v*100)+'%'}</b></div>`;
+  heatmap($('#brHm'),rows,{n,i0,labW:W($('#brHm'))<640?120:210,colT:q=>D.t[i0+q],color:col,fmt:f,tip:tp});
+  const mrows=BR_MEAS.map((m,j)=>({label:JA()?m[1]:m[0],vals:Array.from({length:n},(_,q)=>b.meas[j][i0+q]),last:b.meas[j][N-1]}));
+  heatmap($('#brMeas'),mrows,{n,i0,labW:W($('#brMeas'))<640?130:250,colT:q=>D.t[i0+q],color:col,fmt:f,tip:tp});
+  scaleBar($('#scBr'),0,1,.5,['0%','100%']);
+  const short=b.meas.slice(0,3).map(lastOf),long=b.meas.slice(-3).map(lastOf),sA=sum(short)/3,lA=sum(long)/3;
+  $('#brMeasSub').textContent=T(`Short measures at the top, long at the bottom. Turns show up at the top first. Now: short-term ${Math.round(sA*100)}% positive, long-term ${Math.round(lA*100)}%${sA>lA+.15?' — the short end is turning up':sA<lA-.15?' — the short end is rolling over':''}.`,`上が短期、下が長期の指標。転換はまず上段に現れます。現在：短期${Math.round(sA*100)}%、長期${Math.round(lA*100)}%がプラス${sA>lA+.15?'（短期側が上向きに転換中）':sA<lA-.15?'（短期側が下向きに転換中）':''}。`);
+  $('#brHelp').innerHTML=T(`<b>Reading help.</b> For every market in the dashboard (country, sector and TOPIX ETFs, the gaming peers, yen crosses, commodities, credit, crypto; equities in ${S.ccy}) we ask ${BR_MEAS.length} yes/no trend questions every week, from “up over 4 weeks” to “up over 52 weeks”, and count the yeses. One number then says how much of the world is going up. Readings above 80% or below 20% are broad trends; the useful signal is the turn, when the 4-week average crosses 50%. Every measure counts the same, so groups with more markets (countries, TOPIX) weigh more. Our recipe, in the spirit of his “percent positive of everything”; it describes the trend now and is not a forecast.`,`<b>読み方。</b>ダッシュボード内のすべての市場（国・セクター・TOPIXのETF、ゲーム関連、対円通貨、商品、クレジット、暗号資産。株式は${S.ccy==='JPY'?'円':'米ドル'}建て）について、毎週「4週で上昇」から「52週で上昇」まで${BR_MEAS.length}のトレンド質問をし、「はい」の数を数えます。1つの数字で世界のどれだけが上昇しているかが分かります。80%超・20%未満は広範なトレンド。有用なのは転換で、4週平均が50%を横切る時です。各指標は同じ重みのため、市場数の多いグループ（国・TOPIX）の比重が大きくなります。同氏の「すべてのプラス比率」に倣った独自の手法で、現在のトレンドを示すもので予測ではありません。`);
+}
+
+/* ---------- 2. outlier clusters ---------- */
+function zSeries(sym){const key='z|'+sym+'|'+S.ccy;if(CACHE[key])return CACHE[key];const isRate=/^(UST|JGB)/.test(sym),a=isRate?D.s[sym]:pxc(sym);if(!a)return null;const N=a.length,c=new Array(N).fill(null);
+  for(let i=1;i<N;i++)if(a[i]!=null&&a[i-1]!=null&&(isRate||a[i]>0&&a[i-1]>0))c[i]=isRate?(a[i]-a[i-1])*100:Math.log(a[i]/a[i-1]);
+  const z=new Array(N).fill(null);let s=0,s2=0,n=0;const WN=156;
+  for(let i=2;i<N;i++){const add=c[i-1];if(add!=null){s+=add;s2+=add*add;n++}const o=i-1-WN;if(o>=1&&c[o]!=null){s-=c[o];s2-=c[o]*c[o];n--}
+    if(n>=52&&c[i]!=null){const m=s/n,v=(s2-n*m*m)/(n-1);if(v>1e-14)z[i]=c[i]/Math.sqrt(v)}}
+  return CACHE[key]=z}
+function clusters(){const key='cl|'+S.ccy;if(CACHE[key])return CACHE[key];const N=D.t.length,Z=()=>new Array(N).fill(0),up=Z(),dn=Z(),cnt=Z(),byG=[];
+  OUT_GROUPS.forEach(([en,ja,rows])=>{const g={en,ja,u:Z(),d:Z(),c:Z(),who:[]};rows.forEach(r=>{const z=zSeries(r[0]);if(!z)return;g.who.push([r,z]);
+      for(let i=0;i<N;i++){const v=z[i];if(v==null)continue;g.c[i]++;cnt[i]++;if(v>=2){g.u[i]++;up[i]++}else if(v<=-2){g.d[i]++;dn[i]++}}});byG.push(g)});
+  const share=(a)=>a.map((v,i)=>cnt[i]>=20?v/cnt[i]:null);
+  const inten=D.t.map((_,i)=>{if(i<12)return null;let o=0,c=0;for(let q=i-12;q<=i;q++){o+=up[q]+dn[q];c+=cnt[q]}return c>=200?o/c:null});
+  const neg=D.t.map((_,i)=>{if(i<12)return null;let o=0,c=0;for(let q=i-12;q<=i;q++){o+=dn[q];c+=cnt[q]}return c>=200?o/c:null});
+  return CACHE[key]={up,dn,cnt,su:share(up),sd:share(dn),inten,neg,byG}}
+/* positive bars up, negative bars down */
+function barsPN(svg,idx,su,sd,o={}){const w=W(svg),h=o.h||200,m={l:38,r:8,t:8,b:22},n=idx.length,bw=(w-m.l-m.r)/n;
+  const mx=Math.max(.04,...idx.map(i=>Math.max(su[i]||0,sd[i]||0))),yt=niceTicks(0,mx,2),top=yt[yt.length-1],ih=(h-m.t-m.b)/2,Y0=m.t+ih,Ys=v=>v/top*ih;let g='';
+  yt.forEach(v=>{if(!v)return;[1,-1].forEach(s=>{const y=Y0-s*Ys(v);g+=`<line class="grd" x1="${m.l}" x2="${w-m.r}" y1="${y}" y2="${y}"/><text x="${m.l-5}" y="${y+4}" text-anchor="end">${s<0?'−':''}${Math.round(v*100)}%</text>`})});
+  let ly=null;idx.forEach((i,q)=>{const x=m.l+q*bw,yy=new Date(D.t[i]).getUTCFullYear();if(yy!==ly){if(ly!=null)g+=`<text x="${x}" y="${h-6}" text-anchor="middle">${yy}</text>`;ly=yy}
+    const u=su[i]||0,d=sd[i]||0;if(u)g+=`<rect x="${x.toFixed(1)}" y="${(Y0-Ys(u)).toFixed(1)}" width="${Math.max(.6,bw-.2).toFixed(2)}" height="${Ys(u).toFixed(1)}" fill="var(--pos)"/>`;if(d)g+=`<rect x="${x.toFixed(1)}" y="${Y0}" width="${Math.max(.6,bw-.2).toFixed(2)}" height="${Ys(d).toFixed(1)}" fill="var(--neg)"/>`});
+  g+=`<line class="ax" x1="${m.l}" x2="${w-m.r}" y1="${Y0}" y2="${Y0}"/>`;
+  svg.setAttribute('viewBox',`0 0 ${w} ${h}`);svg.setAttribute('height',h);svg.innerHTML=g;
+  svg.onmousemove=ev=>{const b=svg.getBoundingClientRect(),x=(ev.clientX-b.left)*w/b.width,q=Math.floor((x-m.l)/bw);if(q<0||q>=n){tip(null);return}const i=idx[q];tip(o.tip(i),ev)};svg.onmouseleave=()=>tip(null)}
+function outlierClusters(){
+  const cl=clusters(),N=D.t.length,i=N-1,c=C(),pr=pctRankAll(cl.inten)[i],prn=pctRankAll(cl.neg)[i];
+  const who=cl.byG.flatMap(g=>g.who.map(([r,z])=>({r,z:z[i]}))).filter(x=>x.z!=null&&Math.abs(x.z)>=2).sort((a,b)=>Math.abs(b.z)-Math.abs(a.z));
+  $('#clSub').innerHTML=T(`This week <b>${cl.up[i]+cl.dn[i]}</b> of ${cl.cnt[i]} markets moved more than 2 sd (${cl.up[i]} up, ${cl.dn[i]} down)${who.length?': '+who.slice(0,5).map(x=>esc(nm(x.r))+' '+(x.z>0?'+':'')+num(x.z,1)).join(', '):''}. With normal moves about 4.6% would.`,`今週は${cl.cnt[i]}市場中<b>${cl.up[i]+cl.dn[i]}</b>が2sd超の変化（上昇${cl.up[i]}、下落${cl.dn[i]}）${who.length?'：'+who.slice(0,5).map(x=>esc(nm(x.r))+' '+(x.z>0?'+':'')+num(x.z,1)).join('、'):''}。正規分布なら約4.6%です。`);
+  const span=Math.min(N-160,520),idx=Array.from({length:span},(_,q)=>N-span+q);
+  barsPN($('#clBars'),idx,cl.su,cl.sd,{h:200,tip:j=>`<div class="m">${md(D.t[j])}</div><div><span style="color:var(--pos)">▲</span> ${cl.up[j]} · <span style="color:var(--neg)">▼</span> ${cl.dn[j]} ${T('of','／')} ${cl.cnt[j]}</div>`});
+  lineChart($('#clLine'),[{name:T('Normal: 4.6%','正規分布：4.6%'),color:c.mute,dash:true,width:1,pts:D.t.map(t=>({x:t,y:4.55}))},
+    {name:T('All outliers, 13 weeks','全アウトライヤー（13週）'),color:c.steel,width:1.5,pts:D.t.map((t,q)=>({x:t,y:cl.inten[q]==null?null:cl.inten[q]*100}))},
+    {name:T('Negative outliers, 13 weeks','下方アウトライヤー（13週）'),color:c.red,width:1.5,pts:D.t.map((t,q)=>({x:t,y:cl.neg[q]==null?null:cl.neg[q]*100}))}],{h:220,xType:'date',floor:0,yFmt:v=>num(v,0)+'%'});
+  legend($('#clLeg'),[{name:T('Share of moves beyond ±2 sd, last 13 weeks','±2sd超の変化の比率（直近13週）'),color:c.steel},{name:T('of which down','うち下落'),color:c.red},{name:T('expected if moves were normal','正規分布の場合の期待値'),color:c.mute,dash:true}]);
+  $('#clInt').innerHTML=T(`Clustering now: <b>${num(cl.inten[i]*100,1)}%</b> of moves over the last 13 weeks were outliers (${Math.round(pr*100)}th percentile since 2008); negative ones ${num(cl.neg[i]*100,1)}% (${Math.round(prn*100)}th). ${prn>=.8?'Negative outliers are clustering: the pattern of a stressed market.':pr>=.8?'Outliers are clustering, mostly on the upside.':'No unusual clustering.'}`,`現在のクラスター：直近13週の変化の<b>${num(cl.inten[i]*100,1)}%</b>がアウトライヤー（2008年以降の${Math.round(pr*100)}パーセンタイル）、下方は${num(cl.neg[i]*100,1)}%（${Math.round(prn*100)}パーセンタイル）。${prn>=.8?'下方アウトライヤーが集中：ストレス相場の典型。':pr>=.8?'アウトライヤーが集中（主に上方）。':'異例の集中はありません。'}`);
+  const n=S.span,i0=N-n,rows=cl.byG.map(g=>({label:JA()?g.ja:g.en,g,vals:Array.from({length:n},(_,q)=>{const j=i0+q;return g.c[j]?(g.u[j]-g.d[j]):null}),last:g.c[i]?g.u[i]-g.d[i]:null}));
+  const col=v=>v==null?cssv('--track'):v===0?cssv('--card'):div(v,-3,0,3);
+  heatmap($('#clHm'),rows,{n,i0,labW:W($('#clHm'))<640?110:170,colT:q=>D.t[i0+q],color:col,fmt:v=>v>0?'+'+v:v,tip:(row,q,v)=>{const j=i0+q,g=row.g,list=g.who.map(([r,z])=>({r,z:z[j]})).filter(x=>x.z!=null&&Math.abs(x.z)>=2);return`<div class="m">${esc(row.label)} · ${md(D.t[j])}</div><div>▲ ${g.u[j]} · ▼ ${g.d[j]} ${T('of','／')} ${g.c[j]}</div>${list.map(x=>`<div>${esc(nm(x.r))} <b>${x.z>0?'+':''}${num(x.z,1)} sd</b></div>`).join('')}`}});
+  scaleBar($('#scCl'),-3,3,0,[T('more down outliers','下方が多い'),T('more up outliers','上方が多い')]);
+}
+
+/* ---------- 3+4. earnings revisions: asymmetry and the sector scorecard ---------- */
+const RV_PRICE={world:'ACWI',reg_US:'SPY',reg_EU:'^STOXX50E',reg_JP:'EWJ',reg_AS:'EEM'};
+SECTORS.forEach(s=>RV_PRICE[s[3]]=s[0]);TOPIX.forEach(s=>RV_PRICE[s[0]]=s[0]);
+const revCol=v=>div(v,-.05,0,.05);
+const momTxt=g=>!g||!g.direction?T('flat','横ばい'):`<span style="color:${g.direction>0?'var(--pos)':'var(--neg)'}">${g.direction>0?'▲':'▼'}</span> ${g.weeks_since_turn==null?T('13+ wk','13週超'):T(`~${g.weeks_since_turn} wk`,`約${g.weeks_since_turn}週`)}`;
+const rvName=(k,g)=>{const s=SECTORS.find(x=>x[3]===k)||TOPIX.find(x=>x[0]===k);return s?nm(s):(JA()?g.ja:g.name)};
+function priceBits(sym){const p=sym&&pxc(sym);if(!p)return{};const N=p.length,a=scoreSeries(sym),L=a&&a[N-1],P=a&&a[N-9];return{sc:L?L.s:null,d8:L&&P?L.s-P.s:null,ytd:ret(p,N-1,ytdWeeks()),r13:ret(p,N-1,13),sp:p.slice(-26)}}
+/* the three earnings tests shown beside the 0–9 price score */
+const eTests=g=>g?[g.rev2m>0,g.up_share>g.dn_share,(g.net_analysts||0)>0].filter(Boolean).length:null;
+function chipH(v,txt,col){const f=col(v);return`<span class="chip" style="background:${f};color:${inkOn(f)}">${txt}</span>`}
+function scoreTable(el,keys,opt={}){
+  const G=RV&&RV.groups||{};let rows=keys.map(k=>{const g=G[k]||null;return{k,g,p:priceBits(opt.price?opt.price(k):RV_PRICE[k]),name:opt.name?opt.name(k,g):rvName(k,g||{name:k,ja:k})}});
+  const rank=x=>(x.p.sc??4.5)+(x.g?eTests(x.g)*1.5+Math.max(-3,Math.min(3,(x.g.rev2m||0)*60)):0);
+  if(S.sort==='score')rows.sort((a,b)=>rank(b)-rank(a));
+  let h=`<thead><tr><th>${opt.h||T('Group','グループ')}</th><th>${T('Score 0–9','スコア0〜9')}</th><th>${T('vs 8 wk','8週前比')}</th><th>${T('EPS revision, 2 mo','EPS修正 2か月')}</th><th>${T('1 mo','1か月')}</th><th>${T('Up : down','上方:下方')}</th><th>${T('Analysts net','アナリスト差引')}</th><th>${T('Momentum, since turn','モメンタム・転換から')}</th><th>${T('Earnings tests','業績テスト')}</th><th>YTD</th><th>${T('26 weeks','26週')}</th></tr></thead><tbody>`;
+  rows.forEach((x,ri)=>{const g=x.g,p=x.p;h+=`<tr${ri===0&&S.sort==='score'?' class="hl"':''}><td>${esc(x.name)}${g?`<span class="nm">${g.of&&g.of!==g.n?`${g.n} ${T('of','／')} ${g.of}`:g.n} ${T('companies','社')}${g.n<3?T(' · thin',' ・少数'):''}</span>`:`<span class="nm">${T('no estimates','予想なし')}</span>`}</td>
+    <td>${p.sc==null?'—':chipH(p.sc,p.sc,scoreCol)}</td><td class="${cls(p.d8)}">${p.d8==null?'—':(p.d8>0?'+':'')+p.d8}</td>
+    <td>${g?chipH(g.rev2m,pct(g.rev2m*100,1),revCol):'—'}</td><td class="${cls(g&&g.rev1m)}">${g?pct(g.rev1m*100,1):'—'}</td>
+    <td>${!g?'—':g.co?`<span class="up">${num(g.an_up,0)}↑</span> <span class="dn">${num(g.an_dn,0)}↓</span>`:`${Math.round(g.up_share*100)} : ${Math.round(g.dn_share*100)}`}</td><td class="${cls(g&&g.net_analysts)}">${g&&g.net_analysts!=null?pct(g.net_analysts*100,0):'—'}</td>
+    <td>${g?momTxt(g):'—'}</td><td>${g?chipH(eTests(g),eTests(g)+'/3',v=>div(v,0,1.5,3)):'—'}</td>
+    <td class="${cls(p.ytd)}">${p.ytd==null?'—':pct(p.ytd*100,1)}</td><td>${p.sp?spark(p.sp,90,22,p.r13>=0?'var(--pos)':'var(--neg)'):''}</td></tr>`});
+  el.innerHTML=h+'</tbody>'}
+function asymChart(svg,sections){const w=W(svg),narrow=w<640,labW=narrow?118:200,rw=narrow?44:70,rh=20;let y=4,g='';const mid=labW+(w-labW-rw)/2,half=(w-labW-rw)/2-6;
+  g+=`<text x="${mid-6}" y="${y+10}" text-anchor="end">${T('← share revised down','← 下方修正の比率')}</text><text x="${mid+6}" y="${y+10}">${T('share revised up →','上方修正の比率 →')}</text><text x="${w-rw/2}" y="${y+10}" text-anchor="middle">${T('median 2 mo','中央値2か月')}</text>`;y+=20;
+  const tips=[];
+  sections.forEach(([title,items])=>{if(!items.length)return;g+=`<text x="0" y="${y+13}" style="font-weight:500;fill:var(--ink)">${esc(title)}</text>`;y+=rh;
+    items.forEach(it=>{const gg=it.g,yy=y;g+=`<text class="rl" x="8" y="${yy+rh*.68}">${esc(it.label.length>(narrow?16:28)?it.label.slice(0,narrow?15:27)+'…':it.label)}</text>`;
+      g+=`<rect x="${mid-gg.dn_share*half}" y="${yy+3}" width="${gg.dn_share*half}" height="${rh-6}" fill="var(--neg)" fill-opacity=".85"/><rect x="${mid}" y="${yy+3}" width="${gg.up_share*half}" height="${rh-6}" fill="var(--pos)" fill-opacity=".85"/>`;
+      if(gg.dn_share>.12)g+=`<text x="${mid-gg.dn_share*half+4}" y="${yy+rh*.68}" style="fill:#fff;font-size:10.5px">${Math.round(gg.dn_share*100)}</text>`;
+      if(gg.up_share>.12)g+=`<text x="${mid+gg.up_share*half-4}" y="${yy+rh*.68}" text-anchor="end" style="fill:#fff;font-size:10.5px">${Math.round(gg.up_share*100)}</text>`;
+      const f=revCol(gg.rev2m);g+=`<rect x="${w-rw}" y="${yy+1}" width="${rw-2}" height="${rh-3}" fill="${f}"/><text class="lv" x="${w-rw/2-1}" y="${yy+rh*.68}" text-anchor="middle" style="fill:${inkOn(f)}">${pct(gg.rev2m*100,1)}</text>`;
+      tips.push([yy,it]);y+=rh});y+=6});
+  g=`<line x1="${mid}" x2="${mid}" y1="22" y2="${y}" stroke="var(--rule)"/>`+g;
+  svg.setAttribute('viewBox',`0 0 ${w} ${y}`);svg.setAttribute('height',y);svg.innerHTML=g;
+  svg.onmousemove=ev=>{const b=svg.getBoundingClientRect(),yy=(ev.clientY-b.top)*y/b.height,hit=tips.find(([t])=>yy>=t&&yy<t+rh);if(!hit){tip(null);return}const it=hit[1],gg=it.g;
+    const mem=(gg.members||[]).map(t=>RV.companies[t]).filter(Boolean).sort((a,b)=>(b.r2m||0)-(a.r2m||0));
+    tip(`<div class="m">${esc(it.label)} · ${gg.n} ${T('companies','社')}</div><div>${T('Revised up','上方修正')} <b>${Math.round(gg.up_share*100)}%</b> · ${T('down','下方')} <b>${Math.round(gg.dn_share*100)}%</b></div><div>${T('Median 2 mo','中央値2か月')} <b>${pct(gg.rev2m*100,1)}</b> · ${T('analysts net','アナリスト差引')} <b>${gg.net_analysts==null?'—':pct(gg.net_analysts*100,0)}</b></div>${mem.length?`<div style="margin-top:4px;font-size:11.5px">${mem.slice(0,3).map(c=>`▲ ${esc(c.t)} ${pct(c.r2m*100,1)}`).join('<br>')}${mem.length>3?'<br>'+mem.slice(-2).map(c=>`▼ ${esc(c.t)} ${pct(c.r2m*100,1)}`).join('<br>'):''}</div>`:''}`,ev)};svg.onmouseleave=()=>tip(null)}
+const GAME_NAMES=Object.fromEntries(GAMING.concat(GAMING_X).map(r=>[r[0],r]));
+function revisionsTab(){
+  const has=RV&&RV.groups&&Object.keys(RV.groups).length,G=has?RV.groups:{};
+  $('#rvWait').hidden=!!has;
+  if(!has)$('#rvWait').innerHTML=T('<b>Earnings revisions are not loaded yet.</b> They come from Keel’s <code>api_revisions</code> tool (about 170 companies; the first call after the server wakes takes a minute). Press Refresh shortly. If it keeps failing, reconnect keel in claude.ai Settings → Connectors so the new tool is listed. Price scores below still work.','<b>業績予想の修正はまだ読み込まれていません。</b>Keelの<code>api_revisions</code>ツールから取得します（約170社。サーバー起動直後の初回は1分ほど）。少し待って更新を押してください。失敗が続く場合はclaude.aiの設定 → コネクタでkeelを再接続し、新しいツールを反映させてください。下の価格スコアは表示されます。');
+  const sectors=SECTORS.map(s=>s[3]).filter(k=>!has||G[k]),best=has?[...sectors].filter(k=>G[k]).sort((a,b)=>{const ra=(priceBits(RV_PRICE[a]).sc??0)+eTests(G[a])*1.5+G[a].rev2m*60,rb=(priceBits(RV_PRICE[b]).sc??0)+eTests(G[b])*1.5+G[b].rev2m*60;return rb-ra})[0]:null;
+  if(has&&best){const g=G[best],p=priceBits(RV_PRICE[best]),w=G.world;
+    $('#rvHead').innerHTML=T(`<b>${esc(rvName(best,g))} is best:</b> price score ${p.sc}/9, two-month earnings revision ${pct(g.rev2m*100,1)}, ${Math.round(g.up_share*100)}% of its companies revised up, momentum ${g.direction>0?'up':'down'} ${g.weeks_since_turn==null?'for 13+ weeks':'since about '+g.weeks_since_turn+' weeks ago'}, ${pct(p.ytd*100,1)} this year (${S.ccy}).`,`<b>${esc(rvName(best,g))}が最良：</b>価格スコア${p.sc}/9、2か月の業績予想修正${pct(g.rev2m*100,1)}、上方修正の企業${Math.round(g.up_share*100)}%、モメンタム${g.direction>0?'上向き':'下向き'}（${g.weeks_since_turn==null?'13週超':'約'+g.weeks_since_turn+'週前から'}）、年初来${pct(p.ytd*100,1)}（${S.ccy==='JPY'?'円':'米ドル'}建て）。`);
+    const tiles=[[T('World: revised up vs down','世界：上方 対 下方'),`${Math.round(w.up_share*100)}<small>:${Math.round(w.dn_share*100)}</small>`,T(w.up_share>=w.dn_share?'Asymmetry positive':'Asymmetry negative',w.up_share>=w.dn_share?'非対称性はプラス':'非対称性はマイナス'),T(`% of ${w.n} companies, 12-month-forward EPS over 2 months`,`${w.n}社中の%、12か月先EPSの2か月変化`)],
+      [T('World median revision','世界の修正中央値'),pct(w.rev2m*100,1),T('two months','2か月'),T(`one month ${pct(w.rev1m*100,1)}`,`1か月 ${pct(w.rev1m*100,1)}`)],
+      [T('Analysts raising, net','引上げアナリスト（差引）'),pct((w.net_analysts||0)*100,0),T(`${num(w.an_up,0)} up, ${num(w.an_dn,0)} down`,`上方${num(w.an_up,0)}、下方${num(w.an_dn,0)}`),T('estimate changes in the last 30 days','直近30日の予想変更')],
+      [T('Japan','日本'),G.reg_JP?pct(G.reg_JP.rev2m*100,1):'—',G.reg_JP?momTxt(G.reg_JP):'',T('Japanese companies in the world baskets','世界バスケット内の日本企業')]];
+    $('#rvTiles').innerHTML=tiles.map(([l,b,n,s])=>`<div class="tile"><span class="lbl">${l}</span><span class="big">${b}</span><span class="nm">${n}</span><span class="s">${s}</span></div>`).join('')}
+  else{$('#rvHead').textContent='';$('#rvTiles').innerHTML=''}
+  $('#rvAsof').textContent=has?T(`Analyst estimates as of ${fdate(RV.asof)} (Yahoo Finance via Keel)${RV.missing&&RV.missing.length?`; ${RV.missing.length} companies without estimates`:''}.`,`アナリスト予想は${fdate(RV.asof)}時点（Yahoo Finance、Keel経由）${RV.missing&&RV.missing.length?`。予想のない企業${RV.missing.length}社`:''}。`):'';
+  if(has){const it=(keys)=>{let a=keys.filter(k=>G[k]).map(k=>({label:rvName(k,G[k]),g:G[k]}));if(S.sort==='score')a.sort((x,y)=>(y.g.up_share-y.g.dn_share)-(x.g.up_share-x.g.dn_share));return a};
+    asymChart($('#rvAsym'),[[T('Regions','地域'),it(['world','reg_US','reg_EU','reg_JP','reg_AS'])],[T('World sectors','世界のセクター'),it(SECTORS.map(s=>s[3]))],[T('TOPIX-17 sectors','TOPIX-17業種'),it(TOPIX.map(s=>s[0]))],[T('Gaming peers','ゲーム関連'),it(['gaming'])]])}
+  else $('#rvAsym').innerHTML='';
+  scoreTable($('#rvSect'),SECTORS.map(s=>s[3]),{h:T('World sector','世界のセクター')});
+  scoreTable($('#rvReg'),['world','reg_US','reg_EU','reg_JP','reg_AS'],{h:T('Region','地域')});
+  scoreTable($('#rvTopix'),TOPIX.map(s=>s[0]),{h:T('TOPIX-17 sector','TOPIX-17業種')});
+  /* gaming: one row per company; the company's own revision in place of a group */
+  const gk=GAMING.concat(GAMING_X).map(r=>r[0]),saveG=RV;
+  const fake=has?{groups:Object.fromEntries(gk.map(t=>{const c=RV.companies[t];if(!c||c.r2m==null)return[t,null];const tot=(c.up||0)+(c.dn||0);return[t,{co:true,an_up:c.up||0,an_dn:c.dn||0,n:1,rev2m:c.r2m,rev1m:c.r1m,up_share:c.r2m>.001?1:0,dn_share:c.r2m<-.001?1:0,net_analysts:tot?(c.up-c.dn)/tot:null,direction:c.r1m>.001?1:c.r1m<-.001?-1:0,weeks_since_turn:(()=>{const s=c.seg||[],d=c.r1m>.001?1:c.r1m<-.001?-1:0;if(!d)return null;for(let i=1;i<4;i++)if(s[i]!=null&&Math.sign(s[i])===-d&&Math.abs(s[i])>.001)return[0,1,4,9][i];return null})()}]}).filter(x=>x[1]))}:null;
+  RV=fake;scoreTable($('#rvGame'),gk,{h:T('Company','企業'),price:k=>D.s[k]?k:null,name:k=>nm(GAME_NAMES[k])});RV=saveG;
+  $$('#rvGame tbody td:first-child .nm').forEach(e=>e.remove());
+  $('#rvHelp').innerHTML=T(`<b>Reading help.</b> For each group we take about ten large companies (four per TOPIX sector) and Yahoo’s consensus EPS estimates for this and next fiscal year, now and 7, 30, 60 and 90 days ago, blended into a 12-month-forward figure. <b>EPS revision</b> is the median change over two (one) months. <b>Up : down</b> is the share of companies whose estimate rose or fell by more than 0.1%: his asymmetry. <b>Analysts net</b> = analysts raising minus cutting in the last 30 days, over both. <b>Momentum</b> is the direction of the one-month revisions, and roughly how long ago it last flipped (the estimate history only goes back 13 weeks, so the answer is about 1, 4 or 9 weeks, or 13+). <b>Earnings tests</b>: one point each for a positive revision, more companies up than down, and more analysts raising than cutting. The 0–9 score is the price score from the Winners tab, so a row reads like his “Energy is best” table: trend, revisions, how long, and the year so far. Baskets are a sample, not the full index. <b>Japan:</b> Yahoo carries no analyst estimates for Tokyo listings, so Japanese companies are read through their US ADRs where one exists (Toyota, Honda, Sony, MUFG, SMFG, Mizuho, Takeda, Nomura, Orix, in USD per ADR, so the yen can colour a revision a little); TOPIX sectors without such a company show price only. Free data, can be wrong or late.`,`<b>読み方。</b>各グループについて大型企業約10社（TOPIX業種は4社）を選び、今期と来期のコンセンサスEPS予想（Yahoo）を現在・7日前・30日前・60日前・90日前で取得し、12か月先の値に合成。<b>EPS修正</b>は2か月（1か月）の変化の中央値。<b>上方:下方</b>は予想が0.1%超上昇・低下した企業の比率で、同氏の言う非対称性。<b>アナリスト差引</b>＝直近30日に引上げたアナリスト数−引下げた数（両者の合計比）。<b>モメンタム</b>は1か月修正の方向と、最後に反転したおおよその時期（予想の履歴は13週までのため、約1・4・9週、または13週超）。<b>業績テスト</b>：修正がプラス、上方修正企業が下方より多い、引上げアナリストが多い、で各1点。0〜9スコアは「勝ち組と負け組」タブの価格スコアで、同氏の「エネルギーが最良」表と同じく、トレンド・修正・期間・年初来を1行で読めます。バスケットは指数全体ではなく標本。<b>日本：</b>Yahooには東証上場銘柄のアナリスト予想がないため、米国ADRのある企業（トヨタ、ホンダ、ソニー、三菱UFJ、三井住友、みずほ、武田、野村、オリックス）をADR経由で取得（ADR当たり米ドル建てのため、円相場が修正に多少影響）。該当企業のないTOPIX業種は価格のみ。無料データのため誤りや遅れがありえます。`);
+}
+
+/* ---------- 5. reversal radar ---------- */
+const RR_SETS=()=>[['ctry',T('Countries','国'),COUNTRIES.filter(r=>r[0]!=='ACWI')],['sect',T('World sectors','世界のセクター'),SECTORS],['topix',T('TOPIX-17','TOPIX-17'),TOPIX],['game',T('Gaming','ゲーム'),GAMING]];
+const QUAD={lead:['Leading','先行'],weak:['Weakening','弱含み'],lag:['Lagging','劣後'],imp:['Improving','改善']};
+const quadOf=(x,y)=>x==null||y==null?null:x>=0?(y>=0?'lead':'weak'):(y>=0?'imp':'lag');
+function rrPoint(sym,i){const r=relSer(sym);return{x:sdOn(r,52,i),y:sdOn(r,13,i)}}
+function revFor(set,r){if(!RV||!RV.groups)return null;if(set==='sect')return RV.groups[r[3]]||null;if(set==='topix')return RV.groups[r[0]]||null;if(set==='game'){const c=RV.companies[r[0]];return c&&c.r1m!=null?{direction:c.r1m>.001?1:c.r1m<-.001?-1:0,rev2m:c.r2m}:null}return null}
+function reversalsTab(){
+  const N=D.t.length,i=N-1,sets=RR_SETS(),cur=sets.find(s=>s[0]===S.rr)||sets[0];
+  $$('#rrSeg button').forEach(b=>b.classList.toggle('on',b.dataset.v===cur[0]));
+  /* radar */
+  const svg=$('#rrPlot'),w=W(svg),h=Math.min(440,Math.max(320,w*.55)),m={l:40,r:14,t:14,b:30},c=C();
+  const pts=cur[2].map(r=>({r,tr:[12,8,4,0].map(k=>rrPoint(r[0],i-k))})).filter(p=>p.tr[3].x!=null&&p.tr[3].y!=null);
+  const ax=Math.max(2,...pts.flatMap(p=>p.tr.map(q=>Math.abs(q.x||0))))*1.08,ay=Math.max(2,...pts.flatMap(p=>p.tr.map(q=>Math.abs(q.y||0))))*1.08;
+  const X=v=>m.l+(v+ax)/(2*ax)*(w-m.l-m.r),Y=v=>m.t+(1-(v+ay)/(2*ay))*(h-m.t-m.b);let g='';
+  [['lead',0,ay,ax,0,c.pos],['weak',0,0,ax,-ay,c.gold],['lag',-ax,0,0,-ay,c.neg],['imp',-ax,ay,0,0,c.steel]].forEach(([k,x0,y0,x1,y1,col])=>{g+=`<rect x="${X(x0)}" y="${Y(y0)}" width="${X(x1)-X(x0)}" height="${Y(y1)-Y(y0)}" fill="${col}" fill-opacity=".06"/><text x="${k==='lead'||k==='weak'?X(x1)-6:X(x0)+6}" y="${k==='lead'||k==='imp'?Y(y0)+14:Y(y1)-6}" text-anchor="${k==='lead'||k==='weak'?'end':'start'}" style="fill:${col};font-weight:500">${JA()?QUAD[k][1]:QUAD[k][0]}</text>`});
+  g+=`<line class="ax" x1="${X(0)}" x2="${X(0)}" y1="${m.t}" y2="${h-m.b}"/><line class="ax" x1="${m.l}" x2="${w-m.r}" y1="${Y(0)}" y2="${Y(0)}"/>`;
+  g+=`<text x="${w-m.r}" y="${h-8}" text-anchor="end">${T('52-week trend vs world, sd →','52週トレンド（対世界、sd）→')}</text><text x="${m.l-28}" y="${m.t+4}" transform="rotate(-90 ${m.l-28} ${m.t+4})" text-anchor="end">${T('13-week momentum vs world, sd →','13週モメンタム（対世界、sd）→')}</text>`;
+  pts.forEach((p,pi)=>{const tr=p.tr.filter(q=>q.x!=null&&q.y!=null),L=p.tr[3],q=quadOf(L.x,L.y),col=q==='lead'?c.pos:q==='weak'?c.gold:q==='lag'?c.neg:c.steel;
+    g+=`<path d="${tr.map((q,j)=>(j?'L':'M')+X(q.x).toFixed(1)+' '+Y(q.y).toFixed(1)).join('')}" fill="none" stroke="${col}" stroke-opacity=".45" stroke-width="1.2"/>`;
+    tr.slice(0,-1).forEach((q,j)=>g+=`<circle cx="${X(q.x)}" cy="${Y(q.y)}" r="${1.5+j*.5}" fill="${col}" fill-opacity=".4"/>`);
+    g+=`<circle cx="${X(L.x)}" cy="${Y(L.y)}" r="5" fill="${col}" data-i="${pi}"/><text x="${X(L.x)+7}" y="${Y(L.y)+4}" style="fill:var(--ink);font-size:11px">${esc(nm(p.r).length>16?nm(p.r).slice(0,15)+'…':nm(p.r))}</text>`});
+  svg.setAttribute('viewBox',`0 0 ${w} ${h}`);svg.setAttribute('height',h);svg.innerHTML=g;
+  svg.onmousemove=ev=>{const b=svg.getBoundingClientRect(),x=(ev.clientX-b.left)*w/b.width,y=(ev.clientY-b.top)*h/b.height;let best=null,bd=18*18;pts.forEach(p=>{const L=p.tr[3],d=(X(L.x)-x)**2+(Y(L.y)-y)**2;if(d<bd){bd=d;best=p}});if(!best){tip(null);return}
+    const L=best.tr[3],sc=lastScore(best.r[0]);tip(`<div class="m">${esc(nm(best.r))}</div><div>${JA()?QUAD[quadOf(L.x,L.y)][1]:QUAD[quadOf(L.x,L.y)][0]} · ${T('score','スコア')} <b>${sc?sc.s:'—'}</b>/9</div><div>52w ${L.x>0?'+':''}${num(L.x,1)} sd · 13w ${L.y>0?'+':''}${num(L.y,1)} sd</div><div class="m">${T('tail: 12, 8 and 4 weeks ago','軌跡：12・8・4週前')}</div>`,ev)};svg.onmouseleave=()=>tip(null);
+  $('#rrSub').textContent=T(`${cur[1]} against the world (MSCI ACWI) in ${S.ccy}. Right = beating the world over a year; up = beating it over 13 weeks, both in standard deviations. Tails show the last 12 weeks. Markets move round clockwise: leading → weakening → lagging → improving. Reversals are the moves into “improving” and “weakening”.`,`${cur[1]}の世界（MSCI ACWI）対比、${S.ccy==='JPY'?'円':'米ドル'}建て。右＝1年で世界を上回る、上＝13週で上回る（いずれも標準偏差）。軌跡は直近12週。市場は時計回りに動く傾向：先行 → 弱含み → 劣後 → 改善。反転は「改善」「弱含み」への移動です。`);
+  /* candidates across all sets */
+  const cand=[];sets.forEach(([k,lab,list])=>list.forEach(r=>{const a=scoreSeries(r[0]);if(!a)return;const L=a[i],P=a[i-8];if(!L||!P)return;const now=rrPoint(r[0],i),then=rrPoint(r[0],i-4),qn=quadOf(now.x,now.y),qt=quadOf(then.x,then.y),d=L.s-P.s,p=pxc(r[0]),m40=sma(p,40);
+    const x40=m40[i]!=null&&m40[i-2]!=null&&p[i-2]!=null?(p[i]>m40[i]&&p[i-2]<=m40[i-2]?1:p[i]<m40[i]&&p[i-2]>=m40[i-2]?-1:0):0;
+    const sig=[];if(d>=4)sig.push(T(`score jumped ${P.s}→${L.s}`,`スコア急上昇 ${P.s}→${L.s}`));if(d<=-4)sig.push(T(`score fell ${P.s}→${L.s}`,`スコア急低下 ${P.s}→${L.s}`));
+    if(qt==='lag'&&qn==='imp')sig.push(T('lagging → improving','劣後 → 改善'));if(qt==='lead'&&qn==='weak')sig.push(T('leading → weakening','先行 → 弱含み'));
+    if(x40>0&&ret(p,i,52)<0)sig.push(T('back above its 40-week average after a down year','下落の1年の後、40週平均を回復'));if(x40<0&&ret(p,i,52)>0)sig.push(T('broke below its 40-week average after an up year','上昇の1年の後、40週平均を割り込み'));
+    if(!sig.length)return;const dir=(d>=4||qn==='imp'&&qt==='lag'||x40>0)?1:-1,ev=revFor(k,r);
+    cand.push({r,lab,P:P.s,L:L.s,d,now,sig,dir,ev,conf:ev&&ev.direction?ev.direction===dir:null})}));
+  cand.sort((a,b)=>Math.abs(b.d)-Math.abs(a.d)||b.sig.length-a.sig.length);
+  $('#rrCount').textContent=T(`${cand.filter(x=>x.dir>0).length} turning up, ${cand.filter(x=>x.dir<0).length} rolling over, out of ${sets.reduce((a,s)=>a+s[2].length,0)} markets.`,`${sets.reduce((a,s)=>a+s[2].length,0)}市場中、上向き転換${cand.filter(x=>x.dir>0).length}、下向き転換${cand.filter(x=>x.dir<0).length}。`);
+  $('#rrTab').innerHTML=cand.length?`<thead><tr><th>${T('Market','市場')}</th><th>${T('Set','区分')}</th><th>${T('Turning','転換')}</th><th>${T('Score 8 wk ago → now','スコア 8週前 → 現在')}</th><th>${T('52w vs world','52週 対世界')}</th><th>${T('13w vs world','13週 対世界')}</th><th>${T('Earnings agree?','業績は一致？')}</th><th style="text-align:left">${T('Signals','シグナル')}</th></tr></thead><tbody>${cand.map(x=>`<tr><td>${esc(nm(x.r))}</td><td>${esc(x.lab)}</td><td style="color:${x.dir>0?'var(--pos)':'var(--neg)'}">${x.dir>0?T('▲ up','▲ 上向き'):T('▼ down','▼ 下向き')}</td><td>${chipH(x.P,x.P,scoreCol)} → ${chipH(x.L,x.L,scoreCol)}</td><td class="${cls(x.now.x)}">${x.now.x==null?'—':(x.now.x>0?'+':'')+num(x.now.x,1)}</td><td class="${cls(x.now.y)}">${x.now.y==null?'—':(x.now.y>0?'+':'')+num(x.now.y,1)}</td><td>${x.conf==null?'<span class="lbl">—</span>':x.conf?`<span class="up">${T('yes','はい')}</span>`:`<span class="dn">${T('no','いいえ')}</span>`}</td><td style="text-align:left;white-space:normal;min-width:220px">${x.sig.join(' · ')}</td></tr>`).join('')}</tbody>`:`<tbody><tr><td class="empty">${T('No reversal signals this week.','今週は転換シグナルなし。')}</td></tr></tbody>`;
+  $('#rrHelp').innerHTML=T(`<b>Reading help.</b> A reversal is flagged when the 0–9 score moves four points or more in eight weeks, when a market crosses from lagging to improving (or leading to weakening) in the last four weeks, or when it crosses its 40-week average against the direction of its past year. <b>Earnings agree?</b> compares the turn with the direction of analysts’ one-month revisions (sectors, TOPIX sectors and gaming companies only): a price turn that earnings confirm is the stronger signal. Turns are frequent and many fail; read it as a list of what to look at, not what to do.`,`<b>読み方。</b>0〜9スコアが8週で4点以上動いた、直近4週で劣後→改善（または先行→弱含み）に移った、過去1年の方向と逆に40週平均を横切った、のいずれかで転換として表示。<b>業績は一致？</b>は価格の転換をアナリストの1か月修正の方向と比較（セクター、TOPIX業種、ゲーム企業のみ）。業績が裏付ける転換の方が強いシグナルです。転換は頻繁に起き、失敗も多いため、何を見るべきかのリストとして読んでください。`);
+}
+
+/* ---------- 6. index-composition lens ---------- */
+function composition(k){const N=D.t.length,i=N-1,ww=(D.w||{}).ACWI;if(!ww)return[];const tw=sum(Object.values(ww)),Rw=ret(pxc('ACWI'),i,k);if(Rw==null)return[];
+  const sec=Object.fromEntries(SECTORS.map(s=>[s[3],ret(pxc(s[0]),i,k)]));
+  return COUNTRIES.filter(r=>r[0]!=='ACWI').map(r=>{const w=(D.w||{})[r[0]];if(!w)return null;const t=sum(Object.values(w)),Rc=ret(pxc(r[0]),i,k);if(!t||Rc==null)return null;let alloc=0;const parts=[];
+    SECTORS.forEach(s=>{const R=sec[s[3]];if(R==null)return;const a=((w[s[3]]||0)/t-(ww[s[3]]||0)/tw)*(R-Rw);alloc+=a;parts.push([s,a])});parts.sort((a,b)=>Math.abs(b[1])-Math.abs(a[1]));
+    return{r,ex:Rc-Rw,alloc,within:Rc-Rw-alloc,parts}}).filter(Boolean)}
+function bar2(v,mx,wd=150){const h=14,mid=wd/2,len=Math.min(1,Math.abs(v)/mx)*(mid-2);return`<svg width="${wd}" height="${h}" style="display:block"><line x1="${mid}" x2="${mid}" y1="0" y2="${h}" stroke="var(--rule)"/><rect x="${v>=0?mid:mid-len}" y="2" width="${len}" height="${h-4}" fill="${v>=0?'var(--pos)':'var(--neg)'}"/></svg>`}
+function compositionLens(){
+  const H=[[13,T('13 weeks','13週')],[26,T('26 weeks','26週')],[ytdWeeks(),T('Year to date','年初来')],[52,T('52 weeks','52週')]],sel=H.find(h=>h[1]===S.cmpL)||H[2];S.cmpL=sel[1];
+  $('#cmpSeg').innerHTML=H.map(h=>`<button data-v="${esc(h[1])}" class="${h[1]===sel[1]?'on':''}">${h[1]}</button>`).join('');
+  $$('#cmpSeg button').forEach(b=>b.onclick=()=>{S.cmpL=b.dataset.v;save();compositionLens()});
+  let rows=composition(sel[0]);if(S.sort==='score')rows.sort((a,b)=>b.ex-a.ex);const mx=Math.max(.02,...rows.flatMap(x=>[Math.abs(x.alloc),Math.abs(x.within)]));
+  const byMix=rows.filter(x=>Math.abs(x.alloc)>Math.abs(x.within)).length;
+  $('#cmpSub').textContent=T(`Each country’s return against the world over ${sel[1].toLowerCase()} (${S.ccy}), split into what its sector mix explains and the rest. In ${byMix} of ${rows.length} countries the sector mix explains more than the local part.`,`各国の対世界リターン（${sel[1]}、${S.ccy==='JPY'?'円':'米ドル'}建て）を、セクター構成で説明できる部分と残りに分解。${rows.length}か国中${byMix}か国でセクター構成の寄与が国内要因を上回ります。`);
+  $('#cmpTab').innerHTML=`<thead><tr><th>${T('Country','国')}</th><th>${T('vs world','対世界')}</th><th style="text-align:center">${T('from its sector mix','セクター構成から')}</th><th></th><th style="text-align:center">${T('from within its sectors (local)','セクター内（国内要因）')}</th><th></th><th style="text-align:left">${T('biggest sector effect','最大のセクター要因')}</th></tr></thead><tbody>${rows.map(x=>{const p=x.parts[0];return`<tr><td>${esc(nm(x.r))}</td><td class="${cls(x.ex)}"><b>${pct(x.ex*100,1)}</b></td><td>${bar2(x.alloc,mx)}</td><td class="${cls(x.alloc)}">${pct(x.alloc*100,1)}</td><td>${bar2(x.within,mx)}</td><td class="${cls(x.within)}">${pct(x.within*100,1)}</td><td style="text-align:left">${p?`${esc(nm(p[0]))} <span class="${cls(p[1])}">${pct(p[1]*100,1)}</span>`:''}</td></tr>`}).join('')}</tbody>`;
+  $('#cmpHelp').innerHTML=T(`<b>Reading help.</b> “From its sector mix” = for each sector, the country’s over- or under-weight against the world times how much that global sector beat or lagged the world, summed (a Brinson allocation effect, using the iShares global sector ETFs). “Within its sectors” is the rest: the country’s own companies doing better or worse than their global peers, plus the currency and anything local. Weights are today’s ETF holdings, applied to the whole period. When most of a country’s gap comes from its mix, the call is about sectors, not the country.`,`<b>読み方。</b>「セクター構成から」＝各セクターで、国の対世界オーバー/アンダーウェイト × その世界セクターの対世界超過リターン、の合計（ブリンソンの配分効果。iShares世界セクターETFを使用）。「セクター内」は残りで、自国企業が世界の同業より良いか悪いか、通貨、国固有の要因を含みます。比率は現在のETF保有で、期間全体に適用。差の大半が構成から来る国は、国ではなくセクターの判断です。`);
+}
+
+/* ================= live load ================= */
+async function load(fresh){
+  /* Live: only the recent weeks, laid over the built-in 20-year history (small calls finish well inside the connector's time limit). */
+  setStatus('busy');const live={};let okN=0,fails=[],firstErr=null;
+  const sd=new Date(Date.parse(SAMPLE.d[SAMPLE.d.length-1])-60*7*864e5).toISOString().slice(0,10);
+  const batches=[];for(let i=0;i<ALL_SYMS.length;i+=8)batches.push(ALL_SYMS.slice(i,i+8));
+  const call=b=>keel('api_history',{symbols:b.join(','),start:sd,interval:'W'},{fresh});
+  const ok=r=>r.ok&&r.data&&r.data.series&&Object.keys(r.data.series).length;
+  /* wake the server with the first batch; give a sleeping free instance a second chance */
+  let r=await call(batches[0]);if(!ok(r)){await new Promise(z=>setTimeout(z,8000));r=await call(batches[0])}
+  if(!ok(r)){LIVE=false;setStatus(r.code==='no_mcp'?'sample':'err',r.code||'tool_error',r.message);render();return}
+  Object.assign(live,r.data.series);okN+=Object.keys(r.data.series).length;
+  for(const b of batches.slice(1)){let q=await call(b);if(!ok(q))q=await call(b);if(ok(q)){Object.assign(live,q.data.series);okN+=Object.keys(q.data.series).length}else{fails.push(...b);firstErr=firstErr||q}}
+  let macro=null,mood=null;const mr=await keel('api_macro',{areas:'US,JP,DE,UK,CN',start:'2010-01'},{fresh});const nr=await keel('api_newsmood',{start:'2010-01-01',daily_days:30},{fresh});
+  if(mr.ok&&mr.data&&mr.data.series&&Object.keys(mr.data.series).length>=4)macro=mr.data.series;if(nr.ok&&nr.data&&nr.data.monthly&&nr.data.monthly.length)mood=nr.data.monthly;
+  D=mergeLive(live,macro,mood);LIVE=true;setStatus('live');render();
+  /* earnings revisions: about 170 companies, so the first call after Keel wakes may say 'preparing' */
+  for(let a=0;a<5;a++){const q=await keel('api_revisions',{fresh:false},{fresh:fresh&&a===0});
+    if(q.ok&&q.data&&q.data.groups&&Object.keys(q.data.groups).length){RV=q.data;break}
+    if(!q.ok&&(q.code==='no_mcp'||q.code==='tool_missing'||!MCP&&q.code!=='rest_unreachable'))break;
+    await new Promise(z=>setTimeout(z,20000))}if(fails.length)console.warn('Keel: these used the snapshot',fails);
+  render();
+}
+/* ================= wiring ================= */
+$('#how').innerHTML=howHtml();
+$$('#tabSeg button').forEach(b=>b.onclick=()=>{S.tab=b.dataset.v;save();render()});
+$$('#ccySeg button').forEach(b=>b.onclick=()=>{S.ccy=b.dataset.v;save();render()});
+$$('#spanSeg button').forEach(b=>b.onclick=()=>{S.span=+b.dataset.v;save();render()});
+$$('#sortSeg button').forEach(b=>b.onclick=()=>{S.sort=b.dataset.v;save();render()});
+$$('#langSeg button').forEach(b=>b.onclick=()=>{setLang(b.dataset.l);$('#how').innerHTML=howHtml();restatus();render()});
+$('#refresh').onclick=()=>load(true);
+$$('#rrSeg button').forEach(b=>b.onclick=()=>{S.rr=b.dataset.v;save();render()});
+$('#printBtn').onclick=()=>{window.__printing=true;$$('.panel').forEach(p=>p.hidden=false);render();setTimeout(()=>{window.print();window.__printing=false;render()},300)};
+/* the epigraph is yours: kept in this browser */
+try{const e=JSON.parse(localStorage.getItem('rineichen-epi')||'{}');$('#epiQ').textContent=e.q||'';$('#epiC').textContent=e.c||''}catch(e){}
+['#epiQ','#epiC'].forEach(s=>$(s).addEventListener('input',()=>{try{localStorage.setItem('rineichen-epi',JSON.stringify({q:$('#epiQ').textContent,c:$('#epiC').textContent}))}catch(e){}}));
+$('#epiQ').dataset.ph=T('Click to type this week’s quote…','クリックして今週の引用を入力…');$('#epiC').dataset.ph=T('— who said it','— 発言者');
+let rT;window.addEventListener('resize',()=>{clearTimeout(rT);rT=setTimeout(render,150)});
+if(!['USD','JPY'].includes(S.ccy))S.ccy='USD';if(![26,52,104].includes(S.span))S.span=52;if(!['weather','wl','rv','br','cs','risk','macro','out','rr','reg'].includes(S.tab))S.tab='weather';
+D=fromSample();RV=SAMPLE.rv||null;setLang(LANG);render();load(false);
+</script>
+
+</body></html>
