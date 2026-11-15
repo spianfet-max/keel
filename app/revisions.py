@@ -184,9 +184,22 @@ def _from_page(t: str) -> dict | None:
     return parse_page(t, r.text)
 
 
+# Yahoo has no analyst estimates for Tokyo listings; the companies with a US-listed ADR are read through it
+# (estimates per ADR in USD, so a yen move between dates can colour the revision a little).
+ADR = {"7203.T": "TM", "7267.T": "HMC", "6758.T": "SONY", "8306.T": "MUFG", "8316.T": "SMFG", "8411.T": "MFG",
+       "4502.T": "TAK", "8604.T": "NMR", "8591.T": "IX"}
+
+
 def fetch_trend(t: str) -> dict | None:
     """EPS trend for one company: Yahoo's quoteSummary API through yfinance (cookie + crumb); when Yahoo
     refuses the crumb from this server, the public analysis page instead."""
+    if t.endswith(".T"):
+        if t not in ADR:
+            return None
+        r = fetch_trend(ADR[t])
+        if r:
+            r["t"], r["via"] = t, ADR[t]
+        return r
     if not _API_BROKEN["v"]:
         try:
             import yfinance as yf  # noqa: PLC0415
@@ -247,7 +260,8 @@ def company(rec: dict, today: date | None = None) -> dict:
             "r1m": _chg(fw[0], fw[2]), "r2m": _chg(fw[0], fw[3]), "r3m": _chg(fw[0], fw[4]),
             # change within each window, newest first: 0-1w, 1-4w, 4-9w, 9-13w
             "seg": [_chg(fw[0], fw[1]), _chg(fw[1], fw[2]), _chg(fw[2], fw[3]), _chg(fw[3], fw[4])],
-            "up": up, "dn": dn, "n": max(rec.get("fy0_n") or 0, rec.get("fy1_n") or 0) or None}
+            "up": up, "dn": dn, "n": max(rec.get("fy0_n") or 0, rec.get("fy1_n") or 0) or None,
+            "via": rec.get("via")}
 
 
 FLAT = 0.001  # a change smaller than 0.1% counts as unchanged
@@ -295,18 +309,23 @@ def build(records: dict[str, dict | None], today: date | None = None) -> dict:
     for k, (en, ja, kind, ts) in GROUPS.items():
         g = group_stats([cos[t] for t in ts if t in cos])
         if g:
-            groups[k] = {"name": en, "ja": ja, "kind": kind, "members": [t for t in ts if t in cos], **g}
+            groups[k] = {"name": en, "ja": ja, "kind": kind, "members": [t for t in ts if t in cos],
+                         "of": len(ts), **g}
     world = [t for k, v in GROUPS.items() if v[2] == "sector" for t in v[3]]
     world = list(dict.fromkeys(world))
+    every = list(dict.fromkeys(t for v in GROUPS.values() for t in v[3]))
     for rk, (en, ja) in REGIONS.items():
-        g = group_stats([cos[t] for t in world if t in cos and cos[t]["region"] == rk])
+        pool = every if rk == "JP" else world  # Japan: every Japanese company with estimates, from any basket
+        g = group_stats([cos[t] for t in pool if t in cos and cos[t]["region"] == rk])
         if g:
             groups["reg_" + rk] = {"name": en, "ja": ja, "kind": "region", **g}
     g = group_stats([cos[t] for t in world if t in cos])
     if g:
         groups["world"] = {"name": "World (all baskets)", "ja": "世界（全バスケット）", "kind": "region", **g}
     return {"asof": str(today or date.today()), "groups": groups, "companies": cos,
-            "missing": [t for t, r in records.items() if not r]}
+            "missing": [t for t, r in records.items() if not r],
+            "note": "Yahoo has no analyst estimates for Tokyo listings: Japanese companies come through their US ADRs "
+                    "where one exists (Toyota, Honda, Sony, MUFG, SMFG, Mizuho, Takeda, Nomura, Orix)."}
 
 
 # ------------------------------------------------------------------ cache + background fetch
@@ -340,7 +359,7 @@ def _run(fetch=fetch_trend, workers: int = 4):
             for t, r in zip(ts[1:], ex.map(one, ts[1:])):
                 recs[t] = r
         data = build(recs)
-        if len(data["companies"]) < len(ts) * 0.3:
+        if len(data["companies"]) < 40:
             sample = "; ".join(f"{k}: {v}" for k, v in list(errs.items())[:3])
             raise RuntimeError(f"only {len(data['companies'])} of {len(ts)} companies answered. First errors: {sample}")
         with _LOCK:

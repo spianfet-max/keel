@@ -8,3 +8,8 @@ for name,key in [('carry','fxcarry'),('brief','brief'),('barrier','sp'),('arcade
     s=open(p).read().replace('/*CORE_CSS*/',css).replace('/*CORE_JS*/',js)
     if key: s=s.replace('/*SAMPLE*/',json.dumps(S[key],separators=(',',':')))
     open(f'dist/{name}.html','w').write(s); print(name,len(s))
+
+# Rineichen is self-contained (its own core); its 20-year weekly sample lives in its own file.
+if os.path.exists('rineichen.src.html'):
+    s=open('rineichen.src.html').read().replace('/*SAMPLE*/',open('rineichen.sample.json').read().strip())
+    open('dist/rineichen.html','w').write(s); print('rineichen',len(s))
