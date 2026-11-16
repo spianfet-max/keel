@@ -560,6 +560,12 @@ def build(key: str, src) -> dict:
         en, ja = PILLAR_META[k]
         out_p.append({"key": k, "name": en, "ja": ja, "w": DEFAULT_W[k], "score": round(float(p["score"]), 3),
                       "text": p["en"], "text_ja": p["ja"], "metrics": p.get("metrics"), "chart": p.get("chart")})
+    ccy = {"N225": "JPY", "JGB10": "JPY", "SX5E": "EUR"}.get(key, "USD")
+    cash = {}
+    for cc in ([a.base, a.quote] if a.cls == "fx" else [ccy]):
+        r = src.rate(cc)
+        if r is not None:
+            cash[cc] = round(float(r.iloc[-1]), 3)
     carry_ann = None
     c = pillars.get("carry")
     if c:
@@ -568,7 +574,7 @@ def build(key: str, src) -> dict:
     return {
         "key": key, "name": a.name, "ja": a.ja, "cls": a.cls, "unit": a.unit, "decimals": a.decimals,
         "base": a.base, "quote": a.quote, "sym": a.sym,
-        "stats": stats, "carry_ann": carry_ann,
+        "stats": stats, "carry_ann": carry_ann, "ccy": a.quote if a.cls == "fx" else ccy, "cash": cash,
         "px": pts(x, nd=a.decimals + 3),
         "pillars": out_p, "fair_value": fv, "analogues": analogues(x, a),
         "missing": [k for k, p in pillars.items() if p is None],
