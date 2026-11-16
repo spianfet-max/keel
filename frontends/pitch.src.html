@@ -1,0 +1,377 @@
+<title>Pitch</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@300;400;500;600&family=Noto+Sans+JP:wght@300;400&display=swap">
+<style>
+/*CORE_CSS*/
+/* Pitch: a view turned into a one-page note. Red = your view and what supports it working,
+   steel = the neutral reference (random walk, all past weeks), green/red chips = supports/against. */
+.app{padding-left:max(20px,env(safe-area-inset-left,0px));padding-right:max(20px,env(safe-area-inset-right,0px))}
+@media (max-width:480px){.app{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}}
+.ctl{display:flex;flex-direction:column;gap:5px;min-width:0}
+select#asset{min-width:210px}
+input.lv{width:110px;text-align:right}
+.thesis{font-size:22px;font-weight:300;line-height:1.4;margin:6px 0 0;max-width:62ch;text-wrap:pretty}
+.thesis b{font-weight:500}.thesis .r{color:var(--red)}
+.head{display:grid;grid-template-columns:minmax(0,1fr) 260px;gap:28px;align-items:start}
+@media (max-width:860px){.head{grid-template-columns:minmax(0,1fr)}}
+.gauge{border:1px solid var(--line);padding:14px 16px;background:var(--card)}
+.gauge .n{font-size:46px;font-weight:300;line-height:1;font-variant-numeric:tabular-nums}
+.gauge .n small{font-size:16px;color:var(--mute)}
+.gauge .bar{height:8px;background:linear-gradient(90deg,var(--neg),var(--track) 50%,var(--pos));position:relative;margin:10px 0 6px}
+.gauge .bar i{position:absolute;top:-4px;width:3px;height:16px;background:var(--ink);transform:translateX(-1px)}
+.gauge .lab{font-size:12.5px;color:var(--mute);line-height:1.45}
+.vchip{display:inline-block;font-size:11.5px;padding:2px 8px;border:1px solid currentColor;white-space:nowrap}
+.vchip.s{color:var(--pos)}.vchip.a{color:var(--neg)}.vchip.n{color:var(--mute)}
+table.pt td,table.pt th{text-align:left;vertical-align:top;padding:9px 8px;white-space:normal}
+table.pt td.nw,table.pt th.nw{white-space:nowrap}
+table.pt td.txt{font-size:13px;line-height:1.45;min-width:260px;max-width:520px}
+.sbar{display:inline-block;width:110px;height:10px;background:var(--track);position:relative;vertical-align:middle}
+.sbar::after{content:"";position:absolute;left:50%;top:-3px;bottom:-3px;width:1px;background:var(--rule)}
+.sbar i{position:absolute;top:0;bottom:0}
+.wseg button{min-height:26px;padding:0 7px;font-size:12px}
+.grid3{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:22px 28px}
+.grid3 h3{font-size:13px;font-weight:500;margin:0 0 2px;display:flex;gap:8px;align-items:center;justify-content:space-between}
+.grid3 p{margin:0 0 4px;font-size:12px;color:var(--mute);line-height:1.4}
+.scn{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0;border-block:1px solid var(--line)}
+@media (max-width:760px){.scn{grid-template-columns:minmax(0,1fr)}}
+.scn>div{padding:14px 16px 14px 0;display:flex;flex-direction:column;gap:5px;min-width:0}
+.scn>div+div{padding-left:16px;border-left:1px solid var(--line)}
+@media (max-width:760px){.scn>div+div{border-left:0;padding-left:0;border-top:1px solid var(--line)}}
+.scn .k{font-size:12px;letter-spacing:.04em;text-transform:uppercase;color:var(--mute)}
+.scn .p{font-size:34px;font-weight:300;font-variant-numeric:tabular-nums;line-height:1}
+.scn .p small{font-size:14px;color:var(--mute)}
+.scn .l{font-size:14px}
+.scn .t{font-size:12.5px;color:var(--mute);line-height:1.45}
+.wrong{margin:10px 0 0;padding-left:18px;font-size:13px;line-height:1.55;max-width:90ch}
+table.it td,table.it th{padding:7px 8px;text-align:right;white-space:nowrap}
+table.it td:first-child,table.it th:first-child{text-align:left}
+table.it td.d{text-align:left;white-space:normal;min-width:220px;max-width:380px;font-size:12.5px;color:var(--mute)}
+table.at td,table.at th{padding:6px 8px;text-align:right;white-space:nowrap}
+table.at td:first-child,table.at th:first-child{text-align:left}
+.saved{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.saved .chip{display:inline-flex;align-items:center;border:1px solid var(--line);background:var(--card);font-size:12.5px}
+.saved .chip button{border:0;background:none;padding:4px 9px;color:var(--ink)}
+.saved .chip button.x{color:var(--mute);padding:4px 8px 4px 2px}
+.dirhint{font-size:11.5px;color:var(--mute)}
+svg.ch .lab{fill:var(--ink);font-size:12px}
+.copyok{font-size:12px;color:var(--pos);margin-left:8px}
+</style>
+
+<div class="app">
+  <header class="top">
+    <div class="brand"><h1 data-ja="ピッチ">Pitch</h1><span data-ja="相場観を、根拠・定量分析・シナリオ・実行方法まで1ページの提案に">A market view turned into a one-page pitch: the evidence for and against, the numbers, the scenarios and how to put it on</span></div>
+    <div class="tright">
+      <span class="pill busy" id="status"><i></i></span>
+      <button class="btn q" id="copyBtn" data-ja="要約をコピー">Copy summary</button><span class="copyok" id="copyOk"></span>
+      <button class="btn q" id="refresh" data-ja="更新">Refresh</button>
+      <button class="btn q" id="themeBtn">Dark</button>
+      <div class="seg" id="langSeg"><button data-l="en">EN</button><button data-l="ja">日本語</button></div>
+    </div>
+  </header>
+  <div class="banner" id="banner" hidden></div>
+  <div class="help" id="how" hidden></div>
+
+  <div class="bar">
+    <div class="ctl"><label class="lbl" for="asset" data-ja="資産">Asset</label><select id="asset"></select></div>
+    <div class="ctl"><span class="lbl" data-ja="見方">View</span><div class="seg" id="dirSeg"><button data-v="1" id="bullB">Bullish</button><button data-v="-1" id="bearB">Bearish</button></div><span class="dirhint" id="dirHint"></span></div>
+    <div class="ctl"><span class="lbl" data-ja="期間">Horizon</span><div class="seg" id="hSeg"><button data-v="4" data-ja="1か月">1 month</button><button data-v="13" data-ja="3か月">3 months</button><button data-v="26" data-ja="6か月">6 months</button><button data-v="52" data-ja="12か月">12 months</button></div></div>
+    <div class="ctl"><label class="lbl" for="tgt" data-ja="目標">Target</label><input type="number" step="any" class="lv" id="tgt"></div>
+    <div class="ctl"><label class="lbl" for="stp" data-ja="ストップ">Stop</label><input type="number" step="any" class="lv" id="stp"></div>
+    <div class="ctl"><span class="lbl" data-ja="保存したビュー">Saved views</span><div class="saved"><button class="btn q" id="saveBtn" data-ja="このビューを保存">Save this view</button><span id="savedList" class="saved"></span></div></div>
+  </div>
+
+  <!-- 1. HEADLINE -->
+  <section class="sec">
+    <div class="head">
+      <div style="min-width:0"><p class="lbl" id="asof"></p><h2 class="thesis" id="thesis"></h2></div>
+      <div class="gauge" id="gauge"></div>
+    </div>
+  </section>
+  <section class="kpis" id="kpis"></section>
+
+  <!-- 2. THE CASE -->
+  <section class="sec">
+    <div class="sh"><h2 data-ja="根拠：柱ごとの評価">The case, pillar by pillar</h2><p id="caseSub"></p></div>
+    <div class="tw"><table class="pt" id="pT"></table></div>
+  </section>
+  <section class="sec">
+    <div class="sh"><h2 data-ja="柱ごとのチャート">The charts behind each pillar</h2><p data-ja="直近の推移。各チャートの評価は上の表と同じ。">Recent history behind each verdict.</p></div>
+    <div class="grid3" id="pCharts"></div>
+  </section>
+
+  <!-- 3. QUANT -->
+  <section class="sec two">
+    <div style="min-width:0"><div class="sh"><h2 id="fvH"></h2><p id="fvSub"></p></div><svg class="ch" id="fvC" height="240"></svg><div class="leg" id="fvLeg"></div></div>
+    <div style="min-width:0"><div class="sh"><h2 data-ja="過去の類似局面">Historical analogues</h2><p id="anSub"></p></div><svg class="ch" id="anC" height="240"></svg><div class="leg" id="anLeg"></div></div>
+  </section>
+  <section class="sec">
+    <div class="sh"><h2 data-ja="類似局面のその後">What followed the analogues</h2><p id="atSub"></p></div>
+    <div class="tw"><table class="at" id="aT"></table></div>
+  </section>
+
+  <!-- 4. SCENARIOS -->
+  <section class="sec">
+    <div class="sh"><h2 data-ja="シナリオ">Scenarios</h2><p id="fanSub"></p></div>
+    <svg class="ch" id="fanC" height="280"></svg><div class="leg" id="fanLeg"></div>
+  </section>
+  <section class="sec">
+    <div class="scn" id="scn"></div>
+    <div class="sh" style="margin-top:16px"><h2 data-ja="見方が間違っていると分かるのは">What would prove the view wrong</h2></div>
+    <ul class="wrong" id="wrong"></ul>
+  </section>
+
+  <!-- 5. HOW TO EXPRESS IT -->
+  <section class="sec">
+    <div class="sh"><h2 data-ja="実行方法">How to put it on</h2><p id="itSub"></p></div>
+    <div class="tw"><table class="it" id="iT"></table></div>
+  </section>
+
+  <p class="note" id="method"></p>
+</div>
+
+<script>
+/*CORE_JS*/
+const SAMPLE=/*SAMPLE*/;
+const CLS=[['fx','FX','為替'],['rates','Rates (bonds)','金利（債券）'],['equity','Equities','株式'],['commodity','Commodities','商品'],['crypto','Crypto','暗号資産']];
+const HLAB={4:['1 month','1か月'],13:['3 months','3か月'],26:['6 months','6か月'],52:['12 months','12か月']};
+const WOPT=[[0,'Off','除外'],[0.5,'½','½'],[1,'1×','1×'],[2,'2×','2×']];
+let S={asset:'USDJPY',dir:1,h:13,tgt:{},stp:{},w:{},saved:[]};
+try{const s=JSON.parse(localStorage.getItem('keel-pitch')||'null');if(s)S={...S,...s}}catch(e){}
+const save=()=>{try{localStorage.setItem('keel-pitch',JSON.stringify(S))}catch(e){}};
+const DATA={},LIVE={};
+const SAMP=SAMPLE.assets||{};
+const uni=()=>Object.values(SAMP).map(p=>({key:p.key,name:p.name,ja:p.ja,cls:p.cls}));
+const P=()=>DATA[S.asset]||SAMP[S.asset];
+const nmA=p=>JA()?p.ja:p.name;
+const C=()=>({red:cssv('--red'),steel:cssv('--steel'),mute:cssv('--mute'),pos:cssv('--pos'),neg:cssv('--neg'),gold:cssv('--gold'),ink:cssv('--ink'),line:cssv('--line'),a5:cssv('--a5')});
+
+/* ---------- units: levels vs moves (moves are in the LONG position's terms: % for prices, bp for bonds) ---------- */
+const isY=p=>p.unit==='yield';
+const mvOf=(p,L)=>isY(p)?-(L-p.stats.spot)*100:Math.log(L/p.stats.spot)*100;
+const lvOf=(p,m)=>isY(p)?p.stats.spot-m/100:p.stats.spot*Math.exp(m/100);
+const fL=(p,L)=>L==null||!isFinite(L)?'—':isY(p)?num(L,3)+'%':num(L,p.decimals);
+const fM=(p,m,d)=>m==null||!isFinite(m)?'—':isY(p)?((m>0?'+':m<0?'−':'')+Math.abs(m).toFixed(0)+'bp'):pct(m,d??1);
+const sigH=(p,h)=>(p.stats.vol52||p.stats.vol5y||10)*Math.sqrt(h/52);
+function levels(p){const sh=sigH(p,S.h);
+  const dT=lvOf(p,S.dir*sh),dS=lvOf(p,-S.dir*0.6*sh);
+  const t=S.tgt[p.key],s=S.stp[p.key];
+  return{tgt:t!=null&&isFinite(t)?t:dT,stp:s!=null&&isFinite(s)?s:dS,dT,dS,custom:t!=null||s!=null}}
+
+/* ---------- conviction ---------- */
+const wOf=k=>S.w[k]??1;
+function scored(p){return p.pillars.map(x=>{const s=x.score*S.dir;return{...x,s,v:s>0.2?'s':s<-0.2?'a':'n',ww:x.w*wOf(x.key)}})}
+function conviction(p){const ps=scored(p).filter(x=>x.ww>0);const sw=ps.reduce((a,x)=>a+x.ww,0);const s=sw?ps.reduce((a,x)=>a+x.ww*x.s,0)/sw:0;return{s,c:5+5*s,ps}}
+
+/* ---------- Monte Carlo fan (random walk at realised vol, seeded so numbers are stable) ---------- */
+function rng(seed){return()=>{seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+function mc(p,h,tgtM,stpM){const R=rng(7),n=3000,sd=(p.stats.vol52||10)/Math.sqrt(52);const ends=new Float64Array(n),byW=Array.from({length:h},()=>new Float64Array(n));let hitT=0,hitS=0;
+  for(let i=0;i<n;i++){let m=0,done=0;for(let w=0;w<h;w++){let u=0;for(let k=0;k<6;k++)u+=R();m+=(u-3)*Math.SQRT2*sd;byW[w][i]=m;
+      if(!done){if(S.dir*m>=tgtM){hitT++;done=1}else if(S.dir*m<=stpM){hitS++;done=1}}}ends[i]=m}
+  const q=(arr,f)=>{const a=Array.from(arr).sort((x,y)=>x-y);return f.map(z=>a[Math.min(a.length-1,Math.floor(z*a.length))])};
+  const fan=byW.map(a=>q(a,[.1,.25,.5,.75,.9]));
+  return{ends,fan,pT:hitT/n,pS:hitS/n,q:q(ends,[.1,.25,.5,.75,.9])}}
+const share=(arr,f)=>arr.length?arr.filter(f).length/arr.length:null;
+
+/* ---------- pillar charts ---------- */
+const ptsOf=o=>o.d.map((d,i)=>({x:+new Date(d+'T00:00:00'),y:o.v[i]}));
+function bars(svg,lab,vals,o={}){const w=W(svg),h=o.h||170,m={l:40,r:8,t:10,b:22},n=vals.length;if(!n){svg.innerHTML='';return}
+  const lo=Math.min(0,...vals),hi=Math.max(0,...vals),yt=niceTicks(lo,hi,3),y0=yt[0],y1=yt[yt.length-1],Y=v=>m.t+(1-(v-y0)/(y1-y0||1))*(h-m.t-m.b),bw=(w-m.l-m.r)/n;let g='';
+  yt.forEach(v=>g+=`<line class="grd" x1="${m.l}" x2="${w-m.r}" y1="${Y(v)}" y2="${Y(v)}"/><text x="${m.l-5}" y="${Y(v)+4}" text-anchor="end">${o.yf?o.yf(v):num(v,0)}</text>`);
+  vals.forEach((v,i)=>{const x=m.l+i*bw,y=Math.min(Y(v),Y(0)),hh=Math.abs(Y(v)-Y(0));g+=`<rect x="${(x+bw*.12).toFixed(1)}" y="${y.toFixed(1)}" width="${Math.max(.8,bw*.76).toFixed(1)}" height="${hh.toFixed(1)}" fill="${o.hl&&o.hl(i)?'var(--red)':v>=0?'var(--steel)':'var(--a5)'}"/>`;
+    if(lab[i]&&(n<=14||i%Math.ceil(n/8)===0))g+=`<text x="${x+bw/2}" y="${h-7}" text-anchor="middle">${esc(lab[i])}</text>`});
+  g+=`<line class="ax" x1="${m.l}" x2="${w-m.r}" y1="${Y(0)}" y2="${Y(0)}"/>`;
+  svg.setAttribute('viewBox',`0 0 ${w} ${h}`);svg.setAttribute('height',h);svg.innerHTML=g;
+  svg.onmousemove=ev=>{const b=svg.getBoundingClientRect(),x=(ev.clientX-b.left)*w/b.width,i=Math.floor((x-m.l)/bw);if(i<0||i>=n){tip(null);return}tip(`<div class="m">${esc(lab[i]||'')}</div><b>${o.tf?o.tf(vals[i]):num(vals[i],1)}</b>`,ev)};svg.onmouseleave=()=>tip(null)}
+function pillarChart(svg,x,p){const c=C(),ch=x.chart;svg.innerHTML='';if(!ch)return false;
+  if(ch.kind==='price_ma'){lineChart(svg,[{name:isY(p)?T('Yield','利回り'):T('Price','価格'),color:c.steel,width:1.4,pts:ptsOf(ch.px)},{name:T('40-week average','40週平均'),color:c.red,dash:true,width:1.3,pts:ptsOf(ch.ma)}],{h:170,xType:'date',yFmt:v=>isY(p)?num(v,2):px(v)});return true}
+  if(ch.kind==='line'||ch.kind==='dual'){const ser=ch.kind==='dual'?[{name:JA()?ch.drv_ja:ch.drv_name,color:c.red,width:1.4,pts:ptsOf(ch.drv)}]:(ch.series||[]).map((s,i)=>({name:JA()?s.ja:s.name,color:[c.red,c.steel,c.gold][i%3],width:1.4,pts:ptsOf(s)}));
+    lineChart(svg,ser,{h:170,xType:'date',zero:true});return true}
+  if(ch.kind==='bars'){const s=ch.series[0];bars(svg,s.d.map(d=>d.slice(2,7)),s.v,{yf:v=>num(v/10000,1),tf:v=>T('¥','¥')+num(v/10000,2)+T('tn','兆円')});return true}
+  if(ch.kind==='months'){const ms=x.metrics.months||{},nx=x.metrics.next3||[];const lab=Array.from({length:12},(_,i)=>JA()?(i+1)+'月':new Date(2000,i,1).toLocaleDateString('en-GB',{month:'short'}));
+    bars(svg,lab,Array.from({length:12},(_,i)=>(ms[i+1]?.mean||0)*S.dir),{hl:i=>nx.includes(i+1),yf:v=>isY(p)?num(v,0):num(v,1),tf:v=>fM(p,v,2)});return true}
+  return false}
+
+/* ---------- render ---------- */
+function render(){const p=P();if(!p)return;const c=C();
+  /* controls */
+  $('#asset').value=S.asset;
+  $$('#dirSeg button').forEach(b=>b.classList.toggle('on',+b.dataset.v===S.dir));
+  $$('#hSeg button').forEach(b=>b.classList.toggle('on',+b.dataset.v===S.h));
+  $('#bullB').textContent=T('Bullish','強気');$('#bearB').textContent=T('Bearish','弱気');
+  $('#dirHint').textContent=isY(p)?T('Bullish bonds = yields down','債券強気＝利回り低下'):p.cls==='fx'?T(`Bullish = ${p.base} up against ${p.quote}`,`強気＝${p.base}高・${p.quote}安`):'';
+  const L=levels(p),tM=S.dir*mvOf(p,L.tgt),sM=S.dir*mvOf(p,L.stp);
+  const ti=$('#tgt'),si=$('#stp');ti.placeholder=fL(p,L.dT).replace('%','');si.placeholder=fL(p,L.dS).replace('%','');
+  if(document.activeElement!==ti)ti.value=S.tgt[p.key]??'';if(document.activeElement!==si)si.value=S.stp[p.key]??'';
+  renderSaved();
+  const st=p.stats,conv=conviction(p),ps=conv.ps,sup=ps.filter(x=>x.v==='s').sort((a,b)=>b.s*b.ww-a.s*a.ww),ag=ps.filter(x=>x.v==='a').sort((a,b)=>a.s*a.ww-b.s*b.ww);
+  const m=mc(p,S.h,tM,sM),an=p.analogues,af=(an&&an.fwd[S.h]||[]).map(v=>v*S.dir);
+  const dirW=S.dir>0?T('Bullish','強気'):T('Bearish','弱気'),hz=T(HLAB[S.h][0],HLAB[S.h][1]);
+  /* headline */
+  $('#asof').textContent=T(`${nmA(p)} · ${fL(p,st.spot)} on ${fdate(st.asof)} · ${LIVE[p.key]?'live':'sample'} data`,`${nmA(p)} · ${fdate(st.asof)}時点 ${fL(p,st.spot)} · ${LIVE[p.key]?'ライブ':'サンプル'}データ`);
+  const pn=x=>JA()?x.ja:x.name.toLowerCase();
+  const fv=p.fair_value;
+  const fvTxt=fv?T(` Fair value on the rate spread is ${fL(p,fv.fair)}, so spot is ${Math.abs(fv.z).toFixed(1)} sd ${fv.z>0?'rich':'cheap'}.`,` 金利差によるフェアバリューは${fL(p,fv.fair)}、スポットは${Math.abs(fv.z).toFixed(1)}sd${fv.z>0?'割高':'割安'}。`):'';
+  const flip=(p.pillars.find(x=>x.key==='trend')||{}).metrics?.flips;
+  $('#thesis').innerHTML=T(`<b class="r">${dirW} ${esc(nmA(p))}, ${hz}.</b> ${sup.length} of ${ps.length} pillars support it${sup.length?', led by '+sup.slice(0,2).map(pn).join(' and '):''}${ag.length?`; ${ag.slice(0,2).map(pn).join(' and ')} argue${ag.length===1&&ag[0]?'s':''} against`:''}.${fvTxt}${flip?` The trend turns ${S.dir>0?'down below':'up above'} ${fL(p,flip.ma40)} (40-week average).`:''}`,
+    `<b class="r">${esc(nmA(p))}に${dirW}、${hz}。</b>${ps.length}本の柱のうち${sup.length}本が支持${sup.length?'（主に'+sup.slice(0,2).map(pn).join('・')+'）':''}${ag.length?`、${ag.slice(0,2).map(pn).join('・')}は逆風`:''}。${fvTxt}${flip?`トレンドは${fL(p,flip.ma40)}（40週平均）を${S.dir>0?'下回る':'上回る'}と転換。`:''}`);
+  const cl=conv.c;
+  $('#gauge').innerHTML=`<span class="lbl">${T('Conviction','確信度')}</span><div class="n">${cl.toFixed(1)}<small> / 10</small></div><div class="bar"><i style="left:${cl*10}%"></i></div><div class="lab">${cl>=6.5?T('Well supported by the evidence','根拠が十分に支持'):cl>=4?T('Mixed evidence','根拠はまちまち'):T('The evidence argues against it','根拠は逆を示唆')}. ${T('Weighted average of the pillars below; change the weights to tilt it.','下の柱の加重平均。ウェイトで調整できます。')}</div>`;
+  const rng68=[lvOf(p,-sigH(p,S.h)),lvOf(p,sigH(p,S.h))].sort((a,b)=>a-b);
+  const carryH=p.cls==='fx'&&p.carry_ann!=null?p.carry_ann*S.dir*S.h/52:null;
+  const kp=[[T('Spot','スポット'),fL(p,st.spot),T(`1m ${fM(p,st.chg?.['1m'])} · YTD ${fM(p,st.ytd)} · 1y ${fM(p,st.chg?.['1y'])}`,`1か月 ${fM(p,st.chg?.['1m'])}・年初来 ${fM(p,st.ytd)}・1年 ${fM(p,st.chg?.['1y'])}`)],
+    [T(`Likely range, ${hz}`,`想定レンジ（${hz}）`),`${fL(p,rng68[0])}–${fL(p,rng68[1])}`,T(`two in three outcomes at ${isY(p)?num(st.vol52,0)+'bp':num(st.vol52,1)+'%'} a year of volatility`,`年${isY(p)?num(st.vol52,0)+'bp':num(st.vol52,1)+'%'}のボラで3回に2回の範囲`)],
+    [T('Target before stop','ストップより先に目標'),Math.round(m.pT*100)+'<small>%</small>',T(`target ${fL(p,L.tgt)} · stop ${fL(p,L.stp)}${L.custom?'':' (defaults)'}; stop first ${Math.round(m.pS*100)}%`,`目標${fL(p,L.tgt)}・ストップ${fL(p,L.stp)}${L.custom?'':'（既定値）'}、先にストップ${Math.round(m.pS*100)}%`)],
+    [T('Analogues positive','類似局面の勝率'),af.length?Math.round(share(af,v=>v>0)*100)+'<small>%</small>':'—',af.length?T(`of ${af.length} similar past weeks after ${hz}; all weeks ${Math.round((S.dir>0?an.all[S.h].hit:1-an.all[S.h].hit)*100)}%`,`${af.length}件の類似局面の${hz}後、全期間${Math.round((S.dir>0?an.all[S.h].hit:1-an.all[S.h].hit)*100)}%`):''],
+    ...(carryH!=null?[[T(`Carry over ${hz}`,`${hz}のキャリー`),pct(carryH,2),T(carryH>=0?'earned while you wait':'paid while you wait',carryH>=0?'待つ間に受取':'待つ間に支払')]]:[])];
+  $('#kpis').innerHTML=kp.map(([l,v,s])=>`<div class="kpi"><span class="lbl">${l}</span><span class="v">${v}</span><span class="s">${s}</span></div>`).join('');
+  /* the case */
+  $('#caseSub').textContent=T(`Each pillar is scored from −1 to +1 for a ${S.dir>0?'long':'short'} position. Weights start at Keel's defaults; tilt them with your own judgement (saved in this browser).`,`各柱を${S.dir>0?'買い':'売り'}ポジションの観点で−1〜+1で評価。ウェイトはKeelの既定値から、ご自身の判断で調整できます（このブラウザに保存）。`);
+  const order=[...ps].sort((a,b)=>b.ww*Math.abs(b.s)-a.ww*Math.abs(a.s));
+  const vlab={s:T('Supports','支持'),a:T('Against','逆風'),n:T('Neutral','中立')};
+  $('#pT').innerHTML=`<thead><tr><th>${T('Pillar','柱')}</th><th>${T('Verdict','評価')}</th><th class="nw">${T('Score','スコア')}</th><th>${T('Weight','ウェイト')}</th><th>${T('Evidence','根拠')}</th></tr></thead><tbody>${scored(p).sort((a,b)=>order.indexOf(order.find(o=>o.key===a.key))-order.indexOf(order.find(o=>o.key===b.key))).map(x=>{const w=Math.abs(x.s)*50,col=x.s>=0?'var(--pos)':'var(--neg)';
+    return`<tr><td class="nw"><b style="font-weight:500">${esc(JA()?x.ja:x.name)}</b></td><td class="nw"><span class="vchip ${x.v}">${vlab[x.v]}</span></td><td class="nw"><span class="sbar"><i style="${x.s>=0?'left:50%':'right:50%'};width:${w}%;background:${col}"></i></span> <span style="font-variant-numeric:tabular-nums">${x.s>=0?'+':'−'}${Math.abs(x.s).toFixed(2)}</span></td>
+    <td class="nw"><div class="seg wseg" data-k="${x.key}">${WOPT.map(o=>`<button data-w="${o[0]}" class="${wOf(x.key)===o[0]?'on':''}">${JA()?o[2]:o[1]}</button>`).join('')}</div></td><td class="txt">${esc(JA()?x.text_ja:x.text)}</td></tr>`}).join('')}</tbody>`;
+  $$('#pT .wseg button').forEach(b=>b.onclick=()=>{S.w[b.parentNode.dataset.k]=+b.dataset.w;save();render()});
+  if(p.missing&&p.missing.length)$('#caseSub').textContent+=' '+T(`Not available for this asset: ${p.missing.map(k=>k).join(', ')}.`,`この資産では対象外：${p.missing.join('、')}。`);
+  const pc=$('#pCharts');pc.innerHTML='';
+  order.forEach(x=>{const d=document.createElement('div');d.style.minWidth='0';d.innerHTML=`<h3><span>${esc(JA()?x.ja:x.name)}</span><span class="vchip ${x.v}">${vlab[x.v]}</span></h3><p>${esc(JA()?x.text_ja:x.text)}</p><svg class="ch"></svg>`;pc.appendChild(d);
+    if(!pillarChart(d.querySelector('svg'),x,p))d.querySelector('svg').remove()});
+  /* fair value */
+  if(fv){$('#fvH').textContent=T('Fair value: spot against the rate spread','フェアバリュー：金利差とスポット');
+    $('#fvSub').textContent=T(`Spot regressed on the ${fv.driver} over the last ${fv.weeks} weeks (R² ${num(fv.r2,2)}; ${num(fv.beta_per_100bp*100,1)}% per 1pt of spread). Fair value ${fL(p,fv.fair)}; spot ${fv.z>0?'above':'below'} by ${Math.abs(fv.z).toFixed(1)} sd${(fv.z>0)===(S.dir>0)?T(', which leans against the view',''):', which leans with the view'}.`,`直近${fv.weeks}週の${fv.ja}にスポットを回帰（R² ${num(fv.r2,2)}、金利差1ptあたり${num(fv.beta_per_100bp*100,1)}%）。フェアバリュー${fL(p,fv.fair)}、スポットは${Math.abs(fv.z).toFixed(1)}sd${fv.z>0?'上':'下'}${(fv.z>0)===(S.dir>0)?'（見方には逆風）':'（見方に追い風）'}。`);
+    lineChart($('#fvC'),[{name:T('Spot','スポット'),color:c.steel,width:1.5,pts:ptsOf(fv.spot_series)},{name:T('Fair value from the spread','金利差によるフェアバリュー'),color:c.red,width:1.5,dash:true,pts:ptsOf(fv.fair_series)}],{h:240,xType:'date',yFmt:v=>px(v)});
+    legend($('#fvLeg'),[{name:T('Spot','スポット'),color:c.steel},{name:T('Fair value from the spread','金利差によるフェアバリュー'),color:c.red,dash:true}])}
+  else{const vp=p.pillars.find(x=>x.key==='value');$('#fvH').textContent=T('Stretch: price against its 5-year average','乖離：5年平均との比較');
+    $('#fvSub').textContent=vp?(JA()?vp.text_ja:vp.text)+T(' Far above it, gains have tended to be harder to extend; far below, the reverse.',' 大きく上なら上昇は続きにくく、下なら逆の傾向。'):'';
+    const ch=vp&&vp.chart&&vp.chart.series&&vp.chart.series[0];if(ch){lineChart($('#fvC'),[{name:JA()?ch.ja:ch.name,color:c.red,width:1.5,area:true,pts:ptsOf(ch)}],{h:240,xType:'date',zero:true});legend($('#fvLeg'),[{name:JA()?ch.ja:ch.name,color:c.red}])}else{$('#fvC').innerHTML='';$('#fvLeg').innerHTML=''}}
+  /* analogues */
+  if(an&&an.paths&&an.paths.length){const ser=an.paths.map(pa=>({name:'',color:c.a5,width:.8,pts:pa.map((v,i)=>({x:i,y:v*S.dir}))}));
+    const med=Array.from({length:27},(_,i)=>{const a=an.paths.map(pa=>pa[i]*S.dir).sort((x,y)=>x-y);return{x:i,y:a[Math.floor(a.length/2)]}});
+    lineChart($('#anC'),[...ser,{name:T('Median','中央値'),color:c.red,width:2.2,pts:med}],{h:240,zero:true,xFmt:v=>v+T('w','週'),tipX:v=>T(`Week ${v}`,`${v}週目`),yFmt:v=>isY(p)?num(v,0):num(v,0)+'%',tipFmt:v=>fM(p,v)});
+    legend($('#anLeg'),[{name:T('Each of the 20 closest past weeks, your position’s P&L','類似20局面（あなたのポジション損益）'),color:c.a5},{name:T('Median','中央値'),color:c.red}]);
+    const f=an.features_now;$('#anSub').textContent=T(`The ${an.n} past weeks most like this one on trend (${num(f.trend,2)}), 13-week momentum (${num(f.mom13,1)} sd), stretch (${num(f.stretch,1)} sd) and volatility (${num(f.vol,2)}× normal), at least a month apart. Closest: ${an.dates.slice(0,4).map(d=>fdate(d,{month:'short',year:'numeric'})).join(', ')}.`,`トレンド（${num(f.trend,2)}）、13週モメンタム（${num(f.mom13,1)}sd）、乖離（${num(f.stretch,1)}sd）、ボラ（通常の${num(f.vol,2)}倍）が今週に最も近い過去${an.n}週（1か月以上の間隔）。最も近いのは${an.dates.slice(0,4).map(d=>fdate(d,{month:'short',year:'numeric'})).join('、')}。`);
+    $('#aT').innerHTML=`<thead><tr><th>${T('After','期間')}</th><th>${T('Analogues positive','類似局面の勝率')}</th><th>${T('Median','中央値')}</th><th>${T('Worst 10%','下位10%')}</th><th>${T('Best 10%','上位10%')}</th><th>${T('All weeks positive','全期間の勝率')}</th><th>${T('All weeks median','全期間の中央値')}</th></tr></thead><tbody>${[4,13,26,52].map(h=>{const a=(an.fwd[h]||[]).map(v=>v*S.dir).sort((x,y)=>x-y),al=an.all[h],q=f=>a.length?a[Math.min(a.length-1,Math.floor(f*a.length))]:null,hitAll=S.dir>0?al.hit:1-al.hit,medAll=al.q[2]*S.dir,hp=share(a,v=>v>0);
+      return`<tr${h===S.h?' class="hl"':''}><td>${T(HLAB[h][0],HLAB[h][1])}</td><td class="${hp>hitAll?'up':'dn'}">${hp==null?'—':Math.round(hp*100)+'%'}</td><td class="${cls(q(.5))}">${fM(p,q(.5))}</td><td>${fM(p,q(.1))}</td><td>${fM(p,q(.9))}</td><td>${Math.round(hitAll*100)}%</td><td>${fM(p,medAll)}</td></tr>`}).join('')}</tbody>`;
+    $('#atSub').textContent=T('Your position’s result after each horizon, in the analogues and in every week since 2005. Better than all weeks = the current set-up has helped this view before. Past patterns, not a forecast.','各期間後のあなたのポジションの結果（類似局面と2005年以降の全週）。全期間より良ければ、現在の状況は過去にこの見方を助けた。過去のパターンで予測ではありません。')}
+  /* fan */
+  fanChart(p,m,L);
+  const qE=S.dir;const bullP=0.5*share(Array.from(m.ends),v=>S.dir*v>=tM)+0.5*(share(af,v=>v>=tM)??share(Array.from(m.ends),v=>S.dir*v>=tM));
+  const bearP=0.5*share(Array.from(m.ends),v=>S.dir*v<=sM)+0.5*(share(af,v=>v<=sM)??share(Array.from(m.ends),v=>S.dir*v<=sM));
+  const baseP=Math.max(0,1-bullP-bearP);
+  const mid=af.filter(v=>v>sM&&v<tM).sort((a,b)=>a-b),baseM=mid.length?mid[Math.floor(mid.length/2)]:0;
+  const trig=triggers(p,ps);
+  $('#scn').innerHTML=[[T('Bull: the view works','強気：見方が当たる'),bullP,L.tgt,trig.bull],[T('Base','ベース'),baseP,lvOf(p,S.dir*baseM),trig.base],[T('Bear: the view fails','弱気：見方が外れる'),bearP,L.stp,trig.bear]].map(([k,pr,lv,t],i)=>`<div><span class="k">${k}</span><span class="p" style="color:${i===0?'var(--pos)':i===2?'var(--neg)':'var(--ink)'}">${Math.round(pr*100)}<small>%</small></span><span class="l">${i===1?T('around ','付近 '):i===0?T('at or beyond ','到達 '):T('at or beyond ','到達 ')}<b style="font-weight:500">${fL(p,lv)}</b> ${T('in','で')} ${hz} (${fM(p,S.dir*mvOf(p,lv)*S.dir*S.dir)})</span><span class="t">${t}</span></div>`).join('');
+  $('#fanSub').textContent=T(`Fan: the range of outcomes over ${hz} if the price moves at its realised volatility with no drift (10–90% and 25–75% bands). Scenario odds blend that with what followed the analogues, half each.`,`ファン：ドリフトなし・実現ボラで${hz}に動いた場合の分布（10〜90%、25〜75%帯）。シナリオ確率はこれと類似局面の結果を半々で合成。`);
+  $('#wrong').innerHTML=trig.wrong.map(x=>`<li>${x}</li>`).join('');
+  /* implementation */
+  impl(p,L,{bull:L.tgt,base:lvOf(p,S.dir*baseM),bear:L.stp});
+  $('#method').innerHTML=T(`<b>Method.</b> Pillars, fair value and analogues come from Keel (<code>api_pitch</code>): Yahoo prices, Fed and MOF yields, OECD/BIS rates, OECD leading indicators and CPI, CFTC positioning, MOF flows, Yahoo analyst estimates. Bonds are scored as long the bond (yield down). Volatility is the last 52 weeks’ realised; option prices use it +10% as a stand-in for implied, so treat them as indications. Analogues and fans describe the past and a random walk, not a forecast. Not investment advice.`,`<b>手法。</b>柱・フェアバリュー・類似局面はKeel（<code>api_pitch</code>）から：Yahoo価格、FRB・財務省の利回り、OECD/BISの金利、OECD景気先行指数とCPI、CFTCポジション、財務省の対外証券投資、Yahooのアナリスト予想。債券は買い（利回り低下）で評価。ボラは直近52週の実現値、オプション価格はその+10%を予想ボラの代用とした目安です。類似局面とファンは過去とランダムウォークで、予測ではありません。投資助言ではありません。`);
+  window.__summary=summary(p,conv,sup,ag,m,L,bullP,baseP,bearP,fv);
+}
+function fanChart(p,m,L){const svg=$('#fanC'),c=C(),w=W(svg),h=280,mg={l:52,r:60,t:12,b:26};
+  const hist=p.px.d.slice(-52).map((d,i)=>({x:i-52+1,y:p.px.v[p.px.v.length-52+i]}));
+  const toL=v=>lvOf(p,v);const fan=m.fan.map((q,i)=>({x:i+1,q:q.map(toL)}));
+  const all=[...hist.map(o=>o.y),...fan.flatMap(f=>f.q),L.tgt,L.stp];const yt=niceTicks(Math.min(...all),Math.max(...all),5),y0=yt[0],y1=yt[yt.length-1];
+  const x0=-51,x1=S.h,X=v=>mg.l+(v-x0)/(x1-x0)*(w-mg.l-mg.r),Y=v=>mg.t+(1-(v-y0)/(y1-y0))*(h-mg.t-mg.b);let g='';
+  yt.forEach(v=>g+=`<line class="grd" x1="${mg.l}" x2="${w-mg.r}" y1="${Y(v)}" y2="${Y(v)}"/><text x="${mg.l-6}" y="${Y(v)+4}" text-anchor="end">${isY(p)?num(v,2):px(v)}</text>`);
+  const band=(a,b,op)=>{const top=fan.map(f=>`${X(f.x).toFixed(1)} ${Y(f.q[a]).toFixed(1)}`),bot=fan.map(f=>`${X(f.x).toFixed(1)} ${Y(f.q[b]).toFixed(1)}`).reverse();g+=`<path d="M${X(0)} ${Y(p.stats.spot)}L${top.join('L')}L${bot.join('L')}Z" fill="${c.steel}" fill-opacity="${op}"/>`};
+  band(0,4,.12);band(1,3,.2);
+  g+=`<path d="M${X(0)} ${Y(p.stats.spot)}L${fan.map(f=>X(f.x).toFixed(1)+' '+Y(f.q[2]).toFixed(1)).join('L')}" fill="none" stroke="${c.steel}" stroke-dasharray="4 3"/>`;
+  g+=`<path d="${hist.map((o,i)=>(i?'L':'M')+X(o.x).toFixed(1)+' '+Y(o.y).toFixed(1)).join('')}" fill="none" stroke="${c.ink}" stroke-width="1.5"/>`;
+  [[L.tgt,T('Target','目標'),c.pos],[L.stp,T('Stop','ストップ'),c.neg]].forEach(([v,lab,col])=>{g+=`<line x1="${X(0)}" x2="${w-mg.r}" y1="${Y(v)}" y2="${Y(v)}" stroke="${col}" stroke-dasharray="6 4" stroke-width="1.3"/><text x="${w-mg.r+4}" y="${Y(v)+4}" style="fill:${col}">${lab}</text>`});
+  g+=`<line class="ax" x1="${X(0)}" x2="${X(0)}" y1="${mg.t}" y2="${h-mg.b}"/><text x="${X(0)}" y="${h-8}" text-anchor="middle">${T('today','現在')}</text><text x="${X(-51)}" y="${h-8}">${T('1 year ago','1年前')}</text><text x="${X(S.h)}" y="${h-8}" text-anchor="end">+${T(HLAB[S.h][0],HLAB[S.h][1])}</text>`;
+  g+=`<line class="ax" x1="${mg.l}" x2="${w-mg.r}" y1="${h-mg.b}" y2="${h-mg.b}"/>`;
+  svg.setAttribute('viewBox',`0 0 ${w} ${h}`);svg.setAttribute('height',h);svg.innerHTML=g;
+  svg.onmousemove=ev=>{const b=svg.getBoundingClientRect(),xv=x0+((ev.clientX-b.left)*w/b.width-mg.l)/(w-mg.l-mg.r)*(x1-x0),i=Math.round(xv);
+    if(i>=1&&i<=S.h){const q=fan[i-1].q;tip(`<div class="m">+${i}${T(' weeks',' 週')}</div><div>10–90%: <b>${fL(p,q[0])}–${fL(p,q[4])}</b></div><div>25–75%: <b>${fL(p,q[1])}–${fL(p,q[3])}</b></div><div>${T('Median','中央値')} <b>${fL(p,q[2])}</b></div>`,ev)}
+    else if(i<=0&&i>=-51){const o=hist[i+51];if(o)tip(`<div class="m">${fdate(p.px.d[p.px.d.length-52+i+51])}</div><b>${fL(p,o.y)}</b>`,ev)}else tip(null)};svg.onmouseleave=()=>tip(null);
+  legend($('#fanLeg'),[{name:T('Last 52 weeks','直近52週'),color:c.ink},{name:T('Random walk at realised volatility: 25–75% and 10–90%','実現ボラのランダムウォーク：25〜75%・10〜90%'),color:c.steel},{name:T('Target and stop','目標とストップ'),color:c.pos,dash:true}])}
+
+/* scenario triggers, written from the pillars */
+const TRIG={
+ trend:{s:['the trend stays intact','トレンドが続く'],a:['the trend turns in your favour','トレンドが有利に転換'],w:f=>T(`a weekly close ${S.dir>0?'below':'above'} the 40-week average (${f})`,`40週平均（${f}）を${S.dir>0?'下回る':'上回る'}週足終値`)},
+ carry:{s:['carry keeps paying while you wait','待つ間もキャリーが入る'],a:['the carry you pay is outrun by the move','支払うキャリー以上に動く'],w:()=>T('the rate gap moving against the position','金利差がポジションに不利に動く')},
+ driver:{s:['rates keep moving your way','金利が有利に動き続ける'],a:['the rate spread turns in your favour','金利差が有利に転じる'],w:()=>T('the rate spread reversing by 25bp or more','金利差の25bp以上の反転')},
+ value:{s:['the price moves back toward fair value','フェアバリューへの回帰'],a:['momentum overrides the valuation gap','モメンタムが割高・割安を上回る'],w:()=>T('valuation becoming the story (a sharp mean reversion)','バリュエーション主導の急な平均回帰')},
+ positioning:{s:['crowded positions on the other side unwind','反対側の過密ポジションの巻き戻し'],a:['crowded positioning keeps building rather than unwinding','過密ポジションが巻き戻されず積み上がる'],w:()=>T('a positioning flush: crowded holders exiting together','過密ポジションの一斉手仕舞い')},
+ flows:{s:['flows keep supporting the move','フローが動きを支え続ける'],a:['flows turn','フローが反転'],w:()=>T('a reversal in the flows that support it','支えているフローの反転')},
+ macro:{s:['growth data keep favouring the view','景気指標が見方を支持し続ける'],a:['the leading indicators turn','景気先行指数が転換'],w:()=>T('the leading indicators turning against the view','景気先行指数が見方に逆行')},
+ seasonality:{s:['the seasonal tailwind plays out','季節的な追い風'],a:['the seasonal headwind fades','季節的な逆風が弱まる'],w:()=>''},
+ revisions:{s:['earnings estimates keep rising','業績予想の上方修正が続く'],a:['earnings revisions turn up','業績修正が上向きに転じる'],w:()=>T('earnings revisions turning negative','業績修正のマイナス転換')},
+ risk:{s:['volatility stays calm','ボラが落ち着いたまま'],a:['volatility settles / the intervention threat fades','ボラ低下・介入懸念の後退'],w:()=>T('a volatility spike or official intervention','ボラ急上昇または当局の介入')}};
+function triggers(p,ps){const sup=ps.filter(x=>x.v==='s').sort((a,b)=>b.s*b.ww-a.s*a.ww),ag=ps.filter(x=>x.v==='a').sort((a,b)=>a.s*a.ww-b.s*b.ww);
+  const tt=(k,v)=>{const t=TRIG[k];return t?T(t[v][0],t[v][1]):''};const flip=(p.pillars.find(x=>x.key==='trend')||{}).metrics?.flips;
+  const bull=[...sup.slice(0,2).map(x=>tt(x.key,'s')),...ag.slice(0,1).map(x=>tt(x.key,'a'))].filter(Boolean);
+  const bear=ag.slice(0,2).map(x=>tt(x.key,'s')).filter(Boolean);
+  const base=sup.length&&ag.length?T(`Supports and headwinds offset: ${(JA()?sup[0].ja:sup[0].name.toLowerCase())} against ${(JA()?ag[0].ja:ag[0].name.toLowerCase())}.`,`支持と逆風が相殺：${sup[0].ja}対${ag[0].ja}。`):T('No decisive push either way.','どちらにも決め手なし。');
+  const wrong=[];if(flip)wrong.push(TRIG.trend.w(fL(p,flip.ma40)));
+  ps.filter(x=>x.ww>0&&x.key!=='trend').sort((a,b)=>b.ww*Math.abs(b.s)-a.ww*Math.abs(a.s)).slice(0,4).forEach(x=>{const w=TRIG[x.key]?.w();if(w)wrong.push(w)});
+  if(p.stats)wrong.push(T(`a close beyond the stop, which a random walk at today’s volatility reaches first in roughly the share of cases shown above`,`ストップを超える終値（現在のボラのランダムウォークで上記の割合で先に到達）`));
+  const cap=s=>s?s[0].toUpperCase()+s.slice(1):s;
+  return{bull:cap(bull.join(T('; ','、')))+(bull.length?'.':''),base,bear:bear.length?T('What hurts: ','痛手：')+bear.map(s=>T('the opposite of “','「')+s+T('”','」の逆')).join(T('; ','、'))+'.':T('A broad move against the position with no single cause.','特定要因のない逆行。'),wrong}}
+
+/* ---------- implementation ---------- */
+const Ncdf=x=>{const t=1/(1+.2316419*Math.abs(x)),d=.3989423*Math.exp(-x*x/2),p=d*t*(.3193815+t*(-.3565638+t*(1.781478+t*(-1.821256+t*1.330274))));return x>0?1-p:p};
+function bs(S0,K,T,vol,rd,rf,call){if(T<=0||vol<=0)return Math.max(0,call?S0-K:K-S0);const d1=(Math.log(S0/K)+(rd-rf+vol*vol/2)*T)/(vol*Math.sqrt(T)),d2=d1-vol*Math.sqrt(T);
+  return call?S0*Math.exp(-rf*T)*Ncdf(d1)-K*Math.exp(-rd*T)*Ncdf(d2):K*Math.exp(-rd*T)*Ncdf(-d2)-S0*Math.exp(-rf*T)*Ncdf(-d1)}
+function impl(p,L,sc){const st=p.stats,Ty=S.h/52,d=S.dir,S0=st.spot,hz=T(HLAB[S.h][0],HLAB[S.h][1]);
+  const rows=[];
+  if(isY(p)){const cm=(p.pillars.find(x=>x.key==='carry')||{}).metrics;const carry=cm?cm.total_bp*Ty*d:0;
+    const pl=lv=>d*mvOf(p,lv)*1+carry;
+    rows.push([T(d>0?'Buy the bond (or bond futures)':'Sell the bond (or pay fixed)',d>0?'債券買い（または先物）':'債券売り（または固定払い）'),T('Straight exposure to the yield; carry and roll-down '+(carry>=0?'add':'cost')+` ${Math.abs(carry).toFixed(0)}bp over ${hz}.`,`利回りへの素直なエクスポージャー。${hz}のキャリーとロールダウンは${carry>=0?'+':'−'}${Math.abs(carry).toFixed(0)}bp。`),'—',fL(p,lvOf(p,-d*carry)),pl(sc.bull),pl(sc.base),pl(sc.bear),'bp']);
+    rows.push([T('Options on bond futures','債券先物オプション'),T('Not priced here: Keel has no rate volatility surface. Ask the desk.','ここでは未計算（金利ボラのデータなし）。デスクに確認。'),'—','—',null,null,null,'bp']);
+  }else{const vol=(st.vol52||15)/100*1.1;let rd,rf;
+    if(p.cls==='fx'){rd=(p.cash[p.quote]??0)/100;rf=(p.cash[p.base]??0)/100}else{rd=(Object.values(p.cash)[0]??0)/100;rf=0}
+    const carryPct=p.cls==='fx'?(rf-rd)*Ty*100*d:-(rd)*Ty*100*d*0;
+    const spot=lv=>d*Math.log(lv/S0)*100+carryPct;
+    const fwd=S0*Math.exp((rd-rf)*Ty);
+    rows.push([p.cls==='fx'?T(`${d>0?'Buy':'Sell'} ${p.base} spot / forward`,`${p.base}の${d>0?'買い':'売り'}（直物・先渡）`):T(d>0?'Buy (cash or futures)':'Sell short (futures)',d>0?'買い（現物・先物）':'売り（先物）'),
+      p.cls==='fx'?T(`Forward ${fL(p,fwd)} for ${hz}: you ${carryPct>=0?'earn':'pay'} ${Math.abs(carryPct).toFixed(2)}% carry.`,`${hz}の先渡${fL(p,fwd)}：キャリー${carryPct>=0?'受取':'支払'}${Math.abs(carryPct).toFixed(2)}%。`):T('Linear; no time decay. Futures carry the financing cost.','線形、時間価値の減少なし。先物は金利コスト込み。'),
+      '—',fL(p,p.cls==='fx'?S0*Math.exp(-carryPct/100*d):S0),spot(sc.bull),spot(sc.base),spot(sc.bear),'%']);
+    const call=d>0,prem=bs(S0,S0,Ty,vol,rd,rf,call)/S0*100,K2=L.tgt,prem2=bs(S0,K2,Ty,vol,rd,rf,call)/S0*100,net=prem-prem2;
+    const opt=lv=>Math.max(0,d*(lv-S0))/S0*100-prem,spr=lv=>Math.min(Math.max(0,d*(lv-S0)),Math.abs(K2-S0))/S0*100-net;
+    rows.push([T(`Buy an at-the-money ${call?'call':'put'}`,`ATM${call?'コール':'プット'}買い`),T(`Loss limited to the premium; needs a move beyond ${fL(p,S0*(1+d*prem/100))} to pay.`,`損失はプレミアムまで。${fL(p,S0*(1+d*prem/100))}超で利益。`),pct(prem,2,false),fL(p,S0*(1+d*prem/100)),opt(sc.bull),opt(sc.base),opt(sc.bear),'%']);
+    rows.push([T(`${call?'Call':'Put'} spread to the target`,`目標までの${call?'コール':'プット'}スプレッド`),T(`Buy at-the-money, sell at ${fL(p,K2)}: cheaper, gains capped at the target.`,`ATM買い・${fL(p,K2)}売り：安価だが目標で利益上限。`),pct(net,2,false),fL(p,S0*(1+d*net/100)),spr(sc.bull),spr(sc.base),spr(sc.bear),'%']);
+    if(d>0||p.cls==='fx'){const K=L.stp,putPrem=bs(S0,K,Ty,vol,rd,rf,!call)/S0*100,dep=p.cls==='fx'?(d>0?rf:rd):rd,yld=(dep*100)+putPrem/Ty;
+      const dcd=lv=>(d*(lv-K)>=0?yld*Ty:yld*Ty+d*(lv-K)/K*100);
+      const name=p.cls==='fx'?T(`Dual-currency deposit in ${d>0?p.base:p.quote}`,`${d>0?p.base:p.quote}建てDCD`):T('Reverse convertible / sell a put','リバースコンバーチブル（プット売り）');
+      rows.push([name,T(`Strike at the stop (${fL(p,K)}): earns about ${yld.toFixed(1)}% a year if it holds; below it you are converted at the strike.`,`ストライクはストップ（${fL(p,K)}）：維持なら年約${yld.toFixed(1)}%、超えればストライクで転換。`),T(`yield ${yld.toFixed(1)}% a.y.`,`利回り年${yld.toFixed(1)}%`),fL(p,K*(1-d*yld*Ty/100)),dcd(sc.bull),dcd(sc.base),dcd(sc.bear),'%'])}}
+  const f=(v,u)=>v==null?'—':u==='bp'?fM(p,v):pct(v,2);
+  $('#iT').innerHTML=`<thead><tr><th>${T('Instrument','商品')}</th><th style="text-align:left">${T('How it works','仕組み')}</th><th>${T('Cost','コスト')}</th><th>${T('Breakeven','損益分岐')}</th><th>${T('Bull','強気')} ${fL(p,sc.bull)}</th><th>${T('Base','ベース')} ${fL(p,sc.base)}</th><th>${T('Bear','弱気')} ${fL(p,sc.bear)}</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${esc(r[0])}</td><td class="d">${esc(r[1])}</td><td>${r[2]}</td><td>${r[3]}</td><td class="${cls(r[4])}">${f(r[4],r[7])}</td><td class="${cls(r[5])}">${f(r[5],r[7])}</td><td class="${cls(r[6])}">${f(r[6],r[7])}</td></tr>`).join('')}</tbody>`;
+  $('#itSub').textContent=T(`Result at the end of ${hz} in each scenario, % of notional (bonds: bp of yield). Option prices are indications from realised volatility +10% (Keel has no implied vols); check live prices with the desk.`,`${hz}後の各シナリオでの損益（想定元本比%、債券は利回りbp）。オプション価格は実現ボラ+10%による目安（Keelに予想ボラはありません）。実際の価格はデスクに確認してください。`)}
+
+function summary(p,conv,sup,ag,m,L,bp,bsP,beP,fv){const hz=T(HLAB[S.h][0],HLAB[S.h][1]),dirW=S.dir>0?T('Bullish','強気'):T('Bearish','弱気');
+  const line=x=>`- ${JA()?x.ja:x.name}: ${JA()?x.text_ja:x.text}`;
+  return[`${dirW} ${nmA(p)} — ${hz} (${T('spot','スポット')} ${fL(p,p.stats.spot)}, ${p.stats.asof})`,`${T('Conviction','確信度')}: ${conv.c.toFixed(1)}/10`,'',T('Supports:','支持：'),...sup.map(line),'',T('Against:','逆風：'),...ag.map(line),'',
+    fv?T(`Fair value ${fL(p,fv.fair)} (${fv.z>0?'+':''}${fv.z.toFixed(1)} sd)`,`フェアバリュー${fL(p,fv.fair)}（${fv.z>0?'+':''}${fv.z.toFixed(1)}sd）`):'',
+    T(`Scenarios over ${hz}: bull ${Math.round(bp*100)}% (${fL(p,L.tgt)}), base ${Math.round(bsP*100)}%, bear ${Math.round(beP*100)}% (${fL(p,L.stp)}). Target before stop ${Math.round(m.pT*100)}%.`,`${hz}のシナリオ：強気${Math.round(bp*100)}%（${fL(p,L.tgt)}）、ベース${Math.round(bsP*100)}%、弱気${Math.round(beP*100)}%（${fL(p,L.stp)}）。ストップより先に目標${Math.round(m.pT*100)}%。`),
+    T('Source: Keel (free public data). Past patterns, not a forecast; not investment advice.','出所：Keel（公開データ）。過去のパターンで予測ではなく、投資助言ではありません。')].filter(x=>x!=null).join('\n')}
+
+function renderSaved(){$('#savedList').innerHTML=S.saved.map((v,i)=>{const p=SAMP[v.asset];if(!p)return'';return`<span class="chip"><button data-i="${i}" class="go">${v.dir>0?'▲':'▼'} ${esc(nmA(p))} · ${T(HLAB[v.h][0],HLAB[v.h][1])}</button><button class="x" data-i="${i}" aria-label="Remove">×</button></span>`}).join('');
+  $$('#savedList .go').forEach(b=>b.onclick=()=>{const v=S.saved[+b.dataset.i];S.asset=v.asset;S.dir=v.dir;S.h=v.h;if(v.tgt!=null)S.tgt[v.asset]=v.tgt;if(v.stp!=null)S.stp[v.asset]=v.stp;save();ensure(true)});
+  $$('#savedList .x').forEach(b=>b.onclick=()=>{S.saved.splice(+b.dataset.i,1);save();renderSaved()})}
+
+/* ---------- controls ---------- */
+function fillAssets(){const sel=$('#asset');sel.innerHTML=CLS.map(([k,en,ja])=>`<optgroup label="${JA()?ja:en}">${uni().filter(a=>a.cls===k).map(a=>`<option value="${a.key}">${esc(JA()?a.ja:a.name)}</option>`).join('')}</optgroup>`).join('');sel.value=S.asset}
+$('#asset').onchange=e=>{S.asset=e.target.value;save();ensure(false)};
+$$('#dirSeg button').forEach(b=>b.onclick=()=>{S.dir=+b.dataset.v;save();render()});
+$$('#hSeg button').forEach(b=>b.onclick=()=>{S.h=+b.dataset.v;save();render()});
+const setLv=(k,el)=>{const v=el.value===''?null:+el.value;if(v==null)delete S[k][S.asset];else S[k][S.asset]=v;save();render()};
+$('#tgt').onchange=e=>setLv('tgt',e.target);$('#stp').onchange=e=>setLv('stp',e.target);
+$('#saveBtn').onclick=()=>{S.saved=S.saved.filter(v=>!(v.asset===S.asset&&v.dir===S.dir&&v.h===S.h));S.saved.unshift({asset:S.asset,dir:S.dir,h:S.h,tgt:S.tgt[S.asset]??null,stp:S.stp[S.asset]??null});S.saved=S.saved.slice(0,8);save();renderSaved()};
+$('#copyBtn').onclick=async()=>{const t=window.__summary||'';try{await navigator.clipboard.writeText(t);$('#copyOk').textContent=T('Copied','コピーしました')}catch(e){$('#copyOk').textContent=T('Copy failed: select the text below','コピー失敗');const pre=document.createElement('pre');pre.textContent=t;pre.style.whiteSpace='pre-wrap';pre.style.fontSize='12px';$('#method').after(pre)}setTimeout(()=>$('#copyOk').textContent='',2500)};
+$$('#langSeg button').forEach(b=>b.onclick=()=>{setLang(b.dataset.l);$('#how').innerHTML=howHtml();restatus();fillAssets();render()});
+window.redraw=render;
+
+/* ---------- data ---------- */
+async function ensure(fresh){render();if(LIVE[S.asset]&&!fresh)return;const key=S.asset;setStatus('busy');let r;
+  for(let a=0;a<4;a++){r=await keel('api_pitch',{asset:key},{fresh:fresh&&a===0});if((r.ok&&r.data&&r.data.pillars)||r.code==='no_mcp'||!MCP)break;
+    if(a<3){$('#banner').hidden=false;$('#banner').innerHTML=T(`<b>Keel is preparing ${esc(nmA(SAMP[key]||{name:key,ja:key}))}.</b> The first load after the server wakes takes a minute or two; trying again (${a+2} of 4)…`,`<b>Keelが${esc(nmA(SAMP[key]||{name:key,ja:key}))}のデータを準備中です。</b>サーバー起動後の初回は1〜2分かかります。再試行中（${a+2}/4）…`);await new Promise(res=>setTimeout(res,20000))}}
+  if(r.ok&&r.data&&r.data.pillars){DATA[key]=r.data;LIVE[key]=true;setStatus('live')}else setStatus(r.code==='no_mcp'?'sample':'err',r.code,r.message);
+  if(key===S.asset)render()}
+$('#refresh').onclick=()=>ensure(true);
+if(!SAMP[S.asset])S.asset='USDJPY';
+bindTheme();setLang(LANG);$('#how').innerHTML=howHtml();fillAssets();ensure(false);
+</script>

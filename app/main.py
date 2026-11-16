@@ -1344,7 +1344,36 @@ def earnings_revisions(fresh: bool = Query(False, description="Re-fetch now inst
 from . import pitch as PT  # noqa: E402
 
 _PITCH_CACHE: dict = {}
+_PITCH_ERR: dict = {}
+_PITCH_RUNNING: set = set()
 _PITCH_LOCK = threading.Lock()
+_PITCH_BUILD = threading.Lock()  # one build at a time: the free server has 512 MB
+
+
+def _pitch_start(key: str) -> None:
+    """Compute one asset in the background (the first build after the server wakes takes a minute or two)."""
+    with _PITCH_LOCK:
+        hit = _PITCH_CACHE.get(key)
+        if (hit and time.time() - hit[0] < 6 * 3600) or key in _PITCH_RUNNING:
+            return
+        _PITCH_RUNNING.add(key)
+
+    def run():
+        try:
+            with _PITCH_BUILD:
+                res = _safe(PT.build(key, _PitchSrc()))
+            with _PITCH_LOCK:
+                _PITCH_CACHE[key] = (time.time(), res)
+                _PITCH_ERR.pop(key, None)
+        except Exception as e:  # noqa: BLE001
+            log.warning("pitch %s failed: %s", key, e)
+            with _PITCH_LOCK:
+                _PITCH_ERR[key] = str(e)
+        finally:
+            with _PITCH_LOCK:
+                _PITCH_RUNNING.discard(key)
+
+    threading.Thread(target=run, daemon=True).start()
 
 
 class _PitchSrc:
@@ -1456,29 +1485,34 @@ def view_pitch(asset: str = Query("USDJPY", description="One or more (max 6, com
     (argues against a long) to +1 (supports it) with a sentence and chart data; a fair-value fit (FX: spot on the
     rate spread); historical analogues (the 40 past weeks most like this one and what followed over 4-52 weeks);
     weekly prices since 2005 and volatility for scenario fans. Bonds are priced as long the bond (yield down = up),
-    moves in bp. Flip the signs for a short view. Cached 6 hours per asset."""
+    moves in bp. Flip the signs for a short view. Cached 6 hours per asset; the first call after the server wakes may answer status 'preparing': ask again."""
     if asset.strip().lower() == "list":
         return {"assets": PT.universe()}
     keys = [k.strip().upper() for k in asset.split(",") if k.strip()][:6]
     bad = [k for k in keys if k not in PT.ASSETS]
     if bad:
         raise HTTPException(400, f"Unknown asset {', '.join(bad)}. Choose from {', '.join(PT.ASSETS)}")
-    src, out, errors = _PitchSrc(), {}, {}
+    out, errors, waiting = {}, {}, []
+    for k in keys:
+        _pitch_start(k)
+    t0 = time.time()
+    while time.time() - t0 < 40:
+        with _PITCH_LOCK:
+            if all(k not in _PITCH_RUNNING for k in keys):
+                break
+        time.sleep(0.5)
     for k in keys:
         with _PITCH_LOCK:
-            hit = _PITCH_CACHE.get(k)
-        if hit and time.time() - hit[0] < 6 * 3600:
+            hit, err, running = _PITCH_CACHE.get(k), _PITCH_ERR.get(k), k in _PITCH_RUNNING
+        if hit:
             out[k] = hit[1]
-            continue
-        try:
-            res = _safe(PT.build(k, src))
-        except Exception as e:  # noqa: BLE001
-            log.warning("pitch %s failed: %s", k, e)
-            errors[k] = str(e)
-            continue
-        with _PITCH_LOCK:
-            _PITCH_CACHE[k] = (time.time(), res)
-        out[k] = res
+        elif running:
+            waiting.append(k)
+        else:
+            errors[k] = err or "no data"
+    if waiting and not out:
+        return {"status": "preparing", "waiting": waiting,
+                "note": "Collecting about 20 years of prices, rates, positioning and macro data; ask again in 20 seconds."}
     if not out:
         raise HTTPException(503, "Pitch data unavailable: " + "; ".join(f"{k}: {v}" for k, v in errors.items()))
     if len(keys) == 1:
