@@ -12,6 +12,7 @@ from __future__ import annotations
 import logging
 import math
 import os
+import time
 from datetime import date, timedelta
 
 import numpy as np
@@ -1335,6 +1336,154 @@ def earnings_revisions(fresh: bool = Query(False, description="Re-fetch now inst
         return _safe(RV.get(wait=40.0, fresh=fresh))
     except Exception as e:  # noqa: BLE001
         raise HTTPException(503, f"Revisions did not load: {e}") from e
+
+
+# --------------------------------------------------------------------------- #
+# Pitch: the evidence for and against a view on one asset (app/pitch.py)
+# --------------------------------------------------------------------------- #
+from . import pitch as PT  # noqa: E402
+
+_PITCH_CACHE: dict = {}
+_PITCH_LOCK = threading.Lock()
+
+
+class _PitchSrc:
+    """Data adapter for app/pitch.py: every source fails soft (None) so one missing feed drops one pillar."""
+
+    def __init__(self):
+        self._carry = self._ppp = self._macro = self._mof = None
+        self._cot: dict = {}
+
+    def px(self, sym):
+        try:
+            return D.closes(sym, 22.0)
+        except Exception as e:  # noqa: BLE001
+            log.warning("pitch px %s: %s", sym, e)
+            return None
+
+    def yld(self, key):
+        try:
+            return _yield_series(key, 22.0)
+        except Exception as e:  # noqa: BLE001
+            log.warning("pitch yield %s: %s", key, e)
+            return None
+
+    def curve(self, ccy):
+        try:
+            df = D.ust_history(3) if ccy == "USD" else D.jgb_history()
+            last = df.dropna(how="all").iloc[-1]
+            return {float(k): float(v) for k, v in last.items() if pd.notna(v)}
+        except Exception:  # noqa: BLE001
+            return None
+
+    def rate(self, ccy):
+        if self._carry is None:
+            try:
+                self._carry = fx_carry(years=22)
+            except Exception as e:  # noqa: BLE001
+                log.warning("pitch carry: %s", e)
+                self._carry = {}
+        r = (self._carry.get("rate") or {}).get(ccy)
+        if not r:
+            return None
+        s = pd.Series(r, index=pd.to_datetime(self._carry["months"])).dropna()
+        return s if len(s) else None
+
+    def ppp_gap(self, ccy):
+        if ccy == "USD":
+            return 0.0
+        if self._ppp is None:
+            try:
+                self._ppp = {r["ccy"]: r["gap"] for r in ppp(base_year=2005)["rows"]}
+            except Exception as e:  # noqa: BLE001
+                log.warning("pitch ppp: %s", e)
+                self._ppp = {}
+        code = {"CNH": "CNY"}.get(ccy, ccy)
+        return self._ppp.get(code)
+
+    def cot(self, key):
+        if key not in self._cot:
+            try:
+                self._cot[key] = S.cot((key,), "2006-01-01").get(key)
+            except Exception as e:  # noqa: BLE001
+                log.warning("pitch cot %s: %s", key, e)
+                self._cot[key] = None
+        return self._cot[key]
+
+    def mof(self):
+        if self._mof is None:
+            try:
+                self._mof = S.mof_week()
+            except Exception as e:  # noqa: BLE001
+                log.warning("pitch mof: %s", e)
+                self._mof = []
+        return self._mof
+
+    def _m(self):
+        if self._macro is None:
+            try:
+                self._macro = macro(areas="US,JP,EA,UK,CN", start="2003-01")["series"]
+            except Exception as e:  # noqa: BLE001
+                log.warning("pitch macro: %s", e)
+                self._macro = {}
+        return self._macro
+
+    def _ser(self, area, k):
+        v = (self._m().get(area) or {}).get(k) or []
+        if not v:
+            return None
+        return pd.Series([p["v"] for p in v], index=pd.to_datetime([p["d"] for p in v])).sort_index()
+
+    def cli(self, area):
+        return self._ser(area, "cli")
+
+    def cpi(self, area):
+        return self._ser(area, "cpi_yoy")
+
+    def revisions(self, group):
+        from . import revisions as RV  # noqa: PLC0415
+        try:
+            d = RV.get(wait=0.0)
+        except Exception:  # noqa: BLE001
+            return None
+        return (d.get("groups") or {}).get(group)
+
+
+@app.get("/api/pitch", operation_id="view_pitch", dependencies=[Depends(check_token)])
+def view_pitch(asset: str = Query("USDJPY", description="One or more (max 6, comma-separated) of: " + ",".join(PT.ASSETS) + "; or 'list'")):
+    """The evidence for and against being LONG one asset, for a client pitch: up to ten pillars (trend, carry,
+    rates driver, value, positioning, flows, macro, seasonality, earnings revisions, risks), each scored from -1
+    (argues against a long) to +1 (supports it) with a sentence and chart data; a fair-value fit (FX: spot on the
+    rate spread); historical analogues (the 40 past weeks most like this one and what followed over 4-52 weeks);
+    weekly prices since 2005 and volatility for scenario fans. Bonds are priced as long the bond (yield down = up),
+    moves in bp. Flip the signs for a short view. Cached 6 hours per asset."""
+    if asset.strip().lower() == "list":
+        return {"assets": PT.universe()}
+    keys = [k.strip().upper() for k in asset.split(",") if k.strip()][:6]
+    bad = [k for k in keys if k not in PT.ASSETS]
+    if bad:
+        raise HTTPException(400, f"Unknown asset {', '.join(bad)}. Choose from {', '.join(PT.ASSETS)}")
+    src, out, errors = _PitchSrc(), {}, {}
+    for k in keys:
+        with _PITCH_LOCK:
+            hit = _PITCH_CACHE.get(k)
+        if hit and time.time() - hit[0] < 6 * 3600:
+            out[k] = hit[1]
+            continue
+        try:
+            res = _safe(PT.build(k, src))
+        except Exception as e:  # noqa: BLE001
+            log.warning("pitch %s failed: %s", k, e)
+            errors[k] = str(e)
+            continue
+        with _PITCH_LOCK:
+            _PITCH_CACHE[k] = (time.time(), res)
+        out[k] = res
+    if not out:
+        raise HTTPException(503, "Pitch data unavailable: " + "; ".join(f"{k}: {v}" for k, v in errors.items()))
+    if len(keys) == 1:
+        return {**out[keys[0]], "errors": errors}
+    return {"assets": out, "errors": errors}
 
 
 # --------------------------------------------------------------------------- #

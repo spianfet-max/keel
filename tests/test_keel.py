@@ -810,3 +810,27 @@ def test_revisions_parse_yahoo_page():
     assert r["fy0_up"] == 12 and r["fy0_dn"] == 0 and r["fy1_dn"] == 4 and r["fy0_end"] == "2026-12-31"
     c = R.company(r)
     assert c["r2m"] > 0.1 and c["up"] == 27
+
+
+def test_pitch_builds_every_asset_on_synthetic_data():
+    import json as _json
+
+    from app import pitch as P
+    from app.main import _safe
+    from tests.pitch_fake import Fake
+
+    f = Fake()
+    for k in P.ASSETS:
+        r = _safe(P.build(k, f))
+        _json.dumps(r)
+        assert r["pillars"] and all(-1 <= p["score"] <= 1 for p in r["pillars"])
+        assert r["analogues"]["n"] >= 20 and set(r["analogues"]["fwd"]) == set(P.H)
+    usdjpy = P.build("USDJPY", f)
+    assert usdjpy["fair_value"]["fair"] > 0
+    assert {p["key"] for p in usdjpy["pillars"]} >= {"trend", "carry", "driver", "value", "positioning", "flows", "risk"}
+
+
+def test_pitch_route_list(client):
+    j = client.get("/api/pitch", params={"asset": "list"}).json()
+    assert any(a["key"] == "USDJPY" for a in j["assets"])
+    assert client.get("/api/pitch", params={"asset": "XXX"}).status_code == 400
