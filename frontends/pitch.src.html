@@ -367,8 +367,8 @@ window.redraw=render;
 
 /* ---------- data ---------- */
 async function ensure(fresh){render();if(LIVE[S.asset]&&!fresh)return;const key=S.asset;setStatus('busy');let r;
-  for(let a=0;a<4;a++){r=await keel('api_pitch',{asset:key},{fresh:fresh&&a===0});if((r.ok&&r.data&&r.data.pillars)||r.code==='no_mcp'||!MCP)break;
-    if(a<3){$('#banner').hidden=false;$('#banner').innerHTML=T(`<b>Keel is preparing ${esc(nmA(SAMP[key]||{name:key,ja:key}))}.</b> The first load after the server wakes takes a minute or two; trying again (${a+2} of 4)…`,`<b>Keelが${esc(nmA(SAMP[key]||{name:key,ja:key}))}のデータを準備中です。</b>サーバー起動後の初回は1〜2分かかります。再試行中（${a+2}/4）…`);await new Promise(res=>setTimeout(res,20000))}}
+  for(let a=0;a<6;a++){r=await keel('api_pitch',{asset:key},{fresh:fresh&&a===0});if((r.ok&&r.data&&r.data.pillars)||r.code==='no_mcp'||!MCP)break;
+    if(a<5){$('#banner').hidden=false;$('#banner').innerHTML=T(`<b>Keel is preparing ${esc(nmA(SAMP[key]||{name:key,ja:key}))}.</b> The first load after the server wakes takes a minute or two; trying again (${a+2} of 6)…`,`<b>Keelが${esc(nmA(SAMP[key]||{name:key,ja:key}))}のデータを準備中です。</b>サーバー起動後の初回は1〜2分かかります。再試行中（${a+2}/6）…`);await new Promise(res=>setTimeout(res,20000))}}
   if(r.ok&&r.data&&r.data.pillars){DATA[key]=r.data;LIVE[key]=true;setStatus('live')}else setStatus(r.code==='no_mcp'?'sample':'err',r.code,r.message);
   if(key===S.asset)render()}
 $('#refresh').onclick=()=>ensure(true);

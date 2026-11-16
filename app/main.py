@@ -1362,8 +1362,13 @@ def _pitch_start(key: str) -> None:
         try:
             with _PITCH_BUILD:
                 res = _safe(PT.build(key, _PitchSrc()))
+            # Earnings revisions load separately (a few minutes after a restart): keep an equity build without them
+            # for 15 minutes only, so the next call picks them up.
+            stamp = time.time()
+            if res.get("cls") == "equity" and "revisions" in (res.get("missing") or []):
+                stamp -= 6 * 3600 - 900
             with _PITCH_LOCK:
-                _PITCH_CACHE[key] = (time.time(), res)
+                _PITCH_CACHE[key] = (stamp, res)
                 _PITCH_ERR.pop(key, None)
         except Exception as e:  # noqa: BLE001
             log.warning("pitch %s failed: %s", key, e)
@@ -1412,7 +1417,7 @@ class _PitchSrc:
             except Exception as e:  # noqa: BLE001
                 log.warning("pitch carry: %s", e)
                 self._carry = {}
-        r = (self._carry.get("rate") or {}).get(ccy)
+        r = (self._carry.get("rate") or {}).get({"CNY": "CNH"}.get(ccy, ccy))
         if not r:
             return None
         s = pd.Series(r, index=pd.to_datetime(self._carry["months"])).dropna()
@@ -1451,7 +1456,7 @@ class _PitchSrc:
     def _m(self):
         if self._macro is None:
             try:
-                self._macro = macro(areas="US,JP,EA,UK,CN", start="2003-01")["series"]
+                self._macro = macro(areas="US,JP,EA,UK,CN,DE", start="2003-01")["series"]
             except Exception as e:  # noqa: BLE001
                 log.warning("pitch macro: %s", e)
                 self._macro = {}
@@ -1464,7 +1469,10 @@ class _PitchSrc:
         return pd.Series([p["v"] for p in v], index=pd.to_datetime([p["d"] for p in v])).sort_index()
 
     def cli(self, area):
-        return self._ser(area, "cli")
+        s = self._ser(area, "cli")
+        if (s is None or s.empty) and area == "EA":  # the OECD publishes no euro-area CLI at times: Germany stands in
+            s = self._ser("DE", "cli")
+        return s
 
     def cpi(self, area):
         return self._ser(area, "cpi_yoy")

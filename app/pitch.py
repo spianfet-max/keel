@@ -49,7 +49,7 @@ ASSETS: dict[str, Asset] = {a.key: a for a in [
     A("GBPJPY", "GBP/JPY", "ポンド円", "fx", "GBPJPY=X", base="GBP", quote="JPY", cot=[("GBP", 1), ("JPY", -1)], areas=["UK", "JP"], flows="re", jpy_cross=True),
     A("AUDUSD", "AUD/USD", "豪ドル米ドル", "fx", "AUDUSD=X", base="AUD", quote="USD", cot=[("AUD", 1)], areas=["CN", "US"], decimals=4),
     A("AUDJPY", "AUD/JPY", "豪ドル円", "fx", "AUDJPY=X", base="AUD", quote="JPY", cot=[("AUD", 1), ("JPY", -1)], areas=["CN", "JP"], flows="re", jpy_cross=True),
-    A("USDCNH", "USD/CNH", "ドル人民元", "fx", "CNH=X", base="USD", quote="CNH", areas=["US", "CN"], decimals=4),
+    A("USDCNY", "USD/CNY", "ドル人民元", "fx", "CNY=X", base="USD", quote="CNY", areas=["US", "CN"], decimals=4),
     A("MXNJPY", "MXN/JPY", "メキシコペソ円", "fx", "MXNJPY=X", base="MXN", quote="JPY", cot=[("MXN", 1), ("JPY", -1)], areas=["US", "JP"], flows="re", jpy_cross=True, decimals=3),
     A("UST10", "US 10-year Treasury", "米10年国債", "rates", "UST10Y", unit="yield", cot=[("TY", 1)], areas=["US"]),
     A("UST2", "US 2-year Treasury", "米2年国債", "rates", "UST2Y", unit="yield", cot=[("TU", 1)], areas=["US"]),
@@ -261,8 +261,14 @@ def p_value(x, a, src):
                     "metrics": {"ppp_gap_base": round(gb, 4), "ppp_gap_quote": round(gq, 4), "rel": round(rel, 4),
                                 "fair": float(x.iloc[-1] * (1 + gb) / (1 + gq)) if (1 + gq) else None},
                     "chart": None,
-                    "en": f"On relative PPP {a.base} is {abs(gb) * 100:.0f}% {'rich' if gb > 0 else 'cheap'} and {a.quote} {abs(gq) * 100:.0f}% {'rich' if gq > 0 else 'cheap'} against the dollar, so the pair is {abs(rel) * 100:.0f}% {'cheap' if rel > 0 else 'rich'}.",
-                    "ja": f"相対PPPでは{a.base}は対ドル{abs(gb) * 100:.0f}%{'割高' if gb > 0 else '割安'}、{a.quote}は{abs(gq) * 100:.0f}%{'割高' if gq > 0 else '割安'}。この通貨ペアは{abs(rel) * 100:.0f}%{'割安' if rel > 0 else '割高'}。"}
+                    "en": (f"On relative PPP {a.quote if a.base == 'USD' else a.base} is {abs(gq if a.base == 'USD' else gb) * 100:.0f}% "
+                           f"{'rich' if (gq if a.base == 'USD' else gb) > 0 else 'cheap'} against the dollar"
+                           + ("" if "USD" in (a.base, a.quote) else f" and {a.quote} {abs(gq) * 100:.0f}% {'rich' if gq > 0 else 'cheap'}")
+                           + f", so the pair is {abs(rel) * 100:.0f}% {'cheap' if rel > 0 else 'rich'}."),
+                    "ja": (f"相対PPPでは{a.quote if a.base == 'USD' else a.base}は対ドル{abs(gq if a.base == 'USD' else gb) * 100:.0f}%"
+                           f"{'割高' if (gq if a.base == 'USD' else gb) > 0 else '割安'}"
+                           + ("" if "USD" in (a.base, a.quote) else f"、{a.quote}は{abs(gq) * 100:.0f}%{'割高' if gq > 0 else '割安'}")
+                           + f"。この通貨ペアは{abs(rel) * 100:.0f}%{'割安' if rel > 0 else '割高'}。")}
     # Stretch against the 5-year average (prices: log gap; yields: bp gap), z-scored on its own history.
     if a.unit == "yield":
         gap = (x - x.rolling(260, min_periods=150).mean()) * 100
