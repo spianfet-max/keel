@@ -187,7 +187,7 @@ function bars(svg,lab,vals,o={}){const w=W(svg),h=o.h||170,m={l:40,r:8,t:10,b:22
 function pillarChart(svg,x,p){const c=C(),ch=x.chart;svg.innerHTML='';if(!ch)return false;
   if(ch.kind==='price_ma'){lineChart(svg,[{name:isY(p)?T('Yield','利回り'):T('Price','価格'),color:c.steel,width:1.4,pts:ptsOf(ch.px)},{name:T('40-week average','40週平均'),color:c.red,dash:true,width:1.3,pts:ptsOf(ch.ma)}],{h:170,xType:'date',yFmt:v=>isY(p)?num(v,2):px(v)});return true}
   if(ch.kind==='line'||ch.kind==='dual'){const ser=ch.kind==='dual'?[{name:JA()?ch.drv_ja:ch.drv_name,color:c.red,width:1.4,pts:ptsOf(ch.drv)}]:(ch.series||[]).map((s,i)=>({name:JA()?s.ja:s.name,color:[c.red,c.steel,c.gold][i%3],width:1.4,pts:ptsOf(s)}));
-    lineChart(svg,ser,{h:170,xType:'date',zero:true});return true}
+    lineChart(svg,ser,{h:170,xType:'date',zero:!!ch.unit});return true}
   if(ch.kind==='bars'){const s=ch.series[0];bars(svg,s.d.map(d=>d.slice(2,7)),s.v,{yf:v=>num(v/10000,1),tf:v=>T('¥','¥')+num(v/10000,2)+T('tn','兆円')});return true}
   if(ch.kind==='months'){const ms=x.metrics.months||{},nx=x.metrics.next3||[];const lab=Array.from({length:12},(_,i)=>JA()?(i+1)+'月':new Date(2000,i,1).toLocaleDateString('en-GB',{month:'short'}));
     bars(svg,lab,Array.from({length:12},(_,i)=>(ms[i+1]?.mean||0)*S.dir),{hl:i=>nx.includes(i+1),yf:v=>isY(p)?num(v,0):num(v,1),tf:v=>fM(p,v,2)});return true}
@@ -234,7 +234,6 @@ function render(){const p=P();if(!p)return;const c=C();
     return`<tr><td class="nw"><b style="font-weight:500">${esc(JA()?x.ja:x.name)}</b></td><td class="nw"><span class="vchip ${x.v}">${vlab[x.v]}</span></td><td class="nw"><span class="sbar"><i style="${x.s>=0?'left:50%':'right:50%'};width:${w}%;background:${col}"></i></span> <span style="font-variant-numeric:tabular-nums">${x.s>=0?'+':'−'}${Math.abs(x.s).toFixed(2)}</span></td>
     <td class="nw"><div class="seg wseg" data-k="${x.key}">${WOPT.map(o=>`<button data-w="${o[0]}" class="${wOf(x.key)===o[0]?'on':''}">${JA()?o[2]:o[1]}</button>`).join('')}</div></td><td class="txt">${esc(JA()?x.text_ja:x.text)}</td></tr>`}).join('')}</tbody>`;
   $$('#pT .wseg button').forEach(b=>b.onclick=()=>{S.w[b.parentNode.dataset.k]=+b.dataset.w;save();render()});
-  if(p.missing&&p.missing.length)$('#caseSub').textContent+=' '+T(`Not available for this asset: ${p.missing.map(k=>k).join(', ')}.`,`この資産では対象外：${p.missing.join('、')}。`);
   const pc=$('#pCharts');pc.innerHTML='';
   order.forEach(x=>{const d=document.createElement('div');d.style.minWidth='0';d.innerHTML=`<h3><span>${esc(JA()?x.ja:x.name)}</span><span class="vchip ${x.v}">${vlab[x.v]}</span></h3><p>${esc(JA()?x.text_ja:x.text)}</p><svg class="ch"></svg>`;pc.appendChild(d);
     if(!pillarChart(d.querySelector('svg'),x,p))d.querySelector('svg').remove()});
@@ -304,13 +303,13 @@ const TRIG={
 function triggers(p,ps){const sup=ps.filter(x=>x.v==='s').sort((a,b)=>b.s*b.ww-a.s*a.ww),ag=ps.filter(x=>x.v==='a').sort((a,b)=>a.s*a.ww-b.s*b.ww);
   const tt=(k,v)=>{const t=TRIG[k];return t?T(t[v][0],t[v][1]):''};const flip=(p.pillars.find(x=>x.key==='trend')||{}).metrics?.flips;
   const bull=[...sup.slice(0,2).map(x=>tt(x.key,'s')),...ag.slice(0,1).map(x=>tt(x.key,'a'))].filter(Boolean);
-  const bear=ag.slice(0,2).map(x=>tt(x.key,'s')).filter(Boolean);
+  const bear=ag.slice(0,2).map(x=>TRIG[x.key]?.w(flip?fL(p,flip.ma40):'')).filter(Boolean);
   const base=sup.length&&ag.length?T(`Supports and headwinds offset: ${(JA()?sup[0].ja:sup[0].name.toLowerCase())} against ${(JA()?ag[0].ja:ag[0].name.toLowerCase())}.`,`支持と逆風が相殺：${sup[0].ja}対${ag[0].ja}。`):T('No decisive push either way.','どちらにも決め手なし。');
   const wrong=[];if(flip)wrong.push(TRIG.trend.w(fL(p,flip.ma40)));
   ps.filter(x=>x.ww>0&&x.key!=='trend').sort((a,b)=>b.ww*Math.abs(b.s)-a.ww*Math.abs(a.s)).slice(0,4).forEach(x=>{const w=TRIG[x.key]?.w();if(w)wrong.push(w)});
   if(p.stats)wrong.push(T(`a close beyond the stop, which a random walk at today’s volatility reaches first in roughly the share of cases shown above`,`ストップを超える終値（現在のボラのランダムウォークで上記の割合で先に到達）`));
   const cap=s=>s?s[0].toUpperCase()+s.slice(1):s;
-  return{bull:cap(bull.join(T('; ','、')))+(bull.length?'.':''),base,bear:bear.length?T('What hurts: ','痛手：')+bear.map(s=>T('the opposite of “','「')+s+T('”','」の逆')).join(T('; ','、'))+'.':T('A broad move against the position with no single cause.','特定要因のない逆行。'),wrong}}
+  return{bull:cap(bull.join(T('; ','、')))+(bull.length?'.':''),base,bear:bear.length?T('What hurts: ','痛手：')+bear.join(T('; ','、'))+T('.','。'):T('A broad move against the position with no single cause.','特定要因のない逆行。'),wrong}}
 
 /* ---------- implementation ---------- */
 const Ncdf=x=>{const t=1/(1+.2316419*Math.abs(x)),d=.3989423*Math.exp(-x*x/2),p=d*t*(.3193815+t*(-.3565638+t*(1.781478+t*(-1.821256+t*1.330274))));return x>0?1-p:p};
